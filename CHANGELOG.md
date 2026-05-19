@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2026-05-19]
 
 ### Changed
+- `scripts/build_review_html.py`: Replace highlight.js diff highlighting with a self-rendered per-line markup. New `_render_diff()` splits the diff and tags each line as `diff-add`/`diff-del`/`diff-hunk`/`diff-file-header`/`diff-meta`/`diff-context`; the page CSS styles `.diff-line` as `display:block` with full-width backgrounds (via `display:inline-block; min-width:100%` on the surrounding `<code>`) so consecutive additions or deletions paint a continuous bar instead of per-line "row pills" separated by the trailing-newline gap hljs produced. The highlight.js stylesheet and three scripts are removed from the page template since nothing else used them
+- `claude/CLAUDE.md` (user global): Add "Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit" to the Development Workflow section
 - `make-it-so` skill: Detect ready work streams per phase via `rune streams --available --json` and spawn one parallel subagent per stream (single message, single Task call each) when 2+ streams are ready, falling back to sequential execution when only one stream has ready work. Each subagent uses `rune next --phase --stream N --format json` to retrieve its tasks and marks them complete as it goes. The existing per-phase review → commit → specs-overview update → compact-and-continue loop is preserved, and the loop now stops cleanly without compacting when no incomplete tasks remain
 
 ## [2026-05-18]

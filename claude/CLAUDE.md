@@ -13,6 +13,7 @@ When asked to analyze or document something, first check if there's an existing 
 
 # Development Workflow
 
+- Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit
 - After writing code, you MUST ensure you use appropriate linters and validators.
 - When you discover a learning specific to a language that needs to be kept, add it to the related language-rule file (or create a new one if needed).
 - When managing tasks, use the rune skill.

@@ -89,6 +89,37 @@ def _severity_pill(sev: str) -> str:
     return f'<span class="pill pill-{klass}">{_escape(sev)}</span>'
 
 
+def _render_diff(diff: str) -> str:
+    """Render a unified diff as one <span class="diff-line"> per line.
+
+    Each line is classified by its leading marker so consecutive additions or
+    deletions paint a continuous full-width background bar. Rendering this
+    ourselves (instead of letting highlight.js do it) avoids hljs's display:block
+    + trailing-newline double-spacing and the per-line "row pill" look.
+    """
+    if not diff:
+        return ""
+    lines = diff.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    spans = []
+    for line in lines:
+        if line.startswith(("+++", "---")):
+            cls = "diff-file-header"
+        elif line.startswith("@@"):
+            cls = "diff-hunk"
+        elif line.startswith("+"):
+            cls = "diff-add"
+        elif line.startswith("-"):
+            cls = "diff-del"
+        elif line.startswith("\\"):
+            cls = "diff-meta"
+        else:
+            cls = "diff-context"
+        spans.append(f'<span class="diff-line {cls}">{_escape(line)}</span>')
+    return "".join(spans)
+
+
 # --- section renderers -----------------------------------------------------
 
 def render_metrics(metrics: list[dict]) -> str:
@@ -443,7 +474,7 @@ def render_files(files: list[dict], diff_dir: Path | None) -> str:
         blocks.append(textwrap.dedent(f"""\
             <details id="{anchor}" class="file-diff">
               <summary><span class="file-path">{_escape(path)}</span> <span class="badge {badge_class}">{_escape(badge)}</span> <span class="line-stat">{_escape(stat)}</span></summary>
-              <pre><code class="language-diff">{_escape(diff)}</code></pre>
+              <pre><code class="diff-block">{_render_diff(diff)}</code></pre>
             </details>"""))
     return f"""<section id="diffs">
     <h2>Per-file diffs</h2>
@@ -743,25 +774,24 @@ table.findings tr:last-child td { border-bottom: none; }
 .file-diff pre {
   margin: 0; background: var(--code-bg);
   border-top: 1px solid var(--code-border);
-  padding: 12px 16px; overflow-x: auto; line-height: 1.45;
+  padding: 12px 0; overflow-x: auto; line-height: 1.45;
 }
 .file-diff code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 13px; color: var(--text-secondary); white-space: pre;
+  font-size: 13px; color: var(--text-secondary);
+  display: inline-block; min-width: 100%;
 }
-
-.hljs-addition, code .hljs-addition {
-  background: var(--diff-add-bg) !important;
-  color: var(--diff-add-fg) !important;
+.diff-line {
   display: block;
+  padding: 0 16px;
+  min-height: 1.45em;
 }
-.hljs-deletion, code .hljs-deletion {
-  background: var(--diff-del-bg) !important;
-  color: var(--diff-del-fg) !important;
-  display: block;
-}
-.hljs-meta, code .hljs-meta { color: var(--text-tertiary) !important; }
-.hljs-comment, code .hljs-comment { color: var(--text-tertiary) !important; }
+.diff-add         { background: var(--diff-add-bg); color: var(--diff-add-fg); }
+.diff-del         { background: var(--diff-del-bg); color: var(--diff-del-fg); }
+.diff-hunk        { color: var(--accent); }
+.diff-file-header { color: var(--text-tertiary); }
+.diff-meta        { color: var(--text-tertiary); }
+.diff-context     { color: var(--text-secondary); }
 
 .pr-description {
   background: var(--surface-1);
@@ -816,10 +846,6 @@ PAGE_TEMPLATE = Template("""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 $publish_metadata
 <style>$css</style>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/diff.min.js" defer></script>
-<script>document.addEventListener("DOMContentLoaded", function () { if (window.hljs) hljs.highlightAll(); });</script>
 </head>
 <body>
 <header class="top-bar">
