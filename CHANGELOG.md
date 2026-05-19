@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-05-19]
+
+### Changed
+- `make-it-so` skill: Detect ready work streams per phase via `rune streams --available --json` and spawn one parallel subagent per stream (single message, single Task call each) when 2+ streams are ready, falling back to sequential execution when only one stream has ready work. Each subagent uses `rune next --phase --stream N --format json` to retrieve its tasks and marks them complete as it goes. The existing per-phase review → commit → specs-overview update → compact-and-continue loop is preserved, and the loop now stops cleanly without compacting when no incomplete tasks remain
+
 ## [2026-05-18]
 
 ### Added
