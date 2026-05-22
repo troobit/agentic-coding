@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-05-22]
+
+### Changed
+- `make-it-so` skill: Restructure parallel execution so each ready work stream is owned end-to-end by a dedicated subagent running in its own git worktree. The main agent now only delegates and oversees — it creates a worktree per ready stream (`git worktree add .claude/worktrees/<phase>-stream-<N> -b stream/<phase>-<N>`), spawns one subagent per worktree in a single Task message, and re-checks `rune streams --available --json` after each return to spawn fresh subagents for newly unblocked streams. Stream subagents implement, mark tasks complete, run tests, and commit on their own stream branch using the project's commit conventions (skipping the changelog, which is now a single phase-level entry written by the main agent after merging all streams). After all streams report `done`, the main agent merges each stream branch with `--no-ff` (trivial `tasks.md` conflicts are expected — accept both sides), removes the worktrees, deletes the merged branches, runs design-critic, writes the phase changelog entry as a separate commit, updates `specs/OVERVIEW.md`, then compact-and-continues. Sequential single-stream / no-stream paths still work in place and still update the changelog themselves
+
 ## [2026-05-19]
 
 ### Changed
