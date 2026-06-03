@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-03]
+
+### Changed
+- `peer-review-validator` agent: Gate the external AI systems (Gemini/Codex/Kiro) behind the `PERSONAL_PROJECTS` environment variable. The Peer Consultation step now checks `echo "$PERSONAL_PROJECTS"` first: when it equals `1` the agent uses external-model mode (the MCP agents, as before); otherwise it uses subagent mode — spawning at least two `general-purpose` subagents via the Task tool with the same validation package but distinct lenses (correctness/edge-cases, architecture/maintainability, optional risk/security). The Communication and Key principles sections were reworded to describe both modes and to require stating which mode was used
+
 ## [2026-05-22]
 
 ### Changed
