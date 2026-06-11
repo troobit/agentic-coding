@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-11]
+
+### Added
+- `spec-cleanup` skill: Identify and clean up stale or superseded feature specs in a project's `specs/` directory. Detects supersession candidates via naming patterns (`-v2`, `-revised`), explicit supersedes/replaces/builds-on references, decision-log statuses, scope overlap, and git-history corroboration, then classifies each pair as fully replaced (recommend removal) or extended (consolidate-vs-remove is a user decision, with decision-log carry-over on consolidation). Presents an evidence-backed report behind a hard approval gate before touching any file, removes via `git rm` so specs stay recoverable, regenerates `specs/OVERVIEW.md` if present, and never touches `specs/bugfixes/`
+
 ## [2026-05-22]
 
 ### Changed
