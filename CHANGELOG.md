@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-19]
+
+### Added
+- `sendit` skill: Ship the active feature's spec documents to the user's Prism iCloud review folder (`~/Library/Mobile Documents/com~apple~CloudDocs/Prism Markdown/`) for review. Resolves the active feature the same way `/nextup` does (conversation/user-zone reference → branch → machine zone), copies `*.md` from `specs/{feature}/` into Prism as is (no subfolder or prefix, replacing same-named files), updates the `nextup.md` machine zone to record the handoff and point Next up at "review in Prism then `/nextup`", and closes out the session
+
+### Changed
+- `starwave-requirements`, `starwave-design`, `starwave-tasks`, and `starwave-smolspec` skills: Make `/sendit` the **default action** offered at every "do the requirements/design/tasks/smolspec look good?" approval gate. The reviewer is often non-technical and reviews markdown in Prism rather than the terminal, so each gate now offers `/sendit` (ship to Prism + close out) as the recommended choice alongside approving inline or requesting changes
+
 ## [2026-05-22]
 
 ### Changed

@@ -119,7 +119,7 @@ You only ever maintain the machine zone of `nextup.md`. Everything under `specs/
 
 ## Hard rules
 
-- You maintain **only** the machine zone of `nextup.md` (below the marker). You never edit the user zone, and you write no other files.
+- You maintain **only** the machine zone of `nextup.md` (below the marker). You never edit the user zone, and you write no other files. (`/sendit` also writes the machine zone when it ships a spec for review; you rebuild the block from the spec files each run regardless, so the two never conflict.)
 - **You never create or write anything under `specs/`.** Those folders are structured deliberately and are owned by the starwave skills; writing into them from outside that workflow is dangerous and corrupts the spec. You read them; the chain writes them. This includes `requirements.md`, `design.md`, `tasks.md`, `smolspec.md`, and `userinput.md`.
 - You do not implement code or run tests.
 - You do not invoke execution skills (`/make-it-so`, `/next-task`). When the spec is complete you **recommend** the right one in plain English and stop.
