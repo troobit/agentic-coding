@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `local-review` agent, `pr-pilot` and `pr-review-fixer` skills: converted to forge-aware. Each detects the forge from `git remote get-url origin` via `PREFLIGHT`, reads the matching adapter, and calls the contract's named operations instead of hard-coded `gh` commands — so the same workflow runs unchanged on GitHub and GitLab
 - README: updated the `local-review` and `peer-review-validator` agent descriptions (forge detection; `PERSONAL_PROJECTS` gating with Claude-subagent fallback), added `claude/forge-adapters/` to the File Structure list
+- README: in the `Personal vs. work projects` section, document scoping `PERSONAL_PROJECTS` to a directory tree — a `.zshrc` `case` snippet for shell-startup evaluation, plus a full `chpwd` hook (with an `unset` branch and an initial call) for setting it on `cd` within a running shell
 - `go-test-fixer` skill: add YAML frontmatter (`name`/`description`) so the skill is discoverable
 - `release-prep` skill: replace the prompt-style `description` frontmatter with a plain one-line summary
 - `capture-knowledge` skill: minor description wording

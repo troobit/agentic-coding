@@ -81,6 +81,31 @@ Set it in your shell profile on personal machines:
 export PERSONAL_PROJECTS=1
 ```
 
+If your machine holds both personal and work repos, you usually don't want it set globally. Scope it to a directory tree instead — for example, when all personal work lives under `~/projects/personal/`, add this to your `.zshrc`:
+
+```bash
+case "$PWD/" in
+  "$HOME/projects/personal/"*) export PERSONAL_PROJECTS=1 ;;
+esac
+```
+
+This evaluates at shell startup against the directory the shell opened in, which suits opening a terminal (or an editor's integrated terminal) directly in a project. If you want it to follow `cd` between trees within an existing shell, wrap the same check in a `chpwd` hook so it re-runs on every directory change:
+
+```bash
+# In .zshrc
+personal_projects_guard() {
+  case "$PWD/" in
+    "$HOME/projects/personal/"*) export PERSONAL_PROJECTS=1 ;;
+    *) unset PERSONAL_PROJECTS ;;
+  esac
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook chpwd personal_projects_guard   # run on every directory change
+personal_projects_guard                      # and once now, for the shell's starting directory
+```
+
+The `*)` branch matters: it `unset`s the flag when you leave the personal tree, so the setting follows `cd` in both directions instead of staying on for the rest of the session. The final call applies the rule to the directory the shell started in, since `chpwd` only fires on subsequent changes.
+
 ## File Structure
 
 All Claude Code configuration files are organized under the `claude/` directory:
