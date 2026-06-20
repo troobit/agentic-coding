@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-20]
+
+### Added
+- Forge adapter layer (`claude/forge-adapters/`): a `CONTRACT.md` defining forge-neutral operations (`PREFLIGHT`, `CR_VIEW`, `CR_DIFF`, `THREADS_FETCH`, `CR_COMMENT`, `CR_MERGE`, etc.) and a shared vocabulary (CR/thread/note/CLI), plus per-forge adapters `github.md` (`gh`) and `gitlab.md` (`glab`) implementing each operation. Workflows call named operations and never hard-code a CLI command — when an operation is missing from the selected adapter they stop and report rather than improvise
+- README: `Forge support (GitHub & GitLab)` and `Personal vs. work projects (PERSONAL_PROJECTS)` sections explaining the adapter architecture and the fail-closed external-AI gating
+
+### Changed
+- `local-review` agent, `pr-pilot` and `pr-review-fixer` skills: converted to forge-aware. Each detects the forge from `git remote get-url origin` via `PREFLIGHT`, reads the matching adapter, and calls the contract's named operations instead of hard-coded `gh` commands — so the same workflow runs unchanged on GitHub and GitLab
+- README: updated the `local-review` and `peer-review-validator` agent descriptions (forge detection; `PERSONAL_PROJECTS` gating with Claude-subagent fallback), added `claude/forge-adapters/` to the File Structure list
+- `go-test-fixer` skill: add YAML frontmatter (`name`/`description`) so the skill is discoverable
+- `release-prep` skill: replace the prompt-style `description` frontmatter with a plain one-line summary
+- `capture-knowledge` skill: minor description wording
+- `.gitignore`: ignore `claude/skills/.system/`
+- `copilot/prompts/Main.instructions.md`: add placeholder instructions file
+
 ## [2026-06-11]
 
 ### Added

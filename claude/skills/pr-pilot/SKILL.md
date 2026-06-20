@@ -1,89 +1,99 @@
 ---
 name: pr-pilot
-description: Push a branch, create a PR, iterate on reviews until clean, then squash-merge. Runs /pr-review-fixer in a loop until no blockers/critical/major issues remain, rebases onto latest origin/main, and squash-merges. Works with or without Transit tickets. Use when you want to shepherd a PR from push to merge, e.g. "push and merge this", "get this PR merged", "review-fix-merge loop".
+description: Push a branch, open a change request, iterate on reviews until clean, then squash-merge. Runs /pr-review-fixer in a loop until no blockers/critical/major issues remain, rebases onto latest origin/main, and squash-merges. Works on both GitHub (gh) and GitLab (glab) — it detects the forge from the git remote. Works with or without Transit tickets. Use when you want to shepherd a PR/MR from push to merge, e.g. "push and merge this", "get this merged", "review-fix-merge loop".
 # model: inherit
 # allowed-tools: Read,Write,Edit,Bash,Grep,Glob,Task
 ---
 
 # PR Pilot
 
-Push a branch, create a PR, loop through reviews until clean, then squash-merge.
+Push a branch, open a change request (CR), loop through reviews until clean, then
+squash-merge.
+
+This skill is **forge-aware**: the repo may be on GitHub (`gh`) or GitLab (`glab`).
+It does not hard-code either CLI — it follows the shared operation contract and the
+adapter for whichever forge the repo uses. The `local-review` agent and
+`/pr-review-fixer` skill it delegates to are themselves forge-aware, so just invoke
+them; they self-detect.
+
+## Forge setup (do this first)
+
+1. Read `~/.claude/forge-adapters/CONTRACT.md` for the neutral terms and operations.
+2. Run **`PREFLIGHT`** to determine `FORGE` and confirm the CLI is authenticated. If
+   not, stop and tell the user how to authenticate.
+3. Read the matching adapter `~/.claude/forge-adapters/<FORGE>.md`. Every concrete
+   command comes from there — do not improvise `gh`/`glab` commands.
 
 ## Input
 
-The skill works in the current working directory (or a specified worktree path). It needs:
+Works in the current working directory (or a specified worktree path). It needs:
 
 - A branch with committed changes ready to push
 - Optionally a Transit ticket reference (`T-{id}`) for status tracking
-- Optionally an existing PR number (skips push and PR creation)
+- Optionally an existing CR id (skips push and CR creation)
 
 If invoked with arguments, parse them for:
 - `T-{number}` — Transit ticket to track
-- `#{number}` or a PR number — existing PR to work with
+- a CR id (`#123` / `!1` / bare number) — existing CR to work with
 - A path — working directory override
 
 ## Workflow
 
-### 1. Push and Create PR
+### 1. Push and Open the CR
 
-If no existing PR number was provided:
+If no existing CR id was provided, run **`CR_CREATE`** with `target` = `main` (pass a
+`title` that includes the `T-{number}` prefix if the branch name carries one). Keep
+the returned id as `<id>`.
 
-1. **Push the branch**:
-   ```bash
-   git push -u origin HEAD
-   ```
-
-2. **Create the PR**:
-   ```bash
-   PR_NUM=$(gh pr create --fill --json number --jq '.number')
-   ```
-   If the branch name contains a `T-{number}` prefix, include it in the PR title.
-
-If an existing PR was provided, fetch its details:
-```bash
-gh pr view {pr_number} --json number,headRefName,state
-```
+If an existing CR id was provided, fetch its details with **`CR_VIEW`** instead.
 
 ### 1.5 Decide Whether to Run Local Claude Review
 
-Run `local-review` by default. Skip it only when the upstream `anthropics/claude-code-action` GitHub Action is already going to post the same comment, so the two don't duplicate each other.
+Run `local-review` by default. Skip it only when an automated reviewer will post the
+same comment, so the two don't duplicate each other.
 
-An active GH Action review = a workflow file GitHub will execute (extension `*.yml` or `*.yaml`) that references the upstream action. Anything else (no workflow, file renamed to `*.yml.disabled`, `.bak`, editor swap, etc.) means the GH Action will not run, so `local-review` should fill the gap.
-
-```bash
-RUN_LOCAL_REVIEW=1
-ACTIVE=$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null)
-if [ -n "$ACTIVE" ] && printf '%s\n' "$ACTIVE" | xargs grep -lq 'anthropics/claude-code-action' 2>/dev/null; then
-  RUN_LOCAL_REVIEW=0
-fi
+```text
+RUN_LOCAL_REVIEW = (AUTO_REVIEWER_DETECT == 0) ? 1 : 0
 ```
 
-If `RUN_LOCAL_REVIEW=0`, skip every "Run Local Claude Review" step below — the GH Action will post the review comment on its own.
+If `RUN_LOCAL_REVIEW=0`, skip every "Run Local Claude Review" step below — the
+automated reviewer posts the comment on its own.
 
 ### 2. Review Loop
 
-#### 2.1 Run Local Claude Review and Wait for CI
+#### 2.1 Run Local Claude Review and Wait
 
-If `RUN_LOCAL_REVIEW=1`, invoke the `local-review` agent on the PR (pass the PR number from step 1) so the Claude review comment is posted from your local subscription instead of being produced by GitHub Actions. The agent reads the repo's `CLAUDE.md`, fetches `gh pr diff`, and posts one `gh pr comment` that `pr-review-fixer` will absorb in step 2.2 alongside any other reviewer comments.
+If `RUN_LOCAL_REVIEW=1`, invoke the `local-review` agent on the CR (pass `<id>`) so
+the Claude review note is posted from your local subscription instead of CI. It
+reads the repo's `CLAUDE.md`, fetches the diff, and posts one comment that
+`pr-review-fixer` absorbs in step 2.2.
 
-Then wait 10 minutes after the PR was created (or after the last push) to allow CI checks and other reviewer comments to arrive.
+Then wait for review input:
+- **If CI exists** (`CI_STATUS` non-empty): wait up to 10 minutes, polling
+  `CI_STATUS`, for checks and other reviewers.
+- **If `CI_STATUS` is empty** (no CI configured): nothing to wait on — proceed once
+  the local-review note is posted. Allow a brief pause only if human reviewers are
+  expected.
 
 #### 2.2 Run PR Review Fixer
 
-Run the `/pr-review-fixer` skill to fetch unresolved PR comments and CI failures, validate them, and fix any issues found.
+Run the `/pr-review-fixer` skill to fetch unresolved threads and any CI failures,
+validate them, and fix issues found.
 
-After the skill completes, evaluate the results:
-- **CLEAN**: No blockers, critical, or major issues were found. Minor and nitpick items are acceptable.
-- **HAS_ISSUES**: There were blockers, critical, or major items that were fixed and pushed. Another round is needed.
+After it completes, evaluate:
+- **CLEAN**: no blockers, critical, or major issues. Minor and nitpick items are
+  acceptable.
+- **HAS_ISSUES**: blockers/critical/major items were fixed and pushed. Another round
+  is needed.
 
 #### 2.3 Evaluate and Repeat
 
-- **HAS_ISSUES**: Wait 10 minutes, then go back to step 2.1.
-- **CLEAN**: Proceed to merge.
+- **HAS_ISSUES**: re-run from step 2.1 (wait only if CI exists).
+- **CLEAN**: proceed to merge.
 
-Cap the loop at 5 iterations. If still not clean after 5 rounds, inform the user and stop. Do not merge.
-
-If a Transit ticket is tracked, add a comment: "Automated review loop did not converge after 5 iterations — manual review needed."
+Cap the loop at 5 iterations. If still not clean after 5 rounds, inform the user and
+stop. Do not merge. If a Transit ticket is tracked, add a comment: "Automated review
+loop did not converge after 5 iterations — manual review needed."
 
 ### 3. Rebase and Merge
 
@@ -94,12 +104,9 @@ git fetch origin main
 git rebase origin/main
 ```
 
-If conflicts arise, resolve them. After resolving:
-```bash
-git rebase --continue
-```
-
-Run the project's test suite and linter to verify the rebase is clean.
+Resolve any conflicts, then `git rebase --continue`. Run the project's tests and
+linter (Makefile target if present, else the project's documented commands) to
+verify the rebase is clean.
 
 #### 3.2 Push Rebased Branch
 
@@ -107,29 +114,30 @@ Run the project's test suite and linter to verify the rebase is clean.
 git push --force-with-lease
 ```
 
-#### 3.3 Run Local Claude Review and Wait for CI
+#### 3.3 Run Local Claude Review and Wait
 
-If `RUN_LOCAL_REVIEW=1`, invoke `local-review` again on the PR so the post-rebase diff gets a fresh Claude comment locally. Skip otherwise.
+If `RUN_LOCAL_REVIEW=1`, invoke `local-review` again so the post-rebase diff gets a
+fresh note. Wait for checks only if `CI_STATUS` is non-empty (poll up to 10 min);
+otherwise proceed. Then run `/pr-review-fixer` to check for new threads and CI
+failures.
 
-Wait 10 minutes after the force push to allow CI checks and other agent reviewers to run.
-
-Then run `/pr-review-fixer` to check for new review comments and CI failures — agent reviewers will post fresh comments on the rebased code.
-
-- **CLEAN**: Proceed to merge.
-- **HAS_ISSUES**: Fix, push, and repeat (up to 3 iterations). If still not clean, inform the user and stop.
+- **CLEAN**: proceed to merge.
+- **HAS_ISSUES**: fix, push, and repeat (up to 3 iterations). If still not clean,
+  inform the user and stop.
 
 #### 3.4 Squash and Merge
 
-```bash
-gh pr merge {pr_number} --squash --delete-branch
-```
+Run **`CR_MERGE`** with `<id>`. If branch protection requires a green pipeline before
+merge, the operation will refuse until checks pass — surface that rather than forcing
+it.
 
 ### 4. Update Transit Ticket
 
 If a Transit ticket is being tracked, move it to `done`:
 
 ```
-mcp__transit__update_task_status(displayId={id}, status="done", comment="Merged via squash-and-merge — PR #{pr_number}", authorName="claude[bot]")
+mcp__transit__update_task_status(displayId={id}, status="done",
+  comment="Merged via squash-and-merge — CR {id}", authorName="claude[bot]")
 ```
 
 If no Transit ticket is tracked, skip this step.
@@ -139,7 +147,7 @@ If no Transit ticket is tracked, skip this step.
 Report the outcome:
 
 ```
-PR #{pr_number} — {MERGED|FAILED}
+CR {id} — {MERGED|FAILED}
 - Review rounds: N
 - Transit: T-{id} → done (or N/A)
 ```

@@ -1,149 +1,132 @@
 ---
 name: pr-review-fixer
-description: Fetch unresolved PR comments (both code-level and PR-level), validate issues, and fix them. Also checks CI status and fixes failing tests, lint errors, and build issues. Use when reviewing and addressing GitHub PR feedback. Filters out resolved comments, keeps only the last Claude review comment per thread (matching either `claude[bot]` from the upstream Action or the `<!-- claude-local-review -->` sentinel from the local-review agent), validates issues, posts review report as a PR comment, then fixes validated issues.
+description: Fetch unresolved change-request review threads (both diff-anchored and CR-level), validate issues, and fix them. Also checks CI status and fixes failing tests, lint errors, and build issues. Works on both GitHub (gh) and GitLab (glab) — it detects the forge from the git remote. Use when reviewing and addressing PR/MR feedback. Filters out resolved threads, keeps only the last Claude review comment per thread (matching the `<!-- claude-local-review -->` sentinel from the local-review agent), validates issues, posts a review report as a CR comment, then fixes validated issues.
 # model: inherit
 # allowed-tools: Bash,Read,Write,Edit,Grep,Glob
 ---
 
 # PR Review Fixer
 
-Fetch unresolved PR comments, validate each issue, create a fix plan, implement fixes, and verify CI checks pass (tests, lint, build).
+Fetch unresolved review threads on a change request (CR), validate each issue, create
+a fix plan, implement fixes, and verify CI checks pass (tests, lint, build).
+
+This skill is **forge-aware**: the repo may be on GitHub (`gh`) or GitLab (`glab`).
+It does not hard-code either CLI — it follows the shared operation contract and the
+adapter for whichever forge the repo uses.
+
+## Forge setup (do this first)
+
+1. Read `~/.claude/forge-adapters/CONTRACT.md` — it defines the neutral terms (CR,
+   thread, note, `<id>`) and the operations this workflow calls.
+2. Run **`PREFLIGHT`** to determine `FORGE` and confirm the CLI is authenticated. If
+   not, stop and tell the user how to authenticate.
+3. Read the matching adapter `~/.claude/forge-adapters/<FORGE>.md`. Every concrete
+   command below comes from that adapter's `## OPERATION` section — do not improvise
+   `gh`/`glab` commands.
 
 ## Workflow
 
-### 1. Fetch PR Comments
+### 1. Fetch CR and Threads
 
-```bash
-# Get PR info
-PR_NUM=$(gh pr view --json number --jq '.number')
-
-# Get all PR comments via GraphQL (code-level AND PR-level)
-gh api graphql -f query='
-  query($owner: String!, $repo: String!, $pr: Int!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $pr) {
-        # Code-level review comments (file/line specific)
-        reviewThreads(first: 100) {
-          nodes {
-            id
-            isResolved
-            comments(first: 50) {
-              nodes { id body author { login } path line }
-            }
-          }
-        }
-        # PR-level review comments (top-level review body)
-        reviews(first: 50) {
-          nodes {
-            id
-            body
-            state
-            author { login }
-          }
-        }
-        # PR-level issue comments (general discussion)
-        comments(first: 100) {
-          nodes {
-            id
-            body
-            author { login }
-          }
-        }
-      }
-    }
-  }
-' -f owner=OWNER -f repo=REPO -F pr=$PR_NUM
+```text
+CR_VIEW            → keep `id` and `source_branch`
+THREADS_FETCH <id> → normalised array, one element per thread (see CONTRACT.md):
+                     {thread_id, scope, resolved, resolvable, author, path, line, body}
 ```
 
-### 2. Filter Comments
+Because `THREADS_FETCH` returns the same shape on both forges, the rest of this
+workflow is identical regardless of forge. Save the array to
+`/tmp/cr-review-${id}/threads.json`.
 
-A comment counts as a "Claude review" if **either** the author is `claude[bot]` (the upstream `anthropics/claude-code-action` Action) **or** the body contains the sentinel `<!-- claude-local-review -->` (emitted by the `local-review` agent when pr-pilot runs it locally). Apply the dedup rules below to both sources uniformly.
+### 2. Filter Threads
 
-**Code-level comments (reviewThreads):**
-1. **Exclude resolved threads**: Filter out threads where `isResolved: true`
-2. **Claude review handling**: For Claude review comments (as defined above), keep only the **last comment** per thread
-3. **Group by file/location**: Organize by path and line number
+A thread is a "Claude review" if its `body` contains the sentinel
+`<!-- claude-local-review -->` (emitted by the `local-review` agent). On neither
+forge is there a bot author — notes post under the invoking user — so the sentinel
+is the only reliable signal.
 
-**PR-level review comments (reviews):**
-1. **Exclude empty bodies**: Skip reviews with empty or whitespace-only body
-2. **Exclude approval-only**: Skip reviews with state `APPROVED` and no actionable feedback
-3. **Claude review handling**: For Claude reviews (as defined above), keep only the **most recent** one
-
-**PR-level issue comments (comments):**
-1. **Exclude bot noise**: Skip automated comments (CI bots, etc.) unless actionable
-2. **Claude review handling**: Keep only the **last** Claude review comment (as defined above)
-3. **Identify actionable items**: Look for requested changes, questions, or suggestions
+From the normalised array:
+1. **Exclude resolved**: drop elements where `resolved == true`.
+2. **Claude review dedup**: when several elements are Claude reviews, keep only the
+   most recent (the adapter already collapsed each thread to its last note; here you
+   dedup *across* threads if the same review was reposted).
+3. **Bucket by `scope`**: `diff` (has `path`/`line`) vs `cr-level`.
+4. **Keep only actionable items**: requested changes, questions, concrete
+   suggestions. Skip pure acknowledgements, thanks, or informational notes.
 
 ### 3. Determine Working Location
 
-Nothing from this skill is written into the repo. Review reports go out as PR comments, and the rune task file lives in a system temp directory.
+Nothing from this skill is written into the repo. Review reports go out as CR
+comments; the rune task file lives in a system temp directory.
 
-**Working directory**: `/tmp/pr-review-${PR_NUM}/`. Create it if needed. Never write under the repo (no `.claude/reviews/`, no report files beside the code).
+**Working directory**: `/tmp/cr-review-${id}/`. Create it before step 1. Never write
+under the repo (no `.claude/reviews/`, no report files beside the code).
 
-**Iteration tracking**: Count existing PR comments whose body contains the sentinel `<!-- pr-review-overview -->` (or, for legacy comments posted before the sentinel existed, comments authored by `claude[bot]` with "PR Review Overview" in the body). The count gives you the current iteration number N. The sentinel is required because `gh pr comment` posts under the local user account, not `claude[bot]`, so an author check alone misses every iteration when this skill runs outside the upstream Action.
+**Iteration tracking**: count prior overview comments via `CR_NOTES_LIST` whose body
+contains the sentinel `<!-- pr-review-overview -->`. That count + 1 is the current
+iteration N. The sentinel is required because notes post under your own account, so
+an author check cannot find prior iterations.
+
+```text
+N = (CR_NOTES_LIST <id> | count bodies containing "<!-- pr-review-overview -->") + 1
+```
 
 ### 4. Validate Issues
 
-**Code-level comments:**
-1. Read the referenced code at path:line
-2. Evaluate: Is issue still present? Is suggestion correct? Does it align with project conventions?
-3. Mark as valid or invalid with brief rationale
+**Diff-anchored threads (`scope: "diff"`):**
+1. Read the referenced code at `path:line`.
+2. Evaluate: is the issue still present? Is the suggestion correct? Does it align
+   with project conventions (consult the repo's `CLAUDE.md`)?
+3. Mark valid or invalid with a brief rationale.
 
-**PR-level comments:**
-1. Parse the comment for actionable items (suggestions, questions, requested changes)
-2. Check if the feedback applies to current PR state (changes may have been made since)
-3. Evaluate: Is the request reasonable? Does it align with project goals?
-4. Mark as valid or invalid with brief rationale
-5. Skip pure acknowledgments, thanks, or informational comments without action items
+**CR-level threads (`scope: "cr-level"`):**
+1. Parse the body for actionable items.
+2. Check the feedback still applies to the current CR state.
+3. Evaluate reasonableness and alignment with project goals.
+4. Mark valid or invalid; skip pure acknowledgements.
 
 ### 5. Prepare Review Overview
 
-Assemble the review overview in-context (not on disk). Step 11 posts the final version — including CI status from step 9 — as a PR comment. Use this structure:
+Assemble in-context (not on disk). Step 11 posts the final version — including CI
+status from step 9 — as a CR comment. Structure:
 
 ```markdown
-# PR Review Overview - Iteration [N]
+# CR Review Overview - Iteration [N]
 
-**PR**: #[number] | **Branch**: [name] | **Date**: [YYYY-MM-DD]
+**CR**: [id] | **Branch**: [name] | **Date**: [YYYY-MM-DD]
 
 ## Valid Issues
 
-### Code-Level Issues
-
+### Diff-Anchored Issues
 #### Issue 1: [title]
 - **File**: `path:line`
 - **Reviewer**: @user
 - **Comment**: [quoted]
 - **Validation**: [rationale]
 
-### PR-Level Issues
-
+### CR-Level Issues
 #### Issue 2: [title]
-- **Type**: review comment | discussion comment
 - **Reviewer**: @user
 - **Comment**: [quoted]
 - **Validation**: [rationale]
 
 ## Invalid/Skipped Issues
-
 ### Issue A: [title]
-- **Location**: `path:line` or PR-level
-- **Reviewer**: @user
-- **Comment**: [quoted]
+- **Location**: `path:line` or CR-level
 - **Reason**: [why invalid]
 ```
 
 ### 6. Create Task List
 
-Use rune to create the task file under the temp working directory from step 3 — never in the repo:
+Use rune to create the task file under the temp working directory from step 3 —
+never in the repo:
 
 ```bash
-WORK_DIR="/tmp/pr-review-${PR_NUM}"
+WORK_DIR="/tmp/cr-review-${id}"
 mkdir -p "${WORK_DIR}"
 TASK_FILE="${WORK_DIR}/review-fixes-${N}.md"
 
-rune create "${TASK_FILE}" --title "PR Review Fixes - Iteration ${N}"
-
-# Add tasks via batch for efficiency
+rune create "${TASK_FILE}" --title "CR Review Fixes - Iteration ${N}"
 rune batch "${TASK_FILE}" --input '{
   "operations": [
     {"type": "add", "title": "Fix: [issue 1]"},
@@ -155,118 +138,113 @@ rune batch "${TASK_FILE}" --input '{
 ### 7. Fix Issues
 
 Loop through tasks:
-1. `rune next [file]` - get next task
-2. `rune progress [file] [id]` - mark in-progress
-3. Implement the fix
-4. `rune complete [file] [id]` - mark complete
+1. `rune next [file]` — get next task
+2. `rune progress [file] [id]` — mark in-progress
+3. Implement the fix, following the project's existing patterns
+4. `rune complete [file] [id]` — mark complete
 5. Repeat until done
 
 ### 8. Check CI Status
 
-After fixing review comments, verify CI checks:
-
-```bash
-# Get check status for the PR
-gh pr checks --json name,state,conclusion
-
-# For failed checks, get details
-gh run view [RUN_ID] --log-failed
+```text
+CI_STATUS <id> → normalised array of {name, state}
 ```
 
-**Check types to handle:**
-
-1. **Test failures**: Parse test output, identify failing tests, fix code or tests
-2. **Lint errors**: Run linter locally, fix reported issues
-3. **Type errors**: Run type checker, fix type mismatches
-4. **Build failures**: Check build logs, fix compilation issues
+If the array is **empty**, the CR has no CI configured — skip steps 8–9 entirely and
+note "no CI to verify" in the overview. Otherwise handle every element whose `state`
+is `failed`.
 
 ### 9. Fix CI Issues
 
 For each failed check:
 
-1. **Identify the failure type** from check name and logs
-2. **Run locally** to reproduce:
-   - Tests: `make test` or project's test command
-   - Lint: `make lint` or project's lint command
-   - Types: `make typecheck` or equivalent
-3. **Parse error output** to identify specific failures
-4. **Fix the issues**:
-   - For test failures: Check if test expectations need updating or if code has a bug
-   - For lint errors: Apply automatic fixes where possible, manual fixes otherwise
-   - For type errors: Add/fix type annotations or fix type mismatches
-5. **Re-run locally** to verify fix
-6. **Add to task list** if not already tracked
+1. **Get logs**: `CI_JOB_LOG <id> <name>`.
+2. **Reproduce locally** using the project's own commands. Prefer a `Makefile`
+   target if present (`make test`, `make lint`), otherwise the command documented in
+   the repo's `CLAUDE.md`/README (e.g. `pytest`, `npm test`, `go test ./...`, `ruff`).
+3. **Parse output**; persist any captured logs to `${WORK_DIR}/ci-output.txt`, never
+   inside the repo.
+4. **Fix**:
+   - Test failures: decide whether the test expectation is wrong or the code has a
+     bug — never edit a test purely to make it pass.
+   - Lint/format: apply the project's auto-fix, then manual fixes.
+   - Type/build: fix the reported mismatches.
+5. **Re-run locally** to verify.
+6. **Add to the task list** if not already tracked.
 
-**Test failure handling:**
+### 10. Reply in Threads and Resolve
 
-Run the project's test command and read the output directly — do not tee to a file in the repo. Examples: `make test`, `pytest --tb=short`, `go test ./...`. If you need to persist output across commands, use `${WORK_DIR}/test-output.txt` (the temp path from step 3), not a path in the repo.
+For **every actionable thread that was processed** (validated-and-fixed *or*
+marked invalid), post a short reply inside that thread — not a new CR-level
+note — stating the outcome:
 
-Parse output for:
-- Failed test names and locations
-- Assertion errors with expected vs actual values
-- Stack traces pointing to failure source
+- **Fixed**: one or two sentences naming the change (file, what was done).
+- **Invalid/skipped**: the one-line rationale from step 4.
 
-### 10. Resolve Fixed Threads
+Stage each reply body in `${WORK_DIR}/reply-<n>.md`, then:
 
-After fixing code-level issues, resolve the corresponding review threads on GitHub:
-
-```bash
-# For each fixed code-level thread, resolve it using its thread ID
-gh api graphql -f query='
-  mutation($threadId: ID!) {
-    resolveReviewThread(input: {threadId: $threadId}) {
-      thread { isResolved }
-    }
-  }
-' -f threadId=THREAD_NODE_ID
+```text
+THREAD_REPLY <id> <thread_id> ${WORK_DIR}/reply-<n>.md
 ```
 
-Only resolve threads whose issues were validated and fixed. Do not resolve threads that were skipped or marked invalid — those need human attention.
+Then resolve with `THREAD_RESOLVE <thread_id>`:
 
-### 11. Post Review Report as PR Comment
+- **Resolve** threads whose issue was fixed.
+- **Resolve** Claude-review threads (body carries the
+  `<!-- claude-local-review -->` sentinel) once every item in them is addressed —
+  fixed or invalidated with rationale. They are machine-generated; nobody else
+  will close them.
+- **Leave unresolved** human-authored threads whose finding was disputed or
+  skipped — the human gets the in-thread reply and decides whether to close.
 
-Compose the final overview here — using the structure from step 5, plus the CI status from step 9 — and post it directly with `gh pr comment`. Do not stage the body in a file first; pass it inline. Example:
+Forge specifics (see adapters): on GitLab, `THREAD_REPLY` works on an individual
+(non-thread) note too — the reply converts it into a thread, after which
+`THREAD_RESOLVE` works even though `THREADS_FETCH` reported it
+`resolvable: false`. So reply first, then resolve. On GitHub, only diff-anchored
+review threads accept in-thread replies; for CR-level comments the reply rides in
+the step 11 overview instead (quote the original), and resolution is skipped.
 
-```bash
-gh pr comment "$PR_NUM" --body "$(cat <<EOF
-<!-- pr-review-overview -->
-# PR Review Overview - Iteration ${N}
+### 11. Post Review Report as CR Comment
 
-**PR**: #${PR_NUM} | **Branch**: ${BRANCH} | **Date**: $(date +%Y-%m-%d)
+Compose the final overview (structure from step 5, plus CI status from step 9), stage
+it in `${WORK_DIR}/overview-${N}.md`, then:
 
-## Valid Issues (fixed)
-...
-
-## Invalid/Skipped Issues
-...
-
-## CI Status
-...
-EOF
-)"
+```text
+CR_COMMENT <id> ${WORK_DIR}/overview-${N}.md
 ```
 
-The leading `<!-- pr-review-overview -->` sentinel is what the iteration counter in step 3 matches on. Without it, N will not increment between rounds when this skill is invoked locally.
+The body MUST begin with the `<!-- pr-review-overview -->` sentinel on its own line —
+that is what the iteration counter in step 3 matches on. Without it, N will not
+increment between rounds.
 
 ### 12. Commit, Push, and Verify
 
 After all fixes:
 
-1. Run full test suite locally
-2. Run linter
-3. Commit the code changes
-4. Push to remote
-5. Monitor CI status to confirm checks pass
+1. Run the full test suite locally (project command / Makefile target).
+2. Run the linter.
+3. Commit the code changes.
+4. Push to remote (`git push`).
+5. If CI exists, re-run `CI_STATUS` to confirm checks pass; otherwise note there is
+   no CI to wait on.
 
-Nothing from `/tmp/pr-review-${PR_NUM}/` belongs in the commit — those paths are outside the repo and git will ignore them automatically.
+Nothing from `/tmp/cr-review-${id}/` belongs in the commit — those paths are outside
+the repo and git ignores them automatically.
 
 ## Key Behaviors
 
-- **Auto-fix**: Fix all validated issues without pausing for approval
-- **Context preservation**: Keep diff_hunk context when analyzing
-- **Convention adherence**: Follow project's existing patterns
-- **Deduplication**: Consolidate multiple comments on same issue into one task
-- **CI verification**: Always check CI status after fixing review comments
-- **Local reproduction**: Run tests/linters locally before pushing fixes
-- **Reports as comments**: Post review reports as PR comments, never write them to disk under the repo
-- **No in-repo working files**: Rune task files and any captured output live under `/tmp/pr-review-${PR_NUM}/`, not in the repo
+- **Forge-neutral**: never call `gh`/`glab` directly; go through the contract
+  operations so the same workflow runs on GitHub and GitLab.
+- **Auto-fix**: fix all validated issues without pausing for approval.
+- **Convention adherence**: follow the project's existing patterns and tooling.
+- **Deduplication**: consolidate multiple notes on the same issue into one task.
+- **CI-aware but CI-optional**: handle checks when they exist, no-op when `CI_STATUS`
+  is empty.
+- **Local reproduction**: run tests/linters locally before pushing fixes.
+- **Reports as comments**: post review reports as CR comments, never to disk under
+  the repo.
+- **Replies in-thread**: outcomes for individual findings go into the originating
+  thread (`THREAD_REPLY`) and handled threads get resolved, so the CR's open-thread
+  count reflects what actually still needs attention.
+- **No in-repo working files**: rune task files and captured output live under
+  `/tmp/cr-review-${id}/`, not in the repo.
