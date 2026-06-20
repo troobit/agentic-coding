@@ -19,19 +19,27 @@ When asked to analyze or document something, first check if there's an existing 
 - When managing tasks, use the rune skill.
 - When creating GitHub issues, ALWAYS create them in the current repository unless explicitly told otherwise.
 
-# Agent Notes
+# Persisting Knowledge
 
-Maintain implementation notes in `docs/agent-notes/` to preserve knowledge across sessions.
+Two destinations, picked by scope. Default to writing nothing — only persist what a future session would otherwise re-investigate.
 
-**Before starting a task**: Check `docs/agent-notes/` for relevant notes and read them. Only read what's relevant — don't load everything.
+## Cross-project patterns → `/capture-knowledge` and `/recall-knowledge`
 
-**After completing a task**: Create or update notes about the code you worked on. Focus on:
-- How things work (architecture, data flow, key abstractions)
-- Non-obvious behavior, gotchas, and things that don't work as expected
-- Why certain approaches were chosen or rejected
-- Setup/configuration details that aren't obvious from the code
+**Before starting a task**: if it touches a framework, language, or domain you've worked in before, run `/recall-knowledge` to see if the vault already has notes — a quick check beats re-investigating something you already documented.
 
-Keep notes factual and concise. Organise by topic or module (e.g., `auth.md`, `api-layer.md`) — not by date or task. Update existing notes rather than creating duplicates.
+If what you learned would help on a *different* project (framework gotchas, integration recipes, reusable patterns, platform quirks), use the `/capture-knowledge` skill to write it into the Obsidian vault. This is the preferred destination for anything generalizable. Be proactive: when you've just solved something non-obvious that isn't tied to this one repo, offer to capture it even if the user didn't ask.
+
+## Project-specific notes → `docs/agent-notes/`
+
+For knowledge that only makes sense inside this one repo (subsystem flow, in-flight refactor state, where-to-look pointers), use `docs/agent-notes/`.
+
+**Before starting a task**: check `docs/agent-notes/` for relevant notes and read what's relevant. Don't load everything.
+
+**Write a note only when** a future session would otherwise re-investigate the same thing — a non-obvious gotcha, a rejected approach worth remembering, a subsystem flow not derivable from the code. Do NOT write a note as a checkbox at task end; most tasks shouldn't produce a note.
+
+**Do NOT duplicate CLAUDE.md.** If the project's CLAUDE.md already covers it (architecture overview, file structure, conventions), don't restate it in agent-notes.
+
+Organise by topic or module (e.g., `auth.md`, `api-layer.md`). Update existing notes rather than creating duplicates. If you find a note that's stale or wrong, fix or delete it — a stale note is worse than no note.
 
 # Project Conventions
 
