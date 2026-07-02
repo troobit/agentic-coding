@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-02]
+
+### Changed
+- `nextup` skill: Reframe from "router, not executor" to **dispatcher, not implementer**. Routing is now evidence-based: step 6 lists concrete light-lane vs spec-lane signals (names an existing file/defect with fix/tweak/rename verbs vs new capability, several components, open design decisions), borderline jobs start at `/starwave:smolspec`, and every dispatch states the lane, skill, and deciding signal so the routing can be trusted without re-checking. New step 6b splits the user zone into independent jobs: unattended-safe light-lane jobs fan out to parallel sub-agents (one per job in a single message, each running its routed skill, worktree isolation when they mutate files, nextup staying on as overseer to integrate outcomes into the machine zone), while gated spec-lane jobs — whose approval gates a sub-agent cannot collect — run inline one at a time with the rest queued under Next up. `/bug-blitz` still owns same-shaped bug batches, and nextup still never implements, reviews, or commits work itself and only recommends `/make-it-so` / `/next-task`
+- `nextup` skill + `nextup.example.md`: Machine-zone marker is now `<!-- LM -->`, mirroring `<!-- USER -->` at the top of the user zone. Legacy markers (`<!-- ML -->`, `<!-- nextup:machine -->`, `# What I want`) still parse but are migrated to `<!-- LM -->` on rewrite. The machine zone is restricted to the template's fields only (feature, branch, stage, progress, next up, notes) — close-out now writes its handoff into those fields instead of growing new sections — and the user-zone placeholder reads `<user inputs for next session>`
+- `sendit` skill: Update the machine-zone reference to the `<!-- LM -->` marker (treating `<!-- ML -->` / `<!-- nextup:machine -->` as legacy equivalents); it previously matched only `<!-- nextup:machine -->` and would have missed migrated files
+
 ## [2026-06-19]
 
 ### Added

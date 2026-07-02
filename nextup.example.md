@@ -1,8 +1,8 @@
 <!-- USER -->
 
-<words here>
+<user inputs for next session>
 
-<!-- ML -->
+<!-- LM -->
 
 ## Where things stand
 

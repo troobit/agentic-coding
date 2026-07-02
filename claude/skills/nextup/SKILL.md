@@ -1,11 +1,11 @@
 ---
 name: nextup
-description: The universal entry point for the starwave spec workflow. Reads nextup.md, works out where you are, keeps a plain-English progress record, and routes you to the right next step — resume a spec phase, start a fresh spec, send a small job straight to a focused skill, recommend implementation, or close out the session. Use when the user says "/nextup", "run nextup", "what's next", "pick up where we left off", "close out", "wrap up", or starts a session without saying which command to run.
+description: The universal entry point for the starwave spec workflow. Reads nextup.md, works out where you are, keeps a plain-English progress record, and routes each job to the right next step — resume a spec phase, start a fresh spec, send a small job straight to a focused skill, fan several independent small jobs out to parallel sub-agents, recommend implementation, or close out the session. Use when the user says "/nextup", "run nextup", "what's next", "pick up where we left off", "close out", "wrap up", or starts a session without saying which command to run.
 ---
 
 # Nextup — the universal entry point for starwave
 
-`/nextup` is the front door to a session: the user runs it so they never have to remember which skill to run or repeat context they already gave. It is a **router, not an executor** — it reads intent, funnels it to the one right next step, and hands off. It never runs the work itself, and any fan-out to agents or sub-agents lives in the skill it routes to, never here.
+`/nextup` is the front door to a session: the user runs it so they never have to remember which skill to run or repeat context they already gave. It is a **dispatcher, not an implementer** — it reads intent, picks the right skill for each job, and hands the work off. It never does the work inline: a single job hands off in this conversation as usual, and several independent jobs fan out to parallel sub-agents that each run their routed skill (see step 6b). The user has to be able to trust the routing blind, so every dispatch names the lane, the skill, and the one signal that decided it.
 
 Run it from any branch, at any time. The branch is one signal for finding your feature, never a gate. All it needs is a `nextup.md`; if none exists it seeds one and still works.
 
@@ -20,9 +20,9 @@ The audience is often **non-technical**. Every message you show the user is plai
 ```markdown
 <!-- USER -->
 
-<what the user wants to build or do next, in their own words>
+<user inputs for next session>
 
-<!-- ML -->
+<!-- LM -->
 
 ## Where things stand
 
@@ -43,12 +43,12 @@ The audience is often **non-technical**. Every message you show the user is plai
 - <date> — <what happened in one line>
 ```
 
-**Markers.** The machine zone begins at the **first** line matching `<!-- ML -->` ("ML" = machine layer); everything above it is the user zone. Legacy files stay valid: treat a `# What I want` heading and a `<!-- nextup:machine -->` marker as equivalent to `<!-- USER -->` and `<!-- ML -->`, and parse the machine zone from whichever appears first. When you rewrite, keep whichever marker style the file already uses. Never write explanatory comments for the user into the template — seed and rewrite files with bare markers only.
+**Markers.** The machine zone begins at the **first** line matching `<!-- LM -->`; everything above it is the user zone, which opens with `<!-- USER -->`. Legacy files stay valid: treat a `# What I want` heading, a `<!-- nextup:machine -->` marker, or `<!-- ML -->` as equivalent to `<!-- LM -->`, and parse the machine zone from whichever appears first. When you rewrite the machine zone, migrate any legacy marker to `<!-- LM -->`. Never write explanatory comments for the user into the template — seed and rewrite files with bare markers only.
 
 **Two rules govern the divide:**
 
 - **The user zone wins.** It is the user's authoritative intent. If it contradicts the machine zone (the machine says "Design" but the user wrote "let's redo the requirements"), follow the user and surface the conflict in plain English.
-- **The machine zone is disposable.** You rebuild it every run from the real source of truth — the files in `specs/{feature}/`. If it's stale, this run fixes it. You only ever rewrite below the marker; never touch the user zone.
+- **The machine zone is disposable.** You rebuild it every run from the real source of truth — the files in `specs/{feature}/`. If it's stale, this run fixes it. You only ever rewrite below the marker; never touch the user zone. And it holds **only the template's fields** — feature, branch, stage, progress, next up, notes — never new sections.
 
 ## Each run: open or close?
 
@@ -84,11 +84,17 @@ If the user zone names a skill ("run `/starwave:smolspec`", "continue with `/sta
 
 ### 5. Update the machine zone
 
-Rewrite everything below the marker to reflect what you just learned: feature, branch, a plain-English stage line, the progress checkboxes, the next action. Prepend a one-line dated note (`date +%Y-%m-%d`). Leave the user zone untouched. Do this **before** you hand off, because the dispatched skill ends the turn.
+Rewrite everything below the marker to reflect what you just learned: feature, branch, a plain-English stage line, the progress checkboxes, the next action. Prepend a one-line dated note (`date +%Y-%m-%d`). Leave the user zone untouched. Do this **before** you hand off, because an inline dispatch ends the turn. (A parallel dispatch is the one exception where you're still around afterwards — update the machine zone again with the outcomes once the sub-agents return.)
 
-### 6. Route to the one right next step
+### 6. Route each job to its one right skill
 
 Pick a **lane** by the weight of the intent, then route within it. Prefer the lightest lane that genuinely fits — don't push a one-line fix through a full spec, and don't smuggle a real feature past requirements.
+
+Weigh intent by concrete signals, not vibes:
+
+- **Light signals:** names an existing file or a specific defect; verbs like fix, tweak, rename, adjust, clean up; bounded to a few files; adds no new capability.
+- **Spec signals:** a new capability or feature; several components touched; open design decisions or trade-offs; words like build, MVP, feature.
+- A job matching both, or neither cleanly, starts at `/starwave:smolspec` — never guess it into the spec lane.
 
 **Light lane — bounded intent goes straight to a focused skill.** No requirements/design ceremony:
 
@@ -114,20 +120,27 @@ Iterative, in-place improvements to something that already exists (a skill, a do
 
 If the user zone carries a `T-<number>` ticket, pass it through to the dispatched skill so its Transit integration can move the ticket. Do not call `mcp__transit__*` yourself.
 
-### 7. Hand off in plain English
+### 6b. One job or many?
 
-Before invoking the chosen skill, tell the user in one or two plain sentences: what you read, which feature or job you're on, where things stand, and what happens next. Quote the deciding signal (a path from the user zone, the branch name, an explicit `/...` directive, or the lane you chose and why).
+Split the user zone into **jobs**: independently completable pieces that share no files and no ordering. Most runs carry one job — hand it off inline (step 7). When there are several, route each job through step 6 on its own, then split by whether it can run unattended:
 
-Then invoke the skill and **pass the user-zone text to it as the input**, so the user never retypes their idea — that is how the chain reads `nextup.md` into the work without each skill opening the file itself.
+- **Unattended-safe jobs** — light-lane work whose skill runs start to finish without stopping to ask the user (`/fix-bug`, a mechanical `/starwave:smolspec` change) — fan out in parallel. Spawn one sub-agent per job **in a single message**, each told to invoke that job's routed skill with the job's user-zone text as input. Jobs that mutate files each get an isolated git worktree so parallel commits don't race. You stay on as overseer: wait for all to return, surface any failure plainly instead of masking it, then update the machine zone with the outcomes.
+- **Gated jobs** — anything in the spec lane, because requirements and design need user sign-off a sub-agent cannot collect — never go to a sub-agent. Route the most important one inline, and queue the rest under **Next up** in the machine zone so the following `/nextup` picks them up.
 
-You MUST NOT continue past the handoff. The dispatched skill owns the rest; the user returns to `/nextup` next session to pick up again.
+A batch of same-shaped bug fixes is not a nextup fan-out — `/bug-blitz` already owns that pipeline; route the whole batch there. And even as overseer you dispatch skills only: you never implement, review, or commit the work yourself.
+
+Before dispatching, tell the user in one or two plain sentences per job: which feature or job it is, where things stand, the lane and skill you chose, and the deciding signal (a path from the user zone, the branch name, an explicit `/...` directive). That evidence line is what lets the user trust the routing without re-checking it.
+
+Then dispatch and **pass the user-zone text as the input** — inline for a single job, via the sub-agent prompts for a parallel fan-out — so the user never retypes their idea. That is how the chain reads `nextup.md` into the work without each skill opening the file itself.
+
+You MUST NOT continue past the dispatch. Inline, the routed skill owns the rest of the turn; in a fan-out, your last act is integrating the sub-agents' results into the machine zone and reporting the outcomes. Either way the user returns to `/nextup` next session to pick up again.
 
 ## Close-out mode
 
 The mirror of opening: instead of routing forward, capture what just happened so the next `/nextup` (or the next person) picks up cleanly. It stays local — the lightweight counterpart to `/sendit`, which ships spec documents to Prism; close-out only writes the machine zone.
 
 1. **Re-read the ground truth** — the spec files in `specs/{feature}/` and the git state (`git rev-parse --abbrev-ref HEAD`, recent commits, `git status`) — so the handoff reflects reality, not memory.
-2. **Write the handoff into the machine zone.** Beyond feature / branch / stage / progress / next-up, capture what this session established — what changed, what was decided, what's blocked, the clear next step. The machine zone may grow into a real, skimmable handoff.
+2. **Write the handoff into the machine zone.** Capture what this session established — what changed, what was decided, what's blocked, the clear next step — inside the template's existing fields: the stage line, **Next up**, and dated **Notes** lines. Never add sections beyond the template.
 3. **Prepend a dated note** (`date +%Y-%m-%d`) summarising the session in one line.
 4. **Stop.** Do not route, dispatch, or recommend a next skill — close-out ends the turn. Leave the user zone untouched.
 
@@ -143,7 +156,7 @@ The mirror of opening: instead of routing forward, capture what just happened so
 
 - You maintain **only** the machine zone of `nextup.md` (below the marker). You never edit the user zone, and you write no other files. (`/sendit` also writes the machine zone when it ships a spec; you rebuild the block from the spec files each run, so the two never conflict.)
 - You **never** create or write anything under `specs/` — those folders are owned by the starwave skills and writing into them from outside corrupts the spec. You read them; the chain writes them. This includes `requirements.md`, `design.md`, `tasks.md`, `smolspec.md`, and `userinput.md`.
-- You are a **router, not an executor**: you do not implement code, run tests, or invoke execution skills (`/make-it-so`, `/next-task`), and you run no pipelines yourself — any fan-out to agents or sub-agents belongs to the skill you route to. When a spec is complete you **recommend** the right execution skill and stop.
+- You are a **dispatcher, not an implementer**: you never write code, run tests, or fix anything inline, and you never invoke execution skills (`/make-it-so`, `/next-task`) — when a spec is complete you **recommend** and stop. Work happens only inside a routed skill: in this conversation for a single job, or inside the sub-agents you spawn for a parallel fan-out (step 6b). Sub-agents run one skill each; deeper fan-out belongs to the skill itself.
 - The user zone is authoritative. When it conflicts with the machine zone or the files, follow the user and surface the conflict.
 - Raise blockers fast and in plain English — "I can't tell which feature you mean — is it X or Y?" is the right output when inputs are genuinely ambiguous.
-- One run does one thing: open (read, update the quick reference, route, hand off) or close out (capture the handoff and stop). Never proceed past the handoff.
+- One run does one mode: open (read, update the quick reference, dispatch — one job inline or several via parallel sub-agents) or close out (capture the handoff and stop). Never proceed past the dispatch.

@@ -51,7 +51,7 @@ Confirm which files were copied. If the folder has no `.md` files, stop and say 
 
 ### 3. Update the nextup machine notes
 
-If `nextup.md` exists at the repo root, update **only** the machine zone (everything below the `<!-- nextup:machine -->` marker); never touch the user zone. Reflect that the spec is out for review:
+If `nextup.md` exists at the repo root, update **only** the machine zone (everything below the `<!-- LM -->` marker; treat legacy `<!-- ML -->` or `<!-- nextup:machine -->` markers as equivalent); never touch the user zone. Reflect that the spec is out for review:
 
 - **Stage:** a plain-English line such as "Spec docs sent to Prism — awaiting your review".
 - **Next up:** "Review the spec files in Prism, then run `/nextup` to continue or ask for changes."
