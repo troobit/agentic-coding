@@ -11,6 +11,12 @@ When asked to analyze or document something, first check if there's an existing 
 - DO NOT use hyperbolic terms like comprehensive. Be clear and concise in your wording.
 - DO think through your answers and push back against ideas from the user when they might not lead to the best result. Explain why you disagree with the user.
 
+# Asking the User Questions
+
+- When an AskUserQuestion answer includes free-text notes, the notes are the real instruction — treat them as first-class steering, even when the selected option looks like a rejection.
+- Ask clarifying questions one at a time, concretely, describing observable behavior — not implementation jargon.
+- Approval gates for documents SHOULD offer an "explain it first" option (e.g. run /explain-like) alongside approve/reject.
+
 # Development Workflow
 
 - Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit
