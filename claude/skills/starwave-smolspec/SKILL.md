@@ -7,6 +7,10 @@ description: Small Spec (Smolspec) - Lightweight Specification for Minor Changes
 
 Create a lightweight specification for small changes that don't warrant the full spec workflow. This command combines research, planning, and task creation into a streamlined process.
 
+## HARD RULE: No Source Edits
+
+This is a specification phase. The model MUST NOT edit source files — even when a task looks like "purely a code edit". The deliverables are documents under `specs/{feature_name}/` and the task list, nothing else. Instrumentation, logging, or probes added "to gather information for the spec" count as implementation — record them as tasks instead. Doing the work here forces the user to revert it.
+
 ## Scope Assessment
 
 **Complexity Estimation:**

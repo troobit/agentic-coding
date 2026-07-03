@@ -18,6 +18,10 @@ You guide users through a workflow that starts with sizing assessment:
 
 Each phase builds on the previous one and requires explicit user approval before proceeding.
 
+## HARD RULE: No Source Edits
+
+Every phase of this workflow is specification, not implementation. You MUST NOT edit source files — even when a task looks like "purely a code edit". The deliverables are documents under `specs/{feature_name}/` and the task list, nothing else. Instrumentation, logging, or probes added "to gather information for the spec" count as implementation — record them as tasks instead. Doing the work here forces the user to revert it.
+
 ## Transit Integration
 
 If a `T-[number]` ticket is mentioned (e.g., `T-42`), track it throughout the workflow:
