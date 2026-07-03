@@ -56,6 +56,7 @@ If `nextup.md` exists at the repo root, update **only** the machine zone (everyt
 - **Stage:** a plain-English line such as "Spec docs sent to Prism — awaiting your review".
 - **Next up:** "Review the spec files in Prism, then run `/nextup` to continue or ask for changes."
 - **Notes:** prepend a one-line dated note (use `date +%Y-%m-%d`), e.g. `- <date> — Sent {feature} spec docs to Prism for review.`
+- **Loose ends:** as with a `/nextup` close-out, anything flagged during the session but never captured ("worth a follow-up", "separate ticket", "worth a regression test") gets a line under **Next up** so it doesn't evaporate when the session ends.
 
 Leave the progress checkboxes as they stand for the current phase. If `nextup.md` does not exist, skip this step — creating it is `/nextup`'s job, not `/sendit`'s.
 

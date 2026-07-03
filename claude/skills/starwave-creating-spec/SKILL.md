@@ -100,9 +100,7 @@ After tasks are approved (or after smolspec approval), update the specs overview
 
 **Process:**
 1. Check if `specs/OVERVIEW.md` exists in the project
-2. If it exists, add the new spec to both the table and detail sections:
-   - Insert a new table row in chronological order (use today's date as creation date) with status `Planned`
-   - Add a new H2 detail section in the same position with the summary and file links
+2. If it exists, run the `/specs-overview` skill to regenerate it — do NOT hand-edit `OVERVIEW.md`
 3. If it does not exist, skip this phase
 
 ---

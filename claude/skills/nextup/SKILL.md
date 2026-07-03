@@ -142,10 +142,14 @@ You MUST NOT continue past the dispatch. Inline, the routed skill owns the rest 
 The mirror of opening: instead of routing forward, capture what just happened so the next `/nextup` (or the next person) picks up cleanly. It stays local — the lightweight counterpart to `/sendit`, which ships spec documents to Prism; close-out only writes the machine zone.
 
 1. **Re-read the ground truth** — the spec files in `specs/{feature}/` and the git state (`git rev-parse --abbrev-ref HEAD`, recent commits, `git status`) — so the handoff reflects reality, not memory.
-2. **Write the handoff into the machine zone.** Capture what this session established — what changed, what was decided, what's blocked, the clear next step — inside the template's existing fields: the stage line, **Next up**, and dated **Notes** lines. Never add sections beyond the template. **Next up** names the concrete next step *and the skill that runs it* (e.g. "run `/starwave:design` for the auth spec"), so the next `/nextup` routes without re-deriving it.
-3. **Validate the structure.** Every close-out: confirm the `<!-- LM -->` marker is present — if it has been lost, repair it rather than appending a second machine zone — and strip any raw logs or command output from the file. A line earns its place only if it matters to future work.
-4. **Prepend a dated note** (`date +%Y-%m-%d`) summarising the session in one line.
-5. **Stop.** Do not route or dispatch — close-out ends the turn; the routing lives in **Next up**, not in this turn's output. Leave the user zone untouched.
+2. **Sweep for loose ends.** Anything flagged during the session but never captured evaporates — don't let it:
+   - Scan the session for flagged-but-untracked items ("worth a follow-up", "separate ticket", "worth a regression test"). Add each to the feature's active tasks file via the rune skill; if there is no active tasks file, list them under **Next up** in the machine zone instead.
+   - If any spec document changed this session, run `/specs-overview` once to regenerate `specs/OVERVIEW.md` — never hand-edit it.
+   - If a naming or canonicality conflict was adjudicated this session (which name or artifact is the real one), record it in the feature's `decision_log.md` before closing so it isn't re-litigated next session.
+3. **Write the handoff into the machine zone.** Capture what this session established — what changed, what was decided, what's blocked, the clear next step — inside the template's existing fields: the stage line, **Next up**, and dated **Notes** lines. Never add sections beyond the template. **Next up** names the concrete next step *and the skill that runs it* (e.g. "run `/starwave:design` for the auth spec"), so the next `/nextup` routes without re-deriving it.
+4. **Validate the structure.** Every close-out: confirm the `<!-- LM -->` marker is present — if it has been lost, repair it rather than appending a second machine zone — and strip any raw logs or command output from the file. A line earns its place only if it matters to future work.
+5. **Prepend a dated note** (`date +%Y-%m-%d`) summarising the session in one line.
+6. **Stop.** Do not route or dispatch — close-out ends the turn; the routing lives in **Next up**, not in this turn's output. Leave the user zone untouched.
 
 ### Interrupts
 
@@ -162,7 +166,7 @@ When the user interrupts or asks to pause mid-run, write the current state into 
 ## Hard rules
 
 - You maintain **only** the machine zone of `nextup.md` (below the marker). You never edit the user zone, and you write no other files. (`/sendit` also writes the machine zone when it ships a spec; you rebuild the block from the spec files each run, so the two never conflict.)
-- You **never** create or write anything under `specs/` — those folders are owned by the starwave skills and writing into them from outside corrupts the spec. You read them; the chain writes them. This includes `requirements.md`, `design.md`, `tasks.md`, `smolspec.md`, and `userinput.md`.
+- You **never** create or write anything under `specs/` — those folders are owned by the starwave skills and writing into them from outside corrupts the spec. You read them; the chain writes them. This includes `requirements.md`, `design.md`, `tasks.md`, `smolspec.md`, and `userinput.md`. **Close-out bookkeeping is the one exception**: the sweep may add follow-up tasks via the rune skill, append adjudicated decisions to `decision_log.md`, and regenerate `specs/OVERVIEW.md` via `/specs-overview`.
 - You are a **dispatcher, not an implementer**: you never write code, run tests, or fix anything inline, and you never invoke execution skills (`/make-it-so`, `/next-task`) — when a spec is complete you **recommend** and stop. Work happens only inside a routed skill: in this conversation for a single job, or inside the sub-agents you spawn for a parallel fan-out (step 6b). Sub-agents run one skill each; deeper fan-out belongs to the skill itself.
 - The user zone is authoritative. When it conflicts with the machine zone or the files, follow the user and surface the conflict.
 - Raise blockers fast and in plain English — "I can't tell which feature you mean — is it X or Y?" is the right output when inputs are genuinely ambiguous.
