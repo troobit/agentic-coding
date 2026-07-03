@@ -63,6 +63,8 @@ Decide the mode first:
 
 Look for `nextup.md` at the repo root. If it's missing it never blocks — seed it (copy `nextup.example.md` if that tracked template exists, otherwise write the skeleton above) and carry on. With nothing else to go on, this run funnels into spec-driven development via `/starwave:creating-spec`. (`nextup.md` is gitignored; `nextup.example.md` is the tracked structure it's seeded from.)
 
+**Worktrees.** `nextup.md` is gitignored, so it never travels into a linked git worktree. When running in a worktree and `nextup.md` is missing or stale, find the main worktree (first entry of `git worktree list`) and read its `nextup.md`: treat the main copy's user zone as the source of intent, and keep the machine zone local to this worktree. Do this merge yourself — the user should never have to ask for it.
+
 An empty user zone is not a dead end — fall through to feature detection (step 2). Stop and ask, in plain English, *"What's the first version (your MVP) you'd like to build?"* only when there is genuinely nothing to go on: no user text, no spec folder matching the branch, and no **in-flight** spec. A spec folder is in-flight only if it holds at least one spec document with real content (`requirements.md`, `design.md`, `tasks.md`, `smolspec.md`, or a non-empty `userinput.md`); a folder of empty/stub files gives you the feature *name*, not intent — so an empty user zone plus a stub-only spec counts as "nothing to go on".
 
 ### 2. Identify the feature
@@ -80,7 +82,7 @@ The files in `specs/{feature}/` are the source of truth for how far the work has
 
 ### 4. Honour explicit skill directives
 
-If the user zone names a skill ("run `/starwave:smolspec`", "continue with `/starwave:design`", "`/fix-bug` this"), dispatch to it — this overrides the lane inference in step 6. But if it contradicts the files (asks for `/starwave:design` with no `requirements.md`), stop and surface the conflict instead of guessing.
+If the user zone names a skill ("run `/starwave:smolspec`", "continue with `/starwave:design`", "`/fix-bug` this"), dispatch to it — this overrides the lane inference in step 6. Arguments passed to `/nextup` count as user-zone text for this run. When a directive contradicts the files (asks for `/starwave:design` with no `requirements.md`), the files win on state: name the conflict plainly, dispatch the nearest achievable step to what was asked, and say what you skipped and why. Never hard-refuse — a run that ends with a refusal and zero work is a failure.
 
 ### 5. Update the machine zone
 
@@ -140,9 +142,14 @@ You MUST NOT continue past the dispatch. Inline, the routed skill owns the rest 
 The mirror of opening: instead of routing forward, capture what just happened so the next `/nextup` (or the next person) picks up cleanly. It stays local — the lightweight counterpart to `/sendit`, which ships spec documents to Prism; close-out only writes the machine zone.
 
 1. **Re-read the ground truth** — the spec files in `specs/{feature}/` and the git state (`git rev-parse --abbrev-ref HEAD`, recent commits, `git status`) — so the handoff reflects reality, not memory.
-2. **Write the handoff into the machine zone.** Capture what this session established — what changed, what was decided, what's blocked, the clear next step — inside the template's existing fields: the stage line, **Next up**, and dated **Notes** lines. Never add sections beyond the template.
-3. **Prepend a dated note** (`date +%Y-%m-%d`) summarising the session in one line.
-4. **Stop.** Do not route, dispatch, or recommend a next skill — close-out ends the turn. Leave the user zone untouched.
+2. **Write the handoff into the machine zone.** Capture what this session established — what changed, what was decided, what's blocked, the clear next step — inside the template's existing fields: the stage line, **Next up**, and dated **Notes** lines. Never add sections beyond the template. **Next up** names the concrete next step *and the skill that runs it* (e.g. "run `/starwave:design` for the auth spec"), so the next `/nextup` routes without re-deriving it.
+3. **Validate the structure.** Every close-out: confirm the `<!-- LM -->` marker is present — if it has been lost, repair it rather than appending a second machine zone — and strip any raw logs or command output from the file. A line earns its place only if it matters to future work.
+4. **Prepend a dated note** (`date +%Y-%m-%d`) summarising the session in one line.
+5. **Stop.** Do not route or dispatch — close-out ends the turn; the routing lives in **Next up**, not in this turn's output. Leave the user zone untouched.
+
+### Interrupts
+
+When the user interrupts or asks to pause mid-run, write the current state into the machine zone **first** — before finishing any in-flight work and without asking a single question — then stop. A pause request is a close-out with whatever ground truth you have.
 
 ## How the chain uses `nextup.md`
 
