@@ -10,6 +10,7 @@ Implement the next unfinished group of tasks from the tasks list. A group of tas
 **Constraints:**
 
 **Task Retrieval:**
+- When no explicit tasks file path was given and more than one spec has an incomplete `tasks.md`, read the active feature from the `nextup.md` machine zone; if still ambiguous, list the candidates and ask the user to confirm — NEVER guess
 - The model MUST use the rune skill to retrieve the next task(s) to work on
 - Use `rune next --format json` to get the next incomplete task. This command will indicate when all tasks are complete
 - If the user asks for the entire phase, use `rune next --phase --format json`
@@ -60,6 +61,12 @@ When spawning a subagent for a stream, provide these instructions:
 - When a subagent completes a task that unblocks tasks in another stream, that stream's agent will pick up the newly unblocked work on their next `rune next --phase --stream N` call
 - If all streams become blocked waiting on each other, this indicates a circular dependency problem that should be reported to the user
 - The main agent should periodically check `rune streams --json` to monitor overall progress
+
+**Headless Runs (no human present):**
+When running non-interactively — e.g. driven by an external runner rather than a live user:
+- The model MUST NEVER call AskUserQuestion; there is no one to answer and the questions are dismissed unanswered
+- If the next task is blocked, requires user approval, or there is nothing left to do: write `.orbit/halt` in the repo root containing a one-line reason, print `ORBIT-HALT: <reason>` as the final line of output, then stop
+- Keep the sentinel file name (`.orbit/halt`) and output prefix (`ORBIT-HALT:`) exactly as written — external tooling matches on them
 
 **Specs Overview Update:**
 - After completing all tasks in the current group, check if `specs/OVERVIEW.md` exists in the project
