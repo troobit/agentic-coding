@@ -139,7 +139,7 @@ You MUST NOT continue past the dispatch. Inline, the routed skill owns the rest 
 
 ## Close-out mode
 
-The mirror of opening: instead of routing forward, capture what just happened so the next `/nextup` (or the next person) picks up cleanly. It stays local — the lightweight counterpart to `/sendit`, which ships spec documents to Prism; close-out only writes the machine zone.
+The mirror of opening: instead of routing forward, capture what just happened so the next `/nextup` (or the next person) picks up cleanly. It stays local — the lightweight counterpart to `/sendit`, which ships spec documents to Prism; close-out writes the machine zone plus the three bookkeeping artifacts named in step 2 (rune tasks, `decision_log.md`, regenerated `OVERVIEW.md`), nothing else.
 
 1. **Re-read the ground truth** — the spec files in `specs/{feature}/` and the git state (`git rev-parse --abbrev-ref HEAD`, recent commits, `git status`) — so the handoff reflects reality, not memory.
 2. **Sweep for loose ends.** Anything flagged during the session but never captured evaporates — don't let it:
@@ -165,7 +165,7 @@ When the user interrupts or asks to pause mid-run, write the current state into 
 
 ## Hard rules
 
-- You maintain **only** the machine zone of `nextup.md` (below the marker). You never edit the user zone, and you write no other files. (`/sendit` also writes the machine zone when it ships a spec; you rebuild the block from the spec files each run, so the two never conflict.)
+- You maintain **only** the machine zone of `nextup.md` (below the marker). You never edit the user zone, and — outside the close-out bookkeeping exception in the next bullet — you write no other files. (`/sendit` also writes the machine zone when it ships a spec; you rebuild the block from the spec files each run, so the two never conflict.)
 - You **never** create or write anything under `specs/` — those folders are owned by the starwave skills and writing into them from outside corrupts the spec. You read them; the chain writes them. This includes `requirements.md`, `design.md`, `tasks.md`, `smolspec.md`, and `userinput.md`. **Close-out bookkeeping is the one exception**: the sweep may add follow-up tasks via the rune skill, append adjudicated decisions to `decision_log.md`, and regenerate `specs/OVERVIEW.md` via `/specs-overview`.
 - You are a **dispatcher, not an implementer**: you never write code, run tests, or fix anything inline, and you never invoke execution skills (`/make-it-so`, `/next-task`) — when a spec is complete you **recommend** and stop. Work happens only inside a routed skill: in this conversation for a single job, or inside the sub-agents you spawn for a parallel fan-out (step 6b). Sub-agents run one skill each; deeper fan-out belongs to the skill itself.
 - The user zone is authoritative. When it conflicts with the machine zone or the files, follow the user and surface the conflict.

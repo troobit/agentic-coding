@@ -133,13 +133,11 @@ Batch operations use JSON input with the following structure:
 - `remove` - Remove a task and all its subtasks
   - Required: `id`
 
-**Important**: In batch operations, `details`, `references`, `requirements`, and `blocked_by` must be arrays, not strings:
+**Important**: In batch operations, always send `details`, `references`, `requirements`, and `blocked_by` as JSON arrays — never bare strings:
 - Correct: `"details": ["First detail", "Second detail"]`
 - Correct: `"references": ["file1.md", "file2.md"]`
 - Correct: `"blocked_by": ["1", "2"]`
-- Incorrect: `"details": "some detail"` (fails: cannot unmarshal string into []string)
-- Incorrect: `"references": "file1.md,file2.md"`
-- Incorrect: `"blocked_by": "1,2"`
+- Wrong: `"details": "some detail"`, `"blocked_by": "1,2"` — on current builds a bare string fails with `cannot unmarshal string into []string`; newer builds may coerce some content fields, but `blocked_by` never coerces. Arrays are always safe.
 
 Note: the CLI flag `--details "a,b"` takes a comma-separated string, but batch JSON always takes an array. Don't mix them up.
 
@@ -397,7 +395,7 @@ Many rune commands use **positional arguments** for task IDs, not flags. The **f
 - `rune complete 1.2 tasks.md` ❌ (fails with "file 1.2 does not exist")
 
 ### Always Pass an Explicit File Path
-Git-based file discovery fails in git worktrees. Always pass the explicit tasks.md path (e.g., `rune list specs/my-feature/tasks.md`) rather than relying on discovery.
+Always pass the explicit tasks.md path (e.g., `rune list specs/my-feature/tasks.md`) rather than relying on discovery. Discovery itself works in git worktrees, but it resolves the file from the current *branch name* — a worktree usually carries a different branch, so the template maps to a spec path that doesn't exist. Discovery also only resolves correctly from the repo root, not from subdirectories. An explicit path sidesteps both.
 
 ### File Format Strictness
 Rune parses tasks.md strictly. The body may only contain the H1 title, H2 phase headers, and task list items with their indented detail/reference lines. **Any free prose paragraph — before the first task, between a phase heading and its first task, or after the last task — fails parsing** with "unexpected content at this indentation level". Put explanatory text in task details, not prose. Front matter should be managed via `rune create --reference` or `rune add-frontmatter`, not written by hand.
