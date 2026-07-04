@@ -62,14 +62,14 @@ references:
   - Stream: 1
   - Requirements: [7.2](requirements.md#7.2), [3.4](requirements.md#3.4)
 
-- [ ] 9. Write align drift-class fixture tests <!-- id:rv5n0lh -->
+- [x] 9. Write align drift-class fixture tests <!-- id:rv5n0lh -->
   - One fixture repo per class: stale user path, invalid JSON, drifted canonical MCP entry, stale agent pack, missing cloud assets, seeded file with local additions outside the managed block, markerless hand-written file
   - Idempotence property: second applying run reports zero changes on every fixture
   - First run with no .agentic.json writes the manifest and prints the plan without applying
   - Stream: 2
   - Requirements: [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [6.1](requirements.md#6.1)
 
-- [ ] 10. Generate scripts/stale-packs.json from the drifted repos <!-- id:rv5n0li -->
+- [x] 10. Generate scripts/stale-packs.json from the drifted repos <!-- id:rv5n0li -->
   - SHA-256 of the actual pack file bytes in ~/repos/rtob/.github/agents and ~/repos/workscripts/.github/agents
   - align warns when .github/agents has files but zero checksum matches (near-miss must not silently no-op)
   - Stream: 2

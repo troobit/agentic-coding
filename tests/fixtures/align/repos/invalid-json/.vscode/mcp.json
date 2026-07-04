@@ -1,0 +1,19 @@
+{
+	"servers": {
+		"mcpServers": {
+			"type": "stdio",
+			"command": "/Users/ronan/go/bin/mcp-devtools"
+		},
+		"azure": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@azure/mcp@latest",
+				"server",
+				"start"
+			],
+			"gallery": true
+		},
+	}
+}

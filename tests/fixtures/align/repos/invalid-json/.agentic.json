@@ -1,0 +1,4 @@
+{
+  "servers": ["devtools", "svelte"],
+  "cloud_assets": false
+}

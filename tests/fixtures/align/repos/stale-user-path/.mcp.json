@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "svelte": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@sveltejs/mcp"
+      ]
+    },
+    "dev-tools": {
+      "type": "stdio",
+      "command": "/Users/ronan/go/bin/mcp-devtools"
+    }
+  }
+}
