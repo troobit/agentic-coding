@@ -10,11 +10,14 @@ The workflow follows a four-phase approach:
 3. **Task Planning** - Break down implementation into actionable steps
 4. **Implementation** - Execute tasks incrementally
 
-This is constantly being worked on, and will evolve over time. Each step also works for all tools, where it's recommended you set them up at the user level as their respective type:
+This is constantly being worked on, and will evolve over time. There are two lanes, with different tool support:
 
-- **Claude Code**: Skills
-- **GitHub Copilot**: Prompt files
-- **Cline**: Workflows
+- **Gated starwave lane** (this document): Claude Code only. The approval gates, sub-agent reviews, and skills below are not ported to other tools.
+- **PRD lane**: toolset-agnostic. Works in Claude Code (the `prd` and `engage` skills), VS Code Copilot (the same skills via the shared `~/.claude/skills` link), the cloud coding agent (via the assets `scripts/align.py` seeds into a repo), and orbit as a headless local executor.
+
+### The PRD Lane
+
+When work should run to completion without approval gates, skip starwave and use the PRD lane: `/prd` authors a single PRD (`specs/{prd-name}/prd.md`, one PRD per repository) and `/engage` derives rune task files per application/code context and executes them in parallel worktrees. See `claude/skills/prd/SKILL.md` and `claude/skills/engage/SKILL.md` for the details. The rest of this document describes the gated starwave lane.
 
 ## Getting Started
 
