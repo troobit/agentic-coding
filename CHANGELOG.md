@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-04]
+
+### Added
+- **PRD lane**: `prd` skill (author a standalone PRD with per-context requirement groups) and `engage` skill (derive rune task files per context, execute contexts in parallel worktrees with context-qualified branches, STOP protocol, integrated-branch quality gate), plus `copilot/agents/prd.agent.md` so VS Code Copilot and the cloud coding agent can author PRDs — the toolset-agnostic autonomous route alongside the Claude-only gated starwave lane
+- **Generation toolchain**: `shared/` convention fragments assembled by `scripts/generate.py` into `claude/CLAUDE.md` and `copilot/instructions/copilot-instructions.md` (both generated, managed-block markers, checked in); `mcp/servers.json` as the single MCP source of truth generating Claude user config, VS Code user `mcp.json`, per-repo `.mcp.json`/`.vscode/mcp.json`, and a paste-ready cloud-agent payload with per-surface secret mechanisms
+- **Per-repo alignment**: `scripts/align.py` driven by a checked-in `.agentic.json` — fixes stale user paths (portable forms), invalid JSON (backup + regenerate), drifted canonical MCP entries (non-canonical preserved), checksum-matched stale agent packs (`scripts/stale-packs.json`), and seeds cloud-agent assets in managed blocks; first run plans without applying
+- **Machine bootstrap**: `scripts/bootstrap.sh` (Homebrew, Brewfile, go installs, symlinks, config generation, VS Code seeding incl. the localml model provider, manual-auth list ending in re-run), `Brewfile`, `Makefile` (generate/sync/align/test/lint with a self-restoring drift check), and runbooks `docs/runbooks/localml-vscode.md` + `docs/runbooks/cloud-agent-mcp.md`
+- Test suite: 66 stdlib-unittest tests with golden fixtures covering generation, alignment idempotence, seeded-file preservation, and sync backwards compatibility
+
+### Changed
+- `scripts/sync-claude.sh`: existing six links unchanged; adds `mkdir -p` guards and a VS Code profile symlink for the PRD agent
+- README.md and spec-workflow.md: document the lane split (gated starwave = Claude Code; PRD lane = toolset-agnostic), the new layout, and the clone → bootstrap → authenticate quickstart
+
+### Removed
+- `copilot/prompts/` (8 stale prompt/chatmode files from the pre-starwave era) — superseded by the PRD lane assets and generated instructions
+
 ## [2026-07-02]
 
 ### Fixed

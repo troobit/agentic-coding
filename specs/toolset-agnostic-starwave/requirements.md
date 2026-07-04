@@ -112,3 +112,14 @@ This feature makes the agentic-coding repository the single source of truth for 
 **Acceptance Criteria:**
 
 1. <a name="9.1"></a>After implementation: the sync script SHALL produce the same `~/.claude` symlink targets as today, no existing skill or slash-command SHALL be renamed, moved, or removed, and the gated starwave lane's skill content SHALL be functionally unchanged.
+
+### 10. Nextup Autonomous Dispatch
+
+**User Story:** As the user, I want nextup to act on my written instructions directly — including PRDs — so that a session started from nextup.md is not forced through the gated spec process.
+
+**Acceptance Criteria:**
+
+1. <a name="10.1"></a>WHEN the user zone contains instructions that do not call for spec work, nextup SHALL execute or dispatch them directly, as it would any prompt, without routing into the starwave lane.
+2. <a name="10.2"></a>WHEN the user zone references a PRD (or a `specs/{name}/prd.md` exists for the named work), nextup SHALL route it to the PRD execution lane.
+3. <a name="10.3"></a>WHEN an act-autonomously flag is present in the user zone, nextup SHALL prefer the ungated lane end-to-end (PRD derivation and execution, no approval gates), using gated-lane routing only when the user zone explicitly demands it.
+4. <a name="10.4"></a>WHERE work is feature-shaped and no autonomy flag is set, nextup MAY recommend the gated lane, but SHALL NOT withhold direct execution when the user zone asks for it.

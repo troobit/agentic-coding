@@ -147,23 +147,31 @@ references:
   - Stream: 5
   - Requirements: [3.1](requirements.md#3.1), [3.2](requirements.md#3.2)
 
+- [ ] 21. Rework nextup skill for autonomous dispatch
+  - User zone is arbitrary instructions: execute/dispatch directly when no spec work is called for (Req 10.1)
+  - Detect PRD references or specs/{name}/prd.md and route to the engage skill (Req 10.2)
+  - Act-autonomously flag in the user zone prefers the ungated lane end-to-end (Req 10.3)
+  - Gated lane is a recommendation for feature-shaped work; never withhold direct execution (Req 10.4)
+  - Keep machine-zone template, close-out mode, and worktree rules unchanged; update nextup.example.md to document the flag
+  - Requirements: 10.1-10.4 in requirements.md
+
 ## Rollout & Verification
 
-- [ ] 21. Run align across the six repos and commit the fixes <!-- id:rv5n0lt -->
+- [ ] 22. Run align across the six repos and commit the fixes <!-- id:rv5n0lt -->
   - rtob, sanarte, workscripts, betscraper, template, agentic-coding; review each inferred .agentic.json before --yes
   - Expected outcomes: /Users/ronan paths portable, sanarte .vscode/mcp.json valid, stale packs removed, cloud assets seeded where opted in
   - Verify the second run reports no changes in every repo
   - Blocked-by: rv5n0lj (Implement scripts/align.py)
   - Requirements: [5.3](requirements.md#5.3)
 
-- [ ] 22. Run bootstrap on this machine and verify idempotence <!-- id:rv5n0lu -->
+- [ ] 23. Run bootstrap on this machine and verify idempotence <!-- id:rv5n0lu -->
   - Second run must report no changes (AC 8.2)
   - Verify VS Code discovers the PRD agent and skills; ~/.copilot/agents/prd.agent.md removed
   - Existing ~/.claude symlinks and skill names unchanged
   - Blocked-by: rv5n0lp (Implement scripts/bootstrap.sh)
   - Requirements: [8.2](requirements.md#8.2), [8.3](requirements.md#8.3), [9.1](requirements.md#9.1)
 
-- [ ] 23. Execute the PRD-lane worked example in a scratch repo <!-- id:rv5n0lv -->
+- [ ] 24. Execute the PRD-lane worked example in a scratch repo <!-- id:rv5n0lv -->
   - PRD with at least two contexts each having streams - exercises the context-qualified branch naming
   - Include one STOP task; verify blocked-at-STOP behaviour in --headless mode and the integrated-branch quality gate
   - Blocked-by: rv5n0ll (Write claude/skills/engage/SKILL.md execution skill), rv5n0lm (Write copilot/agents/prd.agent.md and delete stale copilot/prompts)

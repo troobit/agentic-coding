@@ -483,3 +483,36 @@ One mechanism covers regeneration safety, seeded-file convergence, repo-local ad
 - Marker discipline is load-bearing; a deleted marker demotes a file to hand-written (surfaced by report, but converging it again needs manual re-add)
 
 ---
+
+## Decision 16: Nextup Becomes an Autonomous Dispatcher
+
+**Date**: 2026-07-04
+**Status**: accepted
+
+### Context
+
+Nextup was designed as a dispatcher that routes work into the gated starwave lane. During this feature's rollout the user redefined nextup.md's primary purpose: think outside Claude, write the commands, enter — with instructions treated like any prompt. Forcing the starwave/PRD process when the job doesn't call for it is overkill, and the human-in-the-loop gates block fanning out parallel development attempts for testing.
+
+### Decision
+
+Nextup executes or dispatches user-zone instructions directly, reads PRDs (routing them to the execution lane), and — when an act-autonomously flag is set in the user zone — prefers the ungated lane end-to-end. The gated lane becomes a recommendation for feature-shaped work, never an enforcement (Requirement 10).
+
+### Rationale
+
+Direct user steering. The spec-driven gates exist to keep a human in the loop, which remains the default preference for feature work, but must not be the only path — autonomous parallel runs need an ungated route from a single written instruction.
+
+### Alternatives Considered
+
+- **Keep nextup dispatcher-only, add a separate autonomous entry skill**: Preserves nextup's routing purity - Rejected; nextup.md is exactly where the user writes instructions between sessions, so splitting the entry point defeats its purpose.
+- **Autonomy as the default, gates opt-in**: Maximum autonomy - Rejected; the user explicitly called the human-in-the-loop gating "good for now" as the default for feature work.
+
+### Consequences
+
+**Positive:**
+- One entry point covers gated, direct, and autonomous work
+- Parallel fan-out experiments can start from a single nextup.md instruction
+
+**Negative:**
+- Nextup's routing rules grow more complex; misreading intent now has an ungated failure mode (mitigated by requiring the explicit flag for autonomy)
+
+---
