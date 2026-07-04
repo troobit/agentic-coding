@@ -1,0 +1,11 @@
+{
+  "broken": {
+    "transport": {
+      "type": "stdio",
+      "command": "broken-cmd"
+    },
+    "secrets": {"TOKEN": {"keychain": "some-item"}},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": []
+  }
+}

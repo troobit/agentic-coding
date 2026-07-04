@@ -1,0 +1,24 @@
+#!/bin/sh
+# run_silent — buffer a command's stdout/stderr; print it only on failure.
+# Token-saving wrapper for agent-driven shells (see claude/CLAUDE.md).
+# Usage: run_silent <command> [args...]
+
+if [ $# -eq 0 ]; then
+    echo "usage: run_silent <command> [args...]" >&2
+    exit 64
+fi
+
+# Buffer to a file, not a shell variable: survives huge output and NUL bytes.
+buf=$(mktemp "${TMPDIR:-/tmp}/run_silent.XXXXXX") || exit 1
+trap 'rm -f "$buf"' EXIT
+
+"$@" >"$buf" 2>&1
+code=$?
+
+if [ $code -ne 0 ]; then
+    cat "$buf"
+    echo "run_silent: exit $code: $*" >&2
+else
+    echo "ok: $* ($(wc -l <"$buf" | tr -d ' ') lines suppressed)"
+fi
+exit $code

@@ -10,6 +10,7 @@ Implement the next unfinished group of tasks from the tasks list. A group of tas
 **Constraints:**
 
 **Task Retrieval:**
+- When no explicit tasks file path was given and more than one spec has an incomplete `tasks.md`, read the active feature from the `nextup.md` machine zone; if still ambiguous, list the candidates and ask the user to confirm — NEVER guess
 - The model MUST use the rune skill to retrieve the next task(s) to work on
 - Use `rune next --format json` to get the next incomplete task. This command will indicate when all tasks are complete
 - If the user asks for the entire phase, use `rune next --phase --format json`
@@ -24,7 +25,7 @@ Implement the next unfinished group of tasks from the tasks list. A group of tas
 - The model MUST read all files referenced in the front_matter_references
 - The selected tasks MUST be added to the internal TODO list for tracking and implemented in the order specified
 - The model MUST implement all of the selected tasks, including all subtasks
-- Once a subtask or task is completed, use the rune skill to mark it complete (e.g., `rune complete 1.1`)
+- Once a subtask or task is completed, use the rune skill to mark it complete (e.g., `rune complete specs/{feature}/tasks.md 1.1`)
 - The model MUST NOT proceed past the selected task. Once a task is done, it needs to be put up for review by the user
 - Use tools and skills as appropriate while implementing the task. For example, if you need to know the capabilities of a library, use context7, and if you want to verify your code is efficient, use the efficiency-optimizer skill
 
@@ -37,7 +38,7 @@ When a phase is pulled in and multiple streams have ready tasks:
      - Retrieve all phase tasks for their stream using `rune next --phase --stream N --format json`
      - Read all referenced files from front_matter_references
      - Implement the tasks in dependency order
-     - Mark tasks complete as they finish using `rune complete <task-id>`
+     - Mark tasks complete as they finish using `rune complete <tasks-file-path> <task-id>`
      - Report back when all tasks in the stream are done or blocked
    - The main agent coordinates by:
      - Monitoring subagent progress
@@ -53,7 +54,7 @@ When spawning a subagent for a stream, provide these instructions:
 - Path to the tasks file
 - List of front_matter_references to read
 - Instruction to use `rune next --phase --stream N --format json` to retrieve all tasks for the stream
-- Instruction to mark tasks complete using `rune complete <task-id>`
+- Instruction to mark tasks complete using `rune complete <tasks-file-path> <task-id>`
 - Instruction to stop when all tasks in the stream are complete or blocked by tasks in other streams
 
 **Cross-Stream Coordination:**
@@ -61,8 +62,12 @@ When spawning a subagent for a stream, provide these instructions:
 - If all streams become blocked waiting on each other, this indicates a circular dependency problem that should be reported to the user
 - The main agent should periodically check `rune streams --json` to monitor overall progress
 
+**Headless Runs (no human present):**
+When running non-interactively — e.g. driven by an external runner rather than a live user:
+- The model MUST NEVER call AskUserQuestion; there is no one to answer and the questions are dismissed unanswered
+- If the next task is blocked, requires user approval, or there is nothing left to do: write `.orbit/halt` in the repo root containing a one-line reason, print `ORBIT-HALT: <reason>` as the final line of output, then stop
+- Keep the sentinel file name (`.orbit/halt`) and output prefix (`ORBIT-HALT:`) exactly as written — external tooling matches on them
+
 **Specs Overview Update:**
 - After completing all tasks in the current group, check if `specs/OVERVIEW.md` exists in the project
-- If it exists, update the spec's status in the overview to reflect current progress:
-  - If all tasks in the entire spec are now complete: update status to `Done`
-  - If some tasks remain: update status to `In Progress` (if currently `Planned`)
+- If it exists, run `/specs-overview` once to regenerate it — it derives spec statuses and file lists from the tree. Never hand-edit `OVERVIEW.md`

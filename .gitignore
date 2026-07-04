@@ -1,1 +1,5 @@
 localdocs/
+__pycache__/
+# Local working file for /nextup (template is nextup.example.md)
+nextup.md
+*.pyc

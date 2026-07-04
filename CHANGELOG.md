@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-04]
+
+### Added
+- **PRD lane**: `prd` skill (author a standalone PRD with per-context requirement groups) and `engage` skill (derive rune task files per context, execute contexts in parallel worktrees with context-qualified branches, STOP protocol, integrated-branch quality gate), plus `copilot/agents/prd.agent.md` so VS Code Copilot and the cloud coding agent can author PRDs — the toolset-agnostic autonomous route alongside the Claude-only gated starwave lane
+- **Generation toolchain**: `shared/` convention fragments assembled by `scripts/generate.py` into `claude/CLAUDE.md` and `copilot/instructions/copilot-instructions.md` (both generated, managed-block markers, checked in); `mcp/servers.json` as the single MCP source of truth generating Claude user config, VS Code user `mcp.json`, per-repo `.mcp.json`/`.vscode/mcp.json`, and a paste-ready cloud-agent payload with per-surface secret mechanisms
+- **Per-repo alignment**: `scripts/align.py` driven by a checked-in `.agentic.json` — fixes stale user paths (portable forms), invalid JSON (backup + regenerate), drifted canonical MCP entries (non-canonical preserved), checksum-matched stale agent packs (`scripts/stale-packs.json`), and seeds cloud-agent assets in managed blocks; first run plans without applying
+- **Machine bootstrap**: `scripts/bootstrap.sh` (Homebrew, Brewfile, go installs, symlinks, config generation, VS Code seeding incl. the localml model provider, manual-auth list ending in re-run), `Brewfile`, `Makefile` (generate/sync/align/test/lint with a self-restoring drift check), and runbooks `docs/runbooks/localml-vscode.md` + `docs/runbooks/cloud-agent-mcp.md`
+- Test suite: 66 stdlib-unittest tests with golden fixtures covering generation, alignment idempotence, seeded-file preservation, and sync backwards compatibility
+
+### Changed
+- `nextup` skill: autonomous dispatch — the user zone is arbitrary instructions executed or dispatched directly when no spec work is called for; a PRD reference routes to `/engage` (missing-but-requested PRD → `/prd`); an `act autonomously` user-zone flag prefers the ungated lane end-to-end; the gated starwave lane is a recommendation for feature-shaped work, never an enforcement. Machine-zone rules, close-out mode, and the light/spec signal tables are unchanged
+- `scripts/sync-claude.sh`: existing six links unchanged; adds `mkdir -p` guards and a VS Code profile symlink for the PRD agent
+- README.md and spec-workflow.md: document the lane split (gated starwave = Claude Code; PRD lane = toolset-agnostic), the new layout, and the clone → bootstrap → authenticate quickstart
+- `engage` skill: precision fixes from the worked-example verification — derive commits its output, phase ordinals defined for named rune phases, Override 3 lists the make-it-so steps that don't apply inside a context, headless blocked-at-STOP contexts merge partial work with the task file as resume point, `git worktree remove --force` for artifact-dirtied worktrees
+
+### Fixed
+- Rollout hardening: rune installs via `go install` (the brew tap ships a broken v0.0.0 placeholder that also blocked `brew bundle`'s all-or-nothing fetch); Claude-CLI MCP convergence normalizes `args`/`env` so reruns report already-configured; shellcheck findings fixed now that `make lint` actually runs it; per-repo alignment applied across rtob, sanarte, workscripts, betscraper, template, and this repo (stale `/Users/ronan` paths, invalid JSON, 14 stale agent-pack files)
+
+### Removed
+- `copilot/prompts/` (8 stale prompt/chatmode files from the pre-starwave era) — superseded by the PRD lane assets and generated instructions
+
+## [2026-07-02]
+
+### Fixed
+- `claude/statusline.sh`: Read the effort level from `/Users/r/.claude/settings.json` instead of the hardcoded `/Users/arjen/...` path inherited from the upstream fork — the lookup silently failed on this machine, so the effort level never showed in the statusline
+
+### Changed
+- `nextup` skill: Reframe from "router, not executor" to **dispatcher, not implementer**. Routing is now evidence-based: step 6 lists concrete light-lane vs spec-lane signals (names an existing file/defect with fix/tweak/rename verbs vs new capability, several components, open design decisions), borderline jobs start at `/starwave:smolspec`, and every dispatch states the lane, skill, and deciding signal so the routing can be trusted without re-checking. New step 6b splits the user zone into independent jobs: unattended-safe light-lane jobs fan out to parallel sub-agents (one per job in a single message, each running its routed skill, worktree isolation when they mutate files, nextup staying on as overseer to integrate outcomes into the machine zone), while gated spec-lane jobs — whose approval gates a sub-agent cannot collect — run inline one at a time with the rest queued under Next up. `/bug-blitz` still owns same-shaped bug batches, and nextup still never implements, reviews, or commits work itself and only recommends `/make-it-so` / `/next-task`
+- `nextup` skill + `nextup.example.md`: Machine-zone marker is now `<!-- LM -->`, mirroring `<!-- USER -->` at the top of the user zone. Legacy markers (`<!-- ML -->`, `<!-- nextup:machine -->`, `# What I want`) still parse but are migrated to `<!-- LM -->` on rewrite. The machine zone is restricted to the template's fields only (feature, branch, stage, progress, next up, notes) — close-out now writes its handoff into those fields instead of growing new sections — and the user-zone placeholder reads `<user inputs for next session>`
+- `sendit` skill: Update the machine-zone reference to the `<!-- LM -->` marker (treating `<!-- ML -->` / `<!-- nextup:machine -->` as legacy equivalents); it previously matched only `<!-- nextup:machine -->` and would have missed migrated files
+
+## [2026-06-19]
+
+### Added
+- `sendit` skill: Ship the active feature's spec documents to the user's Prism iCloud review folder (`~/Library/Mobile Documents/com~apple~CloudDocs/Prism Markdown/`) for review. Resolves the active feature the same way `/nextup` does (conversation/user-zone reference → branch → machine zone), copies `*.md` from `specs/{feature}/` into Prism as is (no subfolder or prefix, replacing same-named files), updates the `nextup.md` machine zone to record the handoff and point Next up at "review in Prism then `/nextup`", and closes out the session
+
+### Changed
+- `starwave-requirements`, `starwave-design`, `starwave-tasks`, and `starwave-smolspec` skills: Make `/sendit` the **default action** offered at every "do the requirements/design/tasks/smolspec look good?" approval gate. The reviewer is often non-technical and reviews markdown in Prism rather than the terminal, so each gate now offers `/sendit` (ship to Prism + close out) as the recommended choice alongside approving inline or requesting changes
+
 ## [2026-05-22]
 
 ### Changed

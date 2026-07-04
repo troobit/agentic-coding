@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "devtools": {
+      "type": "stdio",
+      "command": "/Users/ronan/go/bin/mcp-devtools",
+      "env": {
+        "ENABLE_ADDITIONAL_TOOLS": "everything-and-the-kitchen-sink"
+      }
+    },
+    "my-local-server": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["./tools/local-mcp.js"]
+    }
+  }
+}

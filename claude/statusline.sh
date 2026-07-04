@@ -6,7 +6,7 @@ input=$(cat)
 # Extract values
 cwd=$(echo "$input" | jq -r '.workspace.current_dir')
 model=$(echo "$input" | jq -r '.model.display_name')
-effort=$(jq -r '.effortLevel // empty' /Users/arjen/.claude/settings.json 2>/dev/null)
+effort=$(jq -r '.effortLevel // empty' /Users/r/.claude/settings.json 2>/dev/null)
 
 # Get git branch and dirty status if in a git repo
 git_branch=""

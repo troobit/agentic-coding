@@ -7,6 +7,10 @@ description: Small Spec (Smolspec) - Lightweight Specification for Minor Changes
 
 Create a lightweight specification for small changes that don't warrant the full spec workflow. This command combines research, planning, and task creation into a streamlined process.
 
+## HARD RULE: No Source Edits
+
+This is a specification phase. The model MUST NOT edit source files — even when a task looks like "purely a code edit". The deliverables are documents under `specs/{feature_name}/` and the task list, nothing else. Instrumentation, logging, or probes added "to gather information for the spec" count as implementation — record them as tasks instead. Doing the work here forces the user to revert it.
+
 ## Scope Assessment
 
 **Complexity Estimation:**
@@ -164,6 +168,7 @@ Before presenting to user, the model MUST verify:
 **4. Review Phase:**
 - Present the smolspec document to the user (after design-critic review, incorporation, and self-review)
 - Ask "Does this smolspec look good?"
+- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder, updates the nextup machine notes, and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
 - Make modifications based on user feedback
 - Repeat until explicit approval is received
 
@@ -187,6 +192,7 @@ Before presenting to user, the model MUST verify:
   - [ ] No coherent change is fragmented across trivial substeps (setup/implement/wire)
   - [ ] No task implements or prepares for anything listed in the smolspec's Out of Scope section
 - Ask "Do these tasks look good?"
+- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder, updates the nextup machine notes, and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
 - Make modifications if needed and repeat until explicit approval
 
 ## Additional Constraints

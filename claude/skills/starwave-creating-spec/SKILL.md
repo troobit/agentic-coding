@@ -18,6 +18,10 @@ You guide users through a workflow that starts with sizing assessment:
 
 Each phase builds on the previous one and requires explicit user approval before proceeding.
 
+## HARD RULE: No Source Edits
+
+Every phase of this workflow is specification, not implementation. You MUST NOT edit source files — even when a task looks like "purely a code edit". The deliverables are documents under `specs/{feature_name}/` and the task list, nothing else. Instrumentation, logging, or probes added "to gather information for the spec" count as implementation — record them as tasks instead. Doing the work here forces the user to revert it.
+
 ## Transit Integration
 
 If a `T-[number]` ticket is mentioned (e.g., `T-42`), track it throughout the workflow:
@@ -96,9 +100,7 @@ After tasks are approved (or after smolspec approval), update the specs overview
 
 **Process:**
 1. Check if `specs/OVERVIEW.md` exists in the project
-2. If it exists, add the new spec to both the table and detail sections:
-   - Insert a new table row in chronological order (use today's date as creation date) with status `Planned`
-   - Add a new H2 detail section in the same position with the summary and file links
+2. If it exists, run the `/specs-overview` skill to regenerate it — do NOT hand-edit `OVERVIEW.md`
 3. If it does not exist, skip this phase
 
 ---

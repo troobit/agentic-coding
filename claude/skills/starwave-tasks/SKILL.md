@@ -164,15 +164,18 @@ If any check fails, the model MUST fix the issue and re-run the checks before pr
 
 **Approval Workflow:**
 - After updating the tasks document, the model MUST ask the user "Do the tasks look good?"
+- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder, updates the nextup machine notes, and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
 - The model MUST make modifications to the tasks document if the user requests changes or does not explicitly approve
 - The model MUST ask for explicit approval after every iteration of edits to the tasks document
 - The model MUST NOT consider the workflow complete until receiving clear approval (such as "yes", "approved", "looks good", etc.)
 - The model MUST continue the feedback-revision cycle until explicit approval is received
 - The model MUST stop once the task document has been approved
 
-**Workflow Scope:**
+**Workflow Scope — HARD RULE, No Source Edits:**
 This workflow is ONLY for creating design and planning artifacts. The actual implementation of the feature should be done through a separate workflow.
 - The model MUST NOT attempt to implement the feature as part of this workflow
+- The model MUST NOT edit source files — even when a task looks like "purely a code edit"; the deliverables are documents and the task list, nothing else
+- Instrumentation, logging, or probes added "to gather information for the plan" count as implementation — record them as tasks instead
 - The model MUST clearly communicate to the user that this workflow is complete once the design and planning artifacts are created
 
 **Rune CLI Task Creation:**

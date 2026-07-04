@@ -1,0 +1,31 @@
+{
+  "_comment": "SHA-256 checksums of the known-stale agent-pack files duplicated into /Users/r/repos/rtob/.github/agents/ and /Users/r/repos/workscripts/.github/agents/. Generated 2026-07-04 from the actual file bytes in those repos (janitor and prompt-engineer are byte-identical in both; the other five differ, so both hashes are listed). align.py deletes a file under .github/agents/ when its SHA-256 appears in any list below; filenames record provenance only. align warns when .github/agents/ has unmanaged files but zero checksum matches.",
+  "packs": {
+    "agent-yolo.agent.md": [
+      "0f1683da7ca6fc7cf8cc7005827c010fe9883f39c42089619f250934c2cd70f6",
+      "55380259a6c6f7ef2fb94ed71018cd3b338ad674882a2aeaf9f8be8269858d88"
+    ],
+    "janitor.agent.md": [
+      "fb06a0b85093a56b7fb3bf2491e32258c816aa964c3b01edc95414ae4942c709"
+    ],
+    "orchestrator.agent.md": [
+      "8bbd05dcc629aba5593604535e38ac40c725819e5a5c21e68ab981cfe050c02b",
+      "c29c0216c61f61e7974136f6bfe74ad16e10d163116c80f8233c0a6a357dc0bb"
+    ],
+    "planner.agent.md": [
+      "4f0c8ea6932bd1d72103d5a572d47d6ae82456f92a88d8f514d1a884b7a068fc",
+      "7630c32f5e3f77e789b051cf73745bed2b0fc8fbe41535423d379a2596808c2b"
+    ],
+    "prompt-engineer.agent.md": [
+      "52598390ce00e0a691c8e554ee4d6baa0097867627a4b1d9fb4b3edb98cac7a4"
+    ],
+    "reviewer.agent.md": [
+      "64486aad37589e91a34c9244461718fbe3d11d47a9d13b0e5d1271a038560a0e",
+      "b9c468746761a5c429959c4b0698b57e2d75ae9a7de10e8d9dde8dda3cf50096"
+    ],
+    "worker.agent.md": [
+      "adb7ce1e1e34ba0a3ad30373d867869c56cfef638d23048e1febbffe1605857b",
+      "c4f7baffd970ffa372921d138d2c6b0d5bcb28fbf90895aa88734b7787fac353"
+    ]
+  }
+}

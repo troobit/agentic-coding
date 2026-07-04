@@ -1,0 +1,25 @@
+{
+  "_comment": "Canonical MCP fixture for align tests. Mirrors the mcp/servers.json schema from the design; kept minimal and secret-free so align tests do not depend on stream-1 writer goldens.",
+  "devtools": {
+    "transport": {
+      "type": "stdio",
+      "command": "mcp-devtools",
+      "env": {
+        "ENABLE_ADDITIONAL_TOOLS": "sequential_thinking"
+      }
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": ["*"]
+  },
+  "svelte": {
+    "transport": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@sveltejs/mcp"]
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": ["svelte.config.js"]
+  }
+}

@@ -9,10 +9,19 @@ Implement all the remaining tasks from the spec, one phase at a time. The main a
 
 **Constraints:**
 
+**Target Resolution (main agent):**
+- When no explicit tasks file path was given and more than one spec has an incomplete `tasks.md`, read the active feature from the `nextup.md` machine zone
+- If that still doesn't resolve to a single spec, list the candidates and ask the user to confirm — NEVER guess (a guessed target can resolve to a stale spec whose next task is a human STOP gate)
+- Pass the resolved explicit tasks file path to every rune command
+
 **Phase Retrieval (main agent):**
 - The main agent MUST use the rune skill to retrieve the next phase to work on
 - Use `rune next --phase --format json` to get the next incomplete phase
 - If `rune next` reports that all tasks are complete, stop the loop and report completion to the user
+
+**Phase Buildability (main agent):**
+- Each phase's final integrated commit SHOULD leave the app buildable
+- Where the task graph makes that impossible, ensure `tasks.md` records the expected breakage (add a details line via rune) and include that note in every subagent prompt, so subagents don't diagnose a pre-existing build failure as their own
 
 **Stream Detection (main agent):**
 - Once a phase is selected, the main agent MUST run `rune streams --available --json` to detect ready work streams
@@ -38,7 +47,7 @@ Each subagent prompt MUST include:
   - Use `rune next --phase --stream N --format json` to retrieve all tasks for the stream
   - Read all referenced files before implementing
   - Implement tasks in dependency order. Use tools/skills as needed (context7 for library docs, efficiency-optimizer for verification, etc.)
-  - Mark each task complete with `rune complete <task-id>` as it finishes
+  - Mark each task complete with `rune complete <tasks-file-path> <task-id>` as it finishes
   - Run all formatting and test commands for the project before committing
   - Stage changes (including any reformatting and the modified `tasks.md`) and commit using the **Subagent Commit Conventions** below
   - Stop when all tasks in the stream are complete, when blocked by tasks in other streams, or on unrecoverable failure
@@ -72,7 +81,7 @@ The main agent MUST spawn one subagent (Task tool, `general-purpose` unless a mo
   - Use `rune next --phase --stream N --format json` if a single stream is in play, otherwise `rune next --phase --format json`, to retrieve all tasks for the phase
   - Read all referenced files before implementing
   - Implement all tasks (including subtasks) in the order specified, using tools/skills as needed
-  - Mark each task complete with `rune complete <task-id>` as it finishes
+  - Mark each task complete with `rune complete <tasks-file-path> <task-id>` as it finishes
   - Run all formatting and test commands for the project before committing
   - Stage changes (including any reformatting and the modified `tasks.md`) and commit on the current working branch using the **Subagent Commit Conventions** below
   - Report back: list of completed task IDs and final status (`done` | `failed`)
@@ -80,16 +89,13 @@ The main agent MUST spawn one subagent (Task tool, `general-purpose` unless a mo
 The main agent waits for the subagent to return and surfaces any failure to the user before continuing.
 
 **Review (main agent):**
-- Once the phase is fully integrated (parallel mode) or the single subagent has returned `done` (single-subagent mode), use the design-critic skill over the resulting state and verify it's correct. Issues detected should be fixed (delegate the fix as a follow-up subagent if it involves code, or update the decision log directly)
+- Once the phase is fully integrated (parallel mode) or the single subagent has returned `done` (single-subagent mode), run the design-critic skill over the phase's implementation **diff** (e.g. `git diff` from the phase's starting commit to HEAD) — not a plain read-through of the final state, which reliably finds nothing. Issues detected should be fixed (delegate the fix as a follow-up subagent if it involves code, or update the decision log directly)
+- When relaying the phase's results to the user, include one plain-English line per fix or change on how to verify it (what to do in the running app and what should happen) — dense subagent reports alone leave the user unsure what was actually solved
 
 **Phase Changelog & Specs Overview (main agent):**
 - After review, write a single phase-level changelog entry summarising the work done in this phase (subagent commits never touch the changelog — see Subagent Commit Conventions). Read `CHANGELOG.md` (create if missing), prepend the entry if not already present, and commit it as `[doc]: changelog for phase <P>` (or with a ticket prefix if applicable)
 - Then check if all tasks in the spec are complete: `rune list specs/{feature_name}/tasks.md --format json` and verify no incomplete tasks remain
-- If all tasks complete AND `specs/OVERVIEW.md` exists:
-  - Update the spec's status from `Planned` or `In Progress` to `Done`
-  - If new files were created in the spec directory during implementation (e.g., `implementation.md`), add them to the spec's detail section file list
-- If tasks remain AND `specs/OVERVIEW.md` exists AND the spec's status is `Planned`:
-  - Update the spec's status from `Planned` to `In Progress`
+- If `specs/OVERVIEW.md` exists, run `/specs-overview` once to regenerate it — it derives spec statuses and file lists from the tree. Never hand-edit `OVERVIEW.md`
 - Commit any overview/decision-log updates
 
 **Compact and Continue (main agent):**

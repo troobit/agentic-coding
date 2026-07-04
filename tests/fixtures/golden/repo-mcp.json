@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "alpha": {
+      "type": "stdio",
+      "command": "alpha-cmd",
+      "env": {"MODE": "full"}
+    },
+    "bravo": {
+      "type": "http",
+      "url": "https://bravo.example/mcp",
+      "headers": {"Authorization": "${BRAVO_AUTH_TOKEN}"}
+    },
+    "envy": {
+      "type": "stdio",
+      "command": "envy-cmd",
+      "env": {"SERVICE_KEY": "${ENVY_API_KEY}"}
+    }
+  }
+}
