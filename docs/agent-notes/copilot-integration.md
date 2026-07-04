@@ -22,6 +22,7 @@ Facts verified against live docs/issues during the toolset-agnostic-starwave spe
 - Peer review externals are down on this machine: `gemini` CLI not installed, `codex` returns 401 (needs `codex login`, no `~/.codex/auth.json`). Restoration steps are on bootstrap's manual-auth list (spec task 17).
 - Improvement idea (unscheduled): peer-review-validator should detect missing externals immediately and fall back fast instead of spending minutes discovering it.
 
-## Known config drift fixed by this feature's rollout
+## Config drift — FIXED in the 2026-07-04 rollout
 
-- `/Users/ronan/...` absolute paths in rtob and sanarte MCP configs; invalid JSON in sanarte `.vscode/mcp.json`; duplicated awesome-copilot agent packs in rtob and workscripts; four competing MCP config shapes across tools. See specs/toolset-agnostic-starwave/.
+- `/Users/ronan/...` paths, invalid JSON (sanarte), and 14 stale agent-pack files were fixed by running `scripts/align.py` across rtob, sanarte, workscripts, betscraper, template, and this repo (committed per repo, not pushed). Original broken configs survive as `.bak-2026-07-04` files in rtob/sanarte. Keeping repos aligned is now `make align` / `scripts/align.py <repo>` — see docs/agent-notes/align-tooling.md.
+- The rune brew tap (`arjenschwarz/rune`) ships a broken v0.0.0 placeholder — rune installs via `go install github.com/arjenschwarz/rune@latest` (bootstrap does this).
