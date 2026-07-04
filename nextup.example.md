@@ -1,6 +1,6 @@
 <!-- USER -->
 
-<user inputs for next session>
+<user inputs for next session — free-form instructions, run as written; add a line `act autonomously` to skip approval gates>
 
 <!-- LM -->
 
