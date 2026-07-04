@@ -119,7 +119,7 @@ references:
   - Stream: 4
   - Requirements: [3.1](requirements.md#3.1), [3.4](requirements.md#3.4), [9.1](requirements.md#9.1)
 
-- [ ] 17. Implement scripts/bootstrap.sh <!-- id:rv5n0lp -->
+- [x] 17. Implement scripts/bootstrap.sh <!-- id:rv5n0lp -->
   - Order per design; no JSON manipulation in shell - delegates to generate.py (Decision 12 rationale)
   - --dry-run flag; unauthenticated steps skip with report and land on the manual list
   - Manual list: gh auth login, claude login, Copilot sign-in, GitHub MCP token, codex login (restores peer review), optional gemini CLI install; ends with re-run bootstrap.sh after authenticating

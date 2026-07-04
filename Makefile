@@ -1,5 +1,6 @@
 # Development tooling for agentic-coding.
 #
+# bootstrap one-script new-machine setup (scripts/bootstrap.sh)
 # generate  rebuild the checked-in generated files (claude/CLAUDE.md,
 #           copilot/instructions/copilot-instructions.md) and MCP configs
 # sync      create the ~/.claude and VS Code profile symlinks
@@ -8,7 +9,10 @@
 # lint      shellcheck all shell scripts + fail if generated files drift
 #           from their sources in shared/ and mcp/
 
-.PHONY: generate sync align test lint lint-shell lint-drift
+.PHONY: bootstrap generate sync align test lint lint-shell lint-drift
+
+bootstrap:
+	scripts/bootstrap.sh
 
 generate:
 	python3 scripts/generate.py

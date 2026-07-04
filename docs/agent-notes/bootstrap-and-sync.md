@@ -1,5 +1,39 @@
 # Bootstrap, Brewfile, Makefile, and sync-claude.sh
 
+## bootstrap.sh
+
+- One-script new-machine setup (Req 8); order is fixed by design.md's
+  Bootstrap section: Homebrew → `brew bundle` → Claude Code installer →
+  `go install` orbit + mcp-devtools → `mkdir -p` targets → `sync-claude.sh`
+  → `generate.py --user` → remove stale `~/.copilot/agents/prd.agent.md`
+  → print manual auth steps, ending with "re-run scripts/bootstrap.sh after
+  authenticating".
+- No `set -e`: per-step failures are reported (`FAILED:`) and independent
+  later steps still run; exit code is 1 if anything hard-failed. Steps
+  blocked on missing auth use `skip_for_auth`, which both reports the skip
+  and appends the redo instruction to the manual-steps list.
+- Every step prints exactly one of `did:` / `already done:` / `skipped:` /
+  `dry-run: would ...` — a second run on a configured machine is all
+  `already done` (plus generate.py's own "no changes").
+- `--dry-run` mutates nothing. The only commands it runs are read-only
+  probes (`command -v`, `brew bundle check`, `go env GOPATH`).
+- Module paths: orbit `github.com/arjenschwarz/orbit/cmd/orbit@latest`;
+  mcp-devtools `github.com/sammcj/mcp-devtools@latest` (main package at the
+  module root — verified against its go.mod 2026-07-04; upstream README
+  suggests `@HEAD`, `@latest` works). Go tools are skipped as
+  `already done` when the binary is on PATH or in `$(go env GOPATH)/bin` —
+  bootstrap does not upgrade them; re-run `go install` manually for that.
+- Homebrew discovery checks PATH then `/opt/homebrew/bin/brew` and
+  `/usr/local/bin/brew` (fresh installs aren't on PATH yet); after the
+  Homebrew step it `eval "$($BREW shellenv)"` so the rest of the run sees
+  brew and everything brew bundle installed.
+- All JSON work (user MCP configs, VS Code settings merge) is delegated to
+  `generate.py --user` per Decision 12 — the shell only mkdirs, symlinks
+  (via sync-claude.sh), and removes the one known stale file.
+- `make bootstrap` wraps it. shellcheck was not installed on this machine
+  when written; validated with `bash -n` only (make lint-shell will
+  shellcheck it once shellcheck is installed).
+
 ## Brewfile
 
 - Installed by `scripts/bootstrap.sh` via `brew bundle` (Req 8.1 of toolset-agnostic-starwave).
