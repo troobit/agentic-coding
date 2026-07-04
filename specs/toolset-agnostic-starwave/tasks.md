@@ -128,7 +128,7 @@ references:
   - Stream: 4
   - Requirements: [8.1](requirements.md#8.1), [8.2](requirements.md#8.2), [8.3](requirements.md#8.3), [8.4](requirements.md#8.4), [1.4](requirements.md#1.4)
 
-- [ ] 18. Write docs/runbooks/localml-vscode.md <!-- id:rv5n0lq -->
+- [x] 18. Write docs/runbooks/localml-vscode.md <!-- id:rv5n0lq -->
   - Step-by-step exact values only: start command, Manage Language Models fields, placeholder API key, model picking
   - References the seeded settings entry as the already-done part
   - Stream: 5
