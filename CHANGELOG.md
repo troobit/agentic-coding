@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-05]
+
+### Added
+- **Transit workflow integration**: restored the Transit conventions dropped in a0aea2e via the generated-fragments architecture — tool-neutral rules (`T-<id>` ticket references, status-change comments, one Transit project per repo with an optional `transit_project` override in `.agentic.json`) in `shared/conventions.md`, Claude-side `mcp__transit__*` tool names and the `/transit` router pointer in `shared/claude-wrapper.md`, both regenerated into the checked-in outputs. New cross-project integration reference (`docs/agent-notes/transit-integration.md`) mapping every Transit status/column onto the SDD workflow (driving skill + transition trigger, including the PRD lane), plus a `docs/runbooks/transit-mcp.md` setup/smoke-test runbook and a Transit tickets section in `spec-workflow.md`
+- **PRD-lane Transit hooks (optional)**: `prd` moves a referenced ticket to `planning` on authoring start; `engage` moves it to `in-progress` on execution start and `ready-for-review` on completion — always with comments, skipped when no ticket applies, and never setting `done` autonomously
+- `tests/test_align.py`: `ManifestPreservationTest` pins that align never rewrites an existing `.agentic.json`, so optional keys like `transit_project` survive; the conventions test now also forbids `mcp__` in the Copilot output
+
 ## [2026-07-04]
 
 ### Added
