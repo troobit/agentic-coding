@@ -83,14 +83,14 @@ references:
   - Stream: 2
   - Requirements: [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [4.4](requirements.md#4.4), [6.1](requirements.md#6.1), [6.2](requirements.md#6.2)
 
-- [ ] 12. Write claude/skills/prd/SKILL.md authoring skill <!-- id:rv5n0lk -->
+- [x] 12. Write claude/skills/prd/SKILL.md authoring skill <!-- id:rv5n0lk -->
   - Sections per design: product summary, goals/non-goals, functional requirements grouped per context H2, acceptance criteria, execution notes (quality gates, STOP)
   - Adapted from the old prd.agent.md outline; drop personas/metrics boilerplate and the GitHub-issue step
   - Output specs/{prd-name}/prd.md; one PRD targets one repository
   - Stream: 3
   - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.3](requirements.md#1.3)
 
-- [ ] 13. Write claude/skills/engage/SKILL.md execution skill <!-- id:rv5n0ll -->
+- [x] 13. Write claude/skills/engage/SKILL.md execution skill <!-- id:rv5n0ll -->
   - Derive: per-context tasks-{context}.md via rune create/batch with phases+streams, slug rule, STOP tasks from execution notes, skip existing files, abort on slug collision
   - Execute: worktree .claude/worktrees/prd-{prd}-{context}, branch prd/{prd}-{context}, inner stream branches stream/{context}-<phase>-<N>
   - STOP protocol: subagent returns blocked-at-STOP; interactive gate vs --headless blocked report
@@ -99,7 +99,7 @@ references:
   - Stream: 3
   - Requirements: [2.1](requirements.md#2.1), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [2.7](requirements.md#2.7)
 
-- [ ] 14. Write copilot/agents/prd.agent.md and delete stale copilot/prompts <!-- id:rv5n0lm -->
+- [x] 14. Write copilot/agents/prd.agent.md and delete stale copilot/prompts <!-- id:rv5n0lm -->
   - .agent.md frontmatter (name, description, tools) instructing the prd skill outline
   - Delete all 8 files under copilot/prompts/ including design-critic.chatmode.md
   - Blocked-by: rv5n0lk (Write claude/skills/prd/SKILL.md authoring skill)
