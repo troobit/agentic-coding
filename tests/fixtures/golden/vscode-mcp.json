@@ -1,0 +1,38 @@
+{
+  "servers": {
+    "alpha": {
+      "type": "stdio",
+      "command": "alpha-cmd",
+      "env": {"MODE": "full"}
+    },
+    "bravo": {
+      "type": "http",
+      "url": "https://bravo.example/mcp",
+      "headers": {"Authorization": "${input:bravo-auth-token}"}
+    },
+    "envy": {
+      "type": "stdio",
+      "command": "envy-cmd",
+      "env": {"SERVICE_KEY": "${input:envy-api-key}"}
+    },
+    "zulu": {
+      "type": "stdio",
+      "command": "podman",
+      "args": ["run", "-i", "--rm", "img:latest"]
+    }
+  },
+  "inputs": [
+    {
+      "id": "bravo-auth-token",
+      "type": "promptString",
+      "description": "Secret AUTH_TOKEN for MCP server bravo",
+      "password": true
+    },
+    {
+      "id": "envy-api-key",
+      "type": "promptString",
+      "description": "Secret API_KEY for MCP server envy",
+      "password": true
+    }
+  ]
+}
