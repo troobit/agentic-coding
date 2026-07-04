@@ -15,8 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite: 66 stdlib-unittest tests with golden fixtures covering generation, alignment idempotence, seeded-file preservation, and sync backwards compatibility
 
 ### Changed
+- `nextup` skill: autonomous dispatch — the user zone is arbitrary instructions executed or dispatched directly when no spec work is called for; a PRD reference routes to `/engage` (missing-but-requested PRD → `/prd`); an `act autonomously` user-zone flag prefers the ungated lane end-to-end; the gated starwave lane is a recommendation for feature-shaped work, never an enforcement. Machine-zone rules, close-out mode, and the light/spec signal tables are unchanged
 - `scripts/sync-claude.sh`: existing six links unchanged; adds `mkdir -p` guards and a VS Code profile symlink for the PRD agent
 - README.md and spec-workflow.md: document the lane split (gated starwave = Claude Code; PRD lane = toolset-agnostic), the new layout, and the clone → bootstrap → authenticate quickstart
+- `engage` skill: precision fixes from the worked-example verification — derive commits its output, phase ordinals defined for named rune phases, Override 3 lists the make-it-so steps that don't apply inside a context, headless blocked-at-STOP contexts merge partial work with the task file as resume point, `git worktree remove --force` for artifact-dirtied worktrees
+
+### Fixed
+- Rollout hardening: rune installs via `go install` (the brew tap ships a broken v0.0.0 placeholder that also blocked `brew bundle`'s all-or-nothing fetch); Claude-CLI MCP convergence normalizes `args`/`env` so reruns report already-configured; shellcheck findings fixed now that `make lint` actually runs it; per-repo alignment applied across rtob, sanarte, workscripts, betscraper, template, and this repo (stale `/Users/ronan` paths, invalid JSON, 14 stale agent-pack files)
 
 ### Removed
 - `copilot/prompts/` (8 stale prompt/chatmode files from the pre-starwave era) — superseded by the PRD lane assets and generated instructions

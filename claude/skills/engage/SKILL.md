@@ -26,6 +26,7 @@ For each context H2:
    - `rune create specs/{prd-name}/tasks-{slug}.md --title "{PRD title} — {context name}" --reference prd.md`
    - `rune batch` to add phases and tasks: one phase per requirement cluster within the context; tasks derived from the numbered requirements and their acceptance criteria; `blocked_by` where tasks build on one another; streams where tasks within the context are independent (streams give intra-context parallelism).
 5. Execution notes that require human verification become tasks titled with the `STOP — ` prefix, placed in the affected context's file with `blocked_by`/dependents wired so work that needs the verification cannot start before it.
+6. **Commit the derived files** (`[doc]: derive rune task files for prd {prd-name}`). Step 2's worktrees branch from the working branch — an uncommitted task file never reaches the subagents.
 
 ## Step 2: Execute (one worktree per context)
 
@@ -37,8 +38,9 @@ Contexts run in parallel, one subagent per context. For each context with an inc
    - The absolute worktree path (it MUST `cd` there first) and its task file path (`specs/{prd-name}/tasks-{slug}.md` inside the worktree).
    - The instruction to read `prd.md` (the front-matter reference) before implementing.
    - The instruction to apply the **make-it-so delegation loop** against its own task file: `rune next --phase --format json`, stream detection via `rune streams --available --json`, parallel or single-subagent delegation per phase, `rune complete` per task — exactly as make-it-so specifies, with the two overrides below.
-   - **Override 1 — context-qualified inner names**: inner stream branches/worktrees MUST be `stream/{slug}-<phase>-<N>` (worktrees `.claude/worktrees/{slug}-<phase>-stream-<N>`), NOT make-it-so's plain `stream/<phase>-<N>`. Branch names are repo-global; the unqualified names collide the moment two contexts each have streams.
+   - **Override 1 — context-qualified inner names**: inner stream branches/worktrees MUST be `stream/{slug}-<phase>-<N>` (worktrees `.claude/worktrees/{slug}-<phase>-stream-<N>`), NOT make-it-so's plain `stream/<phase>-<N>`. Branch names are repo-global; the unqualified names collide the moment two contexts each have streams. `<phase>` is the 1-based position of the phase among the file's incomplete phases at dispatch time — rune phases are named, not numbered.
    - **Override 2 — nobody touches CHANGELOG.md**: make-it-so's Subagent Commit Conventions apply unchanged EXCEPT that no subagent at any level, and no context, writes to `CHANGELOG.md`. Engage writes one PRD-level changelog entry after integration (Step 4).
+   - **Override 3 — session-level make-it-so steps do not apply inside a context**: skip make-it-so's per-phase changelog entry (superseded by Override 2), `/specs-overview`, and `/compact`. The design-critic phase review is replaced by a diff self-review within the context subagent; engage-level review happens on the integrated branch.
    - The STOP protocol below.
    - Report back: context name, branch, completed task IDs, and final status (`done` | `blocked-at-STOP` with the task id | `failed`).
 
@@ -46,10 +48,10 @@ A context subagent failure surfaces per make-it-so convention: that context stop
 
 ## Step 3: STOP Protocol
 
-A context subagent that reaches a ready `STOP — ` task MUST halt that context (committing completed work first) and return `blocked-at-STOP` with the task id.
+A context subagent that reaches a ready `STOP — ` task MUST halt that context and return `blocked-at-STOP` with the task id. Completed work must be committed before halting — in parallel-stream mode it already is (stream branches commit before the STOP is reachable); in single-stream mode the subagent commits explicitly.
 
 - **Interactive run**: engage asks the user to perform the verification, then re-dispatches the context subagent to continue from its task file.
-- **Headless run**: the STOP task and all its dependents stay not-started; the context is reported blocked. No prompt, no timeout-wait.
+- **Headless run**: the STOP task and all its dependents stay not-started; the context is reported blocked. No prompt, no timeout-wait. The context's partial committed work still merges in Step 4 — the task file on the integrated branch records the remaining state, and a later engage run resumes from it (derive skips the existing file; execute continues its incomplete tasks).
 
 ## Step 4: Integrate
 
@@ -58,7 +60,7 @@ A context subagent that reaches a ready `STOP — ` task MUST halt that context 
 2. **Any merge conflict stops integration and is reported** — never auto-resolve conflicts across contexts. Report which branches merged and which remain.
 3. After all merges, run the quality gates ONCE on the integrated branch: `make build`, `make test`, `make lint` (whichever targets the Makefile defines). A context passing in isolation does not make the PRD complete. If the repository has no Makefile, note "no quality gates ran" in the report.
 4. Write ONE PRD-level `CHANGELOG.md` entry summarising the PRD's work and commit it (this is the only changelog write in the entire flow).
-5. Remove merged worktrees and delete merged context branches.
+5. Remove merged worktrees and delete merged context branches (`git worktree remove --force` — build/lint artifacts like `__pycache__/` routinely dirty a worktree and block the plain command; make sure the project's `.gitignore` covers such artifacts or make-it-so's "stage all files" step commits them and they become the only merge conflicts). Deleting a merged blocked-at-STOP branch is safe: the merged task file is the resume point.
 
 ## Step 5: Complete and Report
 
