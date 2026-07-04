@@ -15,6 +15,10 @@ Produce exactly one PRD document that a coding agent can execute to completion w
 - **Derivability is the quality bar.** The PRD MUST be written so that rune task files (or full specs) can be derived from it by a fresh session without asking the author anything. If a requirement would need clarification at derivation time, it is not done.
 - Do NOT include user personas, success-metrics boilerplate, milestones, or team-sizing sections unless the author explicitly asks for them.
 
+## Transit (Optional)
+
+When the user gives a `T-<id>` reference, or the target repo's `.agentic.json` sets `transit_project` and the user references a ticket: move the ticket to `planning` status via `mcp__transit__update_task_status` when authoring starts, with a comment (e.g. "Moving to planning — PRD authoring started"). The PRD lane has no spec gate, so `planning` is the only status the prd skill sets; the engage skill takes over from execution. Skip this entirely when no ticket applies — a PRD never requires one.
+
 ## Workflow
 
 **1. Clarify.** Before writing anything, ask 3-5 clarifying questions to remove ambiguity. Ask them one at a time, concretely, describing observable behavior — not implementation jargon. Cover at minimum: the target repository, the applications/code contexts involved, what is explicitly out of scope, and any points where a human must verify before work continues.

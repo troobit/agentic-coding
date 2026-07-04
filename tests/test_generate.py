@@ -51,6 +51,7 @@ class ConventionsAssemblyTests(unittest.TestCase):
             ".claude/scripts",
             ".claude/skills",
             "explain-like",
+            "mcp__",
         ):
             self.assertNotIn(forbidden, block, f"Copilot output leaks {forbidden!r}")
 

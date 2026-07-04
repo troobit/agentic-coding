@@ -13,6 +13,10 @@ Take a PRD written by the prd skill and run it to completion with no approval ga
 - **Interactive mode** (default): the skill runs in a live Claude session and may ask the user at STOP tasks.
 - **Headless mode** (`--headless`): no user interaction ever; STOP tasks and their dependents are left not-started and reported as blocked. This is also the mode orbit's non-interactive command uses.
 
+## Transit (Optional)
+
+When the PRD or the user references a `T-<id>` ticket (or the repo's `.agentic.json` sets `transit_project` and a ticket was named): move the ticket to `in-progress` via `mcp__transit__update_task_status` when execution starts (comment: e.g. "Moving to in-progress — engage executing PRD {prd-name}") and to `ready-for-review` when the run completes (comment summarising the outcome, including any blocked-at-STOP contexts). NEVER set `done` — an autonomous run stops at `ready-for-review`; a human closes the ticket. Skip all Transit steps when no ticket applies. In headless mode a Transit failure (server unreachable) is reported, never fatal.
+
 ## Step 1: Derive (idempotent)
 
 Read `prd.md`. The reserved H2s are `Product summary`, `Goals`, `Non-goals`, and `Execution notes`; **every other H2 is a context**.

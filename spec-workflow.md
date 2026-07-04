@@ -19,6 +19,10 @@ This is constantly being worked on, and will evolve over time. There are two lan
 
 When work should run to completion without approval gates, skip starwave and use the PRD lane: `/prd` authors a single PRD (`specs/{prd-name}/prd.md`, one PRD per repository) and `/engage` derives rune task files per application/code context and executes them in parallel worktrees. See `claude/skills/prd/SKILL.md` and `claude/skills/engage/SKILL.md` for the details. The rest of this document describes the gated starwave lane.
 
+## Transit Tickets
+
+Work in either lane can be tracked as a Transit ticket (`T-<id>`). Each repository maps to one Transit project, and the workflow skills move the ticket through Transit's statuses as the work progresses — from `idea` capture through `planning`, `spec`, implementation, and review, with comments on every transition. The full lifecycle table (status → stage → driving skill → trigger), the branch and commit conventions, and the opt-in rule live in `docs/agent-notes/transit-integration.md`. The `/transit` skill routes a ticket to the right workflow by its task type.
+
 ## Getting Started
 
 The recommended way to start a new feature is with the **`/starwave:creating-spec`** skill. This orchestration skill:
