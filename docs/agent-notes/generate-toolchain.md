@@ -34,12 +34,16 @@ target paths are injected).
   on PATH (`use_cli=None` autodetects; tests pass `use_cli=False`), else
   managed merge into `~/.claude.json`. CLI path is idempotent: the existing
   definition is read from the config file read-only (comparison only —
-  `claude mcp get` has no machine-readable output); identical → "unchanged"
-  entry, no CLI run; different → `claude mcp remove --scope user` (failure
-  ignored) then `add-json`; an "already exists" add error triggers
-  remove+retry once. Every CalledProcessError becomes a "warning" entry,
-  never a traceback. Tested via a stubbed `claude` executable on PATH
-  (ClaudeCliPathTests).
+  `claude mcp get` has no machine-readable output); the comparison
+  normalizes both sides first (`_normalized_server`: missing args → `[]`,
+  missing env → `{}`) because the real claude CLI persists an explicit
+  `"args": []` where the canonical render omits args — without this, a
+  converged entry was removed/re-added on every bootstrap run. Identical →
+  "unchanged" entry, no CLI run; different → `claude mcp remove --scope
+  user` (failure ignored) then `add-json`; an "already exists" add error
+  triggers remove+retry once. Every CalledProcessError becomes a "warning"
+  entry, never a traceback. Tested via a stubbed `claude` executable on
+  PATH (ClaudeCliPathTests, incl. the args-normalization rerun case).
 - VS Code settings: `merge_vscode_settings(settings_path, repo_root, report)`
   seeds `chat.instructionsFilesLocations` (repo `copilot/instructions/`) and
   the localml entry under `github.copilot.chat.customOAIModels`

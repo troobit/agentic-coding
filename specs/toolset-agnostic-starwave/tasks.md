@@ -157,7 +157,7 @@ references:
 
 ## Rollout & Verification
 
-- [ ] 22. Run align across the six repos and commit the fixes <!-- id:rv5n0lt -->
+- [x] 22. Run align across the six repos and commit the fixes <!-- id:rv5n0lt -->
   - rtob, sanarte, workscripts, betscraper, template, agentic-coding; review each inferred .agentic.json before --yes
   - Expected outcomes: /Users/ronan paths portable, sanarte .vscode/mcp.json valid, stale packs removed, cloud assets seeded where opted in
   - Verify the second run reports no changes in every repo
@@ -171,7 +171,7 @@ references:
   - Blocked-by: rv5n0lp (Implement scripts/bootstrap.sh)
   - Requirements: [8.2](requirements.md#8.2), [8.3](requirements.md#8.3), [9.1](requirements.md#9.1)
 
-- [ ] 24. Execute the PRD-lane worked example in a scratch repo <!-- id:rv5n0lv -->
+- [x] 24. Execute the PRD-lane worked example in a scratch repo <!-- id:rv5n0lv -->
   - PRD with at least two contexts each having streams - exercises the context-qualified branch naming
   - Include one STOP task; verify blocked-at-STOP behaviour in --headless mode and the integrated-branch quality gate
   - Blocked-by: rv5n0ll (Write claude/skills/engage/SKILL.md execution skill), rv5n0lm (Write copilot/agents/prd.agent.md and delete stale copilot/prompts)

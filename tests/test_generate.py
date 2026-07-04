@@ -399,6 +399,22 @@ class ClaudeCliPathTests(unittest.TestCase):
         self.assertEqual(self.invocations(), [],
                          "an already-converged rerun must not run the CLI")
 
+    def test_claude_args_normalization_reports_no_change(self):
+        import json as j
+        self.run_update()
+        # The real claude CLI persists an explicit "args": [] where the
+        # canonical entry omits args; simulate that in the stored config.
+        # A rerun must still report already-configured, not remove/re-add.
+        data = j.loads(self.config.read_text())
+        data["mcpServers"]["alpha"]["args"] = []
+        self.config.write_text(j.dumps(data))
+        self.clear_log()
+        report = self.run_update()
+        self.assertEqual([r.kind for r in report], ["unchanged"] * 3)
+        self.assertEqual(self.invocations(), [],
+                         "claude's args normalization must not trigger "
+                         "a remove/re-add cycle")
+
     def test_changed_definition_is_removed_then_re_added(self):
         import json as j
         self.run_update()

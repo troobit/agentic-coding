@@ -368,6 +368,22 @@ def _read_claude_user_server(path: Path, name: str):
     return servers.get(name)
 
 
+def _normalized_server(entry):
+    """Normalize a server entry for idempotence comparison.
+
+    `claude mcp add-json` persists explicit empty fields that the canonical
+    render omits (observed: "args": []), so a converged entry would compare
+    unequal on every run and be removed/re-added forever. Treat missing
+    args/env as their empty values on both sides.
+    """
+    if not isinstance(entry, dict):
+        return entry
+    normalized = dict(entry)
+    normalized.setdefault("args", [])
+    normalized.setdefault("env", {})
+    return normalized
+
+
 def update_claude_user_config(path: Path, defs: dict, subset, report: list,
                               use_cli=None) -> None:
     """Converge the Claude user-level MCP config.
@@ -378,8 +394,10 @@ def update_claude_user_config(path: Path, defs: dict, subset, report: list,
     server.
 
     CLI path idempotence: the existing definition is read from `path`
-    (read-only, comparison only). Identical -> reported as already
-    configured, nothing run. Different -> `claude mcp remove --scope user`
+    (read-only, comparison only) and compared after normalization
+    (_normalized_server — claude persists "args": [] where the canonical
+    entry omits args). Identical -> reported as already configured,
+    nothing run. Different -> `claude mcp remove --scope user`
     (failure ignored) then `claude mcp add-json --scope user`. Every
     CalledProcessError becomes a "warning" report entry, never a traceback.
     """
@@ -409,7 +427,7 @@ def update_claude_user_config(path: Path, defs: dict, subset, report: list,
 
     for name, entry in emit_repo_mcp(defs, subset)["mcpServers"].items():
         existing = _read_claude_user_server(path, name)
-        if existing == entry:
+        if _normalized_server(existing) == _normalized_server(entry):
             report.append(ReportEntry(
                 "unchanged", path,
                 f"claude mcp server {name}: already configured"))

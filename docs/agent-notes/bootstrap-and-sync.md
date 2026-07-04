@@ -4,7 +4,7 @@
 
 - One-script new-machine setup (Req 8); order is fixed by design.md's
   Bootstrap section: Homebrew → `brew bundle` → Claude Code installer →
-  `go install` orbit + mcp-devtools → `mkdir -p` targets → `sync-claude.sh`
+  `go install` orbit + mcp-devtools + rune → `mkdir -p` targets → `sync-claude.sh`
   → `generate.py --user` → remove stale `~/.copilot/agents/prd.agent.md`
   → print manual auth steps, ending with "re-run scripts/bootstrap.sh after
   authenticating".
@@ -20,9 +20,13 @@
 - Module paths: orbit `github.com/arjenschwarz/orbit/cmd/orbit@latest`;
   mcp-devtools `github.com/sammcj/mcp-devtools@latest` (main package at the
   module root — verified against its go.mod 2026-07-04; upstream README
-  suggests `@HEAD`, `@latest` works). Go tools are skipped as
-  `already done` when the binary is on PATH or in `$(go env GOPATH)/bin` —
-  bootstrap does not upgrade them; re-run `go install` manually for that.
+  suggests `@HEAD`, `@latest` works); rune
+  `github.com/arjenschwarz/rune@latest` (main package at the module root,
+  public tags up to v1.3.0 — verified 2026-07-04). rune moved here from the
+  Brewfile because its brew tap formula is broken (see Brewfile section).
+  Go tools are skipped as `already done` when the binary is on PATH or in
+  `$(go env GOPATH)/bin` — bootstrap does not upgrade them; re-run
+  `go install` manually for that.
 - Homebrew discovery checks PATH then `/opt/homebrew/bin/brew` and
   `/usr/local/bin/brew` (fresh installs aren't on PATH yet); after the
   Homebrew step it `eval "$($BREW shellenv)"` so the rest of the run sees
@@ -30,10 +34,10 @@
 - All JSON work (user MCP configs, VS Code settings merge) is delegated to
   `generate.py --user` per Decision 12 — the shell only mkdirs, symlinks
   (via sync-claude.sh), and removes the one known stale file.
-- `make bootstrap` wraps it. shellcheck was not installed on this machine
-  when written; validated with `bash -n` only (make lint-shell will
-  shellcheck it once shellcheck is installed — the Brewfile now includes
-  `brew "shellcheck"`, so a bootstrapped machine has it).
+- `make bootstrap` wraps it. shellcheck 0.11.0 is installed (via the
+  Brewfile) and `make lint` passes clean; claude-remote.sh carries a
+  justified `shellcheck disable=SC2153` (`IS_SANDBOX` is an env var set by
+  the sandbox environment, not a typo of the local `IN_SANDBOX` flag).
 - The manual-steps list includes `export GITHUB_AUTH_TOKEN="Bearer <PAT>"`
   for the github MCP server (Claude expands it from the environment); the
   VS Code prompt input takes the same `Bearer <PAT>` value (its
@@ -44,7 +48,9 @@
 - Installed by `scripts/bootstrap.sh` via `brew bundle` (Req 8.1 of toolset-agnostic-starwave).
 - Includes `shellcheck` because `make lint` (lint-shell) hard-fails without it.
 - OpenAI Codex CLI is a Homebrew **cask** named `codex` (prebuilt binary from openai/codex releases) — there is no formula. Verified 2026-07-04.
-- rune comes from the `arjenschwarz/rune` tap; orbit and mcp-devtools are NOT brew — bootstrap `go install`s them (hence `brew "go"`).
+- rune, orbit, and mcp-devtools are NOT brew — bootstrap `go install`s them (hence `brew "go"`). rune was originally in the Brewfile via the `arjenschwarz/rune` tap, but that formula is a broken v0.0.0 placeholder whose tarball 404s (found in the first real bootstrap run 2026-07-04).
+- Modern `brew bundle` is **all-or-nothing**: it fetches every formula/cask up front and installs NOTHING if any fetch fails. The broken rune formula therefore also blocked shellcheck and everything else. Do not assume brew bundle continues past individual failures — it doesn't.
+- The Brewfile currently has no third-party taps. If one is ever added, bootstrap must `brew tap` it and `brew trust` it (guarded — `brew trust` only exists on newer brew) before `brew bundle`, or the untrusted-tap failure blocks the whole bundle. The pattern is documented in a comment above the brew bundle step in bootstrap.sh.
 
 ## Makefile
 

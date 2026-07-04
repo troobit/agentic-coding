@@ -5,7 +5,8 @@
 #   1. Homebrew (install if missing)
 #   2. brew bundle against the repo Brewfile
 #   3. Claude Code via its documented installer (if missing)
-#   4. go install: orbit and mcp-devtools
+#   4. go install: orbit, mcp-devtools, and rune (rune's brew tap formula
+#      is a broken placeholder — see the Brewfile comment)
 #   5. mkdir -p ~/.claude and the VS Code User/ settings dir
 #   6. scripts/sync-claude.sh (symlinks)
 #   7. generate.py --user (user MCP configs, conventions, VS Code settings
@@ -85,8 +86,11 @@ else
     echo "installing Homebrew (official installer)"
     if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
         BREW="$(find_brew || true)"
-        [ -n "$BREW" ] && did "installed Homebrew ($BREW)" \
-                       || failed "Homebrew installer ran but brew was not found"
+        if [ -n "$BREW" ]; then
+            did "installed Homebrew ($BREW)"
+        else
+            failed "Homebrew installer ran but brew was not found"
+        fi
     else
         failed "Homebrew install (see output above)"
     fi
@@ -95,6 +99,12 @@ fi
 [ -n "$BREW" ] && eval "$("$BREW" shellenv)"
 
 # ------------------------------------------------------------- 2. brew bundle
+# The Brewfile currently has no third-party taps. If one is ever added, it
+# must be tapped AND trusted here before `brew bundle`, or the untrusted-tap
+# prompt/failure blocks the whole bundle (brew bundle fetches everything up
+# front and installs nothing if anything fails). Pattern:
+#   brew tap <user/repo>
+#   brew trust <user/repo> 2>/dev/null || true   # `brew trust` is newer brew only
 step "brew bundle ($REPO_ROOT/Brewfile)"
 if [ -z "$BREW" ]; then
     skipped "brew bundle (Homebrew not available)"
@@ -109,8 +119,10 @@ elif brew bundle check --file="$REPO_ROOT/Brewfile" >/dev/null 2>&1; then
 elif brew bundle --file="$REPO_ROOT/Brewfile"; then
     did "brew bundle installed missing dependencies"
 else
-    # brew bundle continues past individual failures itself; report and
-    # keep going — a formula failure must not block the symlink steps.
+    # Modern brew bundle is all-or-nothing: it fetches every formula first
+    # and installs NOTHING if any fetch fails, so one broken formula blocks
+    # the entire bundle. Report and keep going — a bundle failure must not
+    # block the symlink steps.
     failed "brew bundle reported errors (see output above)"
 fi
 
@@ -129,8 +141,8 @@ else
     fi
 fi
 
-# ----------------------------------------------- 4. go install orbit/devtools
-step "Go tools (orbit, mcp-devtools)"
+# ------------------------------------ 4. go install orbit/devtools/rune
+step "Go tools (orbit, mcp-devtools, rune)"
 go_tool() { # go_tool <binary-name> <module@version>
     local bin="$1" module="$2" gobin
     if ! command -v go >/dev/null 2>&1; then
@@ -160,6 +172,10 @@ go_tool() { # go_tool <binary-name> <module@version>
 }
 go_tool orbit "github.com/arjenschwarz/orbit/cmd/orbit@latest"
 go_tool mcp-devtools "github.com/sammcj/mcp-devtools@latest"
+# rune is a go install, not brew: its brew tap formula is a broken v0.0.0
+# placeholder that blocked the whole bundle (see the Brewfile comment).
+# Main package at the module root; public tags exist (verified 2026-07-04).
+go_tool rune "github.com/arjenschwarz/rune@latest"
 
 # ------------------------------------------------------ 5. target directories
 step "Target directories"

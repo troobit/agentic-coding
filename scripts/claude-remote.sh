@@ -3,6 +3,8 @@ set -e
 
 # Detect sandbox or CI environments
 IN_SANDBOX=false
+# shellcheck disable=SC2153 # IS_SANDBOX is set by the Claude Code sandbox
+# environment itself; it is not a misspelling of the local IN_SANDBOX flag.
 if [[ "${CLAUDE_CODE_REMOTE}" == "true" ]] || \
    [[ "${IS_SANDBOX}" == "yes" ]] || \
    [[ "${GITHUB_ACTIONS}" == "true" ]]; then
