@@ -106,13 +106,13 @@ references:
   - Stream: 3
   - Requirements: [1.4](requirements.md#1.4), [3.2](requirements.md#3.2), [1.1](requirements.md#1.1)
 
-- [ ] 15. Add Brewfile and Makefile <!-- id:rv5n0ln -->
+- [x] 15. Add Brewfile and Makefile <!-- id:rv5n0ln -->
   - Brewfile: gh, uv, node, podman, go, arjenschwarz/rune/rune, codex CLI, visual-studio-code cask
   - Makefile targets: generate, sync, align, lint (shellcheck + generated-drift + conventions checks), test
   - Stream: 4
   - Requirements: [8.1](requirements.md#8.1)
 
-- [ ] 16. Extend scripts/sync-claude.sh with VS Code profile links and compat check <!-- id:rv5n0lo -->
+- [x] 16. Extend scripts/sync-claude.sh with VS Code profile links and compat check <!-- id:rv5n0lo -->
   - Adds symlink: VS Code User/prompts/prd.agent.md -> copilot/agents/prd.agent.md; mkdir -p targets first
   - Existing six link targets unchanged; test asserts the link map and pre-feature skill directory names (Req 9.1)
   - chat.agentFilesLocations fallback documented if profile discovery fails - verify during implementation
