@@ -72,7 +72,11 @@ or the real copilot assets. They DO use the real `scripts/stale-packs.json`.
 - `--cloud-mcp` reads the manifest subset (or infers it read-only when no
   manifest exists) and prints `lib.emit_cloud_json` — with the real
   `mcp/servers.json` this yields e.g. `$COPILOT_MCP_GITHUB_AUTH_TOKEN` in
-  headers.
+  headers. User-facing steps (paste location on github.com, `copilot`
+  environment secrets) live in `docs/runbooks/cloud-agent-mcp.md`; with the
+  current canonical set `COPILOT_MCP_GITHUB_AUTH_TOKEN` is the only secret
+  name. Note `make align` passes no repo argument, so runbooks document the
+  direct `python3 scripts/align.py <repo>` invocation.
 
 ## Fixture provenance
 

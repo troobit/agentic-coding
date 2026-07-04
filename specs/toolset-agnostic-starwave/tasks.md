@@ -134,13 +134,13 @@ references:
   - Stream: 5
   - Requirements: [7.1](requirements.md#7.1), [7.2](requirements.md#7.2)
 
-- [ ] 19. Write docs/runbooks/cloud-agent-mcp.md <!-- id:rv5n0lr -->
+- [x] 19. Write docs/runbooks/cloud-agent-mcp.md <!-- id:rv5n0lr -->
   - Applying align --cloud-mcp output in github.com repo settings; COPILOT_MCP_* Actions-secret naming in the copilot environment
   - Blocked-by: rv5n0lj (Implement scripts/align.py)
   - Stream: 5
   - Requirements: [6.2](requirements.md#6.2)
 
-- [ ] 20. Update README.md and spec-workflow.md for the new layout <!-- id:rv5n0ls -->
+- [x] 20. Update README.md and spec-workflow.md for the new layout <!-- id:rv5n0ls -->
   - Document shared/, mcp/, copilot/agents, the PRD lane, and the clone -> bootstrap -> authenticate quickstart
   - Remove references to the deleted copilot/prompts files
   - Blocked-by: rv5n0lj (Implement scripts/align.py), rv5n0lm (Write copilot/agents/prd.agent.md and delete stale copilot/prompts), rv5n0lp (Implement scripts/bootstrap.sh)
