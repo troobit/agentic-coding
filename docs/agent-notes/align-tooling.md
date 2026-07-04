@@ -101,3 +101,7 @@ or the real copilot assets. They DO use the real `scripts/stale-packs.json`.
   in `/Users/r/repos/rtob` and `/Users/r/repos/workscripts` `.github/agents/`.
   It is a frozen record of known-stale content — append new hashes if more
   drifted copies surface; never rewrite existing ones.
+
+## Gitignore interaction
+
+A repo that blanket-ignores `.vscode/` ends up with an on-disk but uncommitted `.vscode/mcp.json` after align (align does not force-add against ignore rules). The fix is the standard selective pattern — `.vscode/*` plus `!.vscode/settings.json`, `!tasks.json`, `!launch.json`, `!extensions.json`, `!mcp.json` — applied to betscraper on 2026-07-05. Check for this whenever align reports a written-but-untracked `.vscode/mcp.json`.
