@@ -1,0 +1,40 @@
+{
+  "alpha": {
+    "transport": {
+      "type": "stdio",
+      "command": "alpha-cmd",
+      "env": {"MODE": "full"}
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": ["*"]
+  },
+  "bravo": {
+    "transport": {
+      "type": "http",
+      "url": "https://bravo.example/mcp"
+    },
+    "secrets": {"AUTH_TOKEN": {"header": "Authorization"}},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": []
+  },
+  "envy": {
+    "transport": {
+      "type": "stdio",
+      "command": "envy-cmd"
+    },
+    "secrets": {"API_KEY": {"env": "SERVICE_KEY"}},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": []
+  },
+  "zulu": {
+    "transport": {
+      "type": "stdio",
+      "command": "podman",
+      "args": ["run", "-i", "--rm", "img:latest"]
+    },
+    "secrets": {},
+    "surfaces": ["vscode"],
+    "default_for": []
+  }
+}

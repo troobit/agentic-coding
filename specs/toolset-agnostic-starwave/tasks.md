@@ -8,55 +8,55 @@ references:
 
 ## Implementation
 
-- [ ] 1. Write golden-fixture tests for conventions assembly <!-- id:rv5n0l9 -->
+- [x] 1. Write golden-fixture tests for conventions assembly <!-- id:rv5n0l9 -->
   - Fixtures: shared fragments in, expected claude/CLAUDE.md and copilot/instructions/copilot-instructions.md out
   - Assert Copilot output contains no claude-wrapper content and no Claude-tree paths (rules/references, .claude/scripts)
   - Assert content outside <!-- agentic:begin/end --> markers survives regeneration (Claude memory-append case)
   - Stream: 1
   - Requirements: [3.3](requirements.md#3.3)
 
-- [ ] 2. Author shared/ fragments by splitting claude/CLAUDE.md <!-- id:rv5n0la -->
+- [x] 2. Author shared/ fragments by splitting claude/CLAUDE.md <!-- id:rv5n0la -->
   - shared/conventions.md (tool-neutral), shared/claude-wrapper.md (AskUserQuestion contract, skill routing, Claude-tree path references), shared/copilot-wrapper.md (PRD-lane preamble)
   - conventions.md contract: no skill names, no AskUserQuestion, no Claude-tree file paths
   - Stream: 1
   - Requirements: [3.3](requirements.md#3.3)
 
-- [ ] 3. Implement conventions assembly in scripts/generate.py <!-- id:rv5n0lb -->
+- [x] 3. Implement conventions assembly in scripts/generate.py <!-- id:rv5n0lb -->
   - Managed-block writer implemented as shared library code - align.py reuses it
   - Generated outputs are checked in; make lint fails when they drift from sources
   - Blocked-by: rv5n0l9 (Write golden-fixture tests for conventions assembly), rv5n0la (Author shared/ fragments by splitting claude/CLAUDE.md)
   - Stream: 1
   - Requirements: [3.3](requirements.md#3.3)
 
-- [ ] 4. Write tests for MCP config generation <!-- id:rv5n0lc -->
+- [x] 4. Write tests for MCP config generation <!-- id:rv5n0lc -->
   - Golden outputs per target: Claude user config, VS Code user mcp.json, .mcp.json, .vscode/mcp.json, cloud paste-ready JSON
   - Failure case: secret with no mechanism for a target aborts naming server and target
   - Preservation: non-canonical entries and unrelated ~/.claude.json keys untouched; invalid target JSON gets .bak plus warning that non-canonical entries may be in the backup
   - Stream: 1
   - Requirements: [4.2](requirements.md#4.2), [4.3](requirements.md#4.3), [4.5](requirements.md#4.5)
 
-- [ ] 5. Create mcp/servers.json with the canonical seven servers <!-- id:rv5n0ld -->
+- [x] 5. Create mcp/servers.json with the canonical seven servers <!-- id:rv5n0ld -->
   - devtools, svelte, github, transit, azure, terraform, awesome-copilot with transport, secrets, surfaces, default_for per design schema
   - Commands are PATH-resolved bare names, never absolute user paths
   - default_for grammar: marker-file globs; literal * means always included
   - Stream: 1
   - Requirements: [4.1](requirements.md#4.1)
 
-- [ ] 6. Implement MCP generation in scripts/generate.py <!-- id:rv5n0le -->
+- [x] 6. Implement MCP generation in scripts/generate.py <!-- id:rv5n0le -->
   - Prefer claude mcp add-json --scope user when the CLI is on PATH (avoids racing a running Claude Code); direct managed merge as fallback
   - Cloud-agent paste-ready emission is library code consumed by align --cloud-mcp
   - Blocked-by: rv5n0lc (Write tests for MCP config generation), rv5n0ld (Create mcp/servers.json with the canonical seven servers)
   - Stream: 1
   - Requirements: [4.2](requirements.md#4.2), [4.3](requirements.md#4.3), [4.4](requirements.md#4.4), [4.5](requirements.md#4.5)
 
-- [ ] 7. Write tests for VS Code settings merge <!-- id:rv5n0lf -->
+- [x] 7. Write tests for VS Code settings merge <!-- id:rv5n0lf -->
   - Merge preserves unrelated keys; handles JSONC (comments, trailing commas) conservatively - unparseable settings.json is backed up and reported, never clobbered
   - Seeds chat.instructionsFilesLocations pointing at copilot/instructions/ and the localml entry under github.copilot.chat.customOAIModels (baseUrl http://127.0.0.1:8080/v1, placeholder model id)
   - chat.useClaudeMdFile must NOT be enabled - it would deliver the Claude wrapper to Copilot
   - Stream: 1
   - Requirements: [7.1](requirements.md#7.1), [7.2](requirements.md#7.2), [3.4](requirements.md#3.4)
 
-- [ ] 8. Implement VS Code settings merge in generate.py --user <!-- id:rv5n0lg -->
+- [x] 8. Implement VS Code settings merge in generate.py --user <!-- id:rv5n0lg -->
   - Same managed-merge discipline as MCP targets; bootstrap delegates all JSON work here
   - Blocked-by: rv5n0lf (Write tests for VS Code settings merge)
   - Stream: 1

@@ -1,4 +1,19 @@
 <!-- agentic:begin -->
+# GitHub Copilot Instructions
+
+These instructions apply to GitHub Copilot in VS Code and to the cloud coding agent.
+
+## PRD Lane
+
+Autonomous work is framed as a PRD: one document targeting exactly one repository, written so tasks can be derived from it without returning to the author.
+
+- Author PRDs with the `prd` custom agent (or by following the `prd` skill's outline). Output goes to `specs/{prd-name}/prd.md` in the target repository.
+- A PRD contains goals, non-goals, functional requirements grouped by application or code context (one H2 per context, with numbered MUST/SHOULD requirements and acceptance criteria), and execution notes. No personas or metrics boilerplate unless asked.
+- A PRD stands alone: it requires no linked spec or ticket.
+- The cloud coding agent may execute a PRD directly through its native loop, producing a pull request. Respect the target repository's quality gates (Makefile build/test/lint where present) before declaring work complete.
+
+The gated spec workflow (requirements/design/tasks approval gates) is not available here; it runs in Claude Code only.
+
 # Communication Style
 
 - DO NOT overcomplicate things. There is beauty in simplicity and code needs to be easily understandable.
@@ -47,26 +62,4 @@ If `run_silent` is available (check with `which run_silent`), use it to reduce t
 # Documentation Standards
 
 Decision log entries use the Enhanced Nygard ADR structure with required fields (ID, Date, Status, Context, Decision, Rationale) and recommended fields (Alternatives Considered, Consequences). Document at least two alternatives with rejection reasons, and list both positive and negative consequences. Entries live in the feature's `decision_log.md`, separated by horizontal rules.
-
-# Skills Usage
-
-This project uses custom skills extensively. Available skills include: spec creation, PR review fixing, pre-push review, and explain-like. Check `.claude/skills/` for the full list before suggesting manual approaches.
-
-When asked to analyze or document something, first check if there's an existing skill/workflow for that task (e.g., spec creation, review). Use the established workflow rather than doing ad-hoc analysis.
-
-When managing tasks, prefer the rune skill over calling the CLI directly.
-
-# Asking the User Questions
-
-- When an AskUserQuestion answer includes free-text notes, the notes are the real instruction — treat them as first-class steering, even when the selected option looks like a rejection.
-- Ask clarifying questions one at a time, concretely, describing observable behavior — not implementation jargon.
-- Approval gates for documents SHOULD offer an "explain it first" option (e.g. run /explain-like) alongside approve/reject.
-
-# Claude-Specific Project Conventions
-
-- If `.claude/scripts/README.md` exists in the project, you SHOULD use the tools mentioned in there for their intended purposes.
-
-# Decision Log Format Reference
-
-When creating or updating decision log entries, follow the format in `rules/references/decision-log-format.md`. Read the format file before creating entries.
 <!-- agentic:end -->

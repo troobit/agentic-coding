@@ -1,0 +1,75 @@
+{
+  "devtools": {
+    "transport": {
+      "type": "stdio",
+      "command": "mcp-devtools",
+      "env": {
+        "ENABLE_ADDITIONAL_TOOLS": "sequential_thinking,gemini-agent,codex-agent"
+      }
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": ["*"]
+  },
+  "svelte": {
+    "transport": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@sveltejs/mcp"]
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": ["svelte.config.js"]
+  },
+  "github": {
+    "transport": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "secrets": {
+      "AUTH_TOKEN": {"header": "Authorization"}
+    },
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": []
+  },
+  "transit": {
+    "_comment": "Transit.app built-in MCP server; enable in Settings (default port 3141). Localhost only, so no cloud surface.",
+    "transport": {
+      "type": "http",
+      "url": "http://localhost:3141/mcp"
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode"],
+    "default_for": []
+  },
+  "azure": {
+    "transport": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure/mcp@latest", "server", "start"]
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": []
+  },
+  "terraform": {
+    "transport": {
+      "type": "stdio",
+      "command": "podman",
+      "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server:latest"]
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode", "cloud"],
+    "default_for": []
+  },
+  "awesome-copilot": {
+    "transport": {
+      "type": "stdio",
+      "command": "podman",
+      "args": ["run", "-i", "--rm", "ghcr.io/microsoft/mcp-dotnet-samples/awesome-copilot:latest"]
+    },
+    "secrets": {},
+    "surfaces": ["vscode"],
+    "default_for": []
+  }
+}

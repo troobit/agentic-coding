@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "alpha": {
+      "type": "local",
+      "command": "alpha-cmd",
+      "env": {"MODE": "full"},
+      "tools": ["*"]
+    },
+    "bravo": {
+      "type": "http",
+      "url": "https://bravo.example/mcp",
+      "headers": {"Authorization": "$COPILOT_MCP_BRAVO_AUTH_TOKEN"},
+      "tools": ["*"]
+    },
+    "envy": {
+      "type": "local",
+      "command": "envy-cmd",
+      "env": {"SERVICE_KEY": "COPILOT_MCP_ENVY_API_KEY"},
+      "tools": ["*"]
+    }
+  }
+}
