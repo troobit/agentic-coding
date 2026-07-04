@@ -31,6 +31,12 @@ First run with no .agentic.json: the manifest is inferred from default_for
 rules and written, and the plan is reported WITHOUT applying - the user
 reviews/commits the manifest and the next run (or --yes) applies.
 
+Manifest schema (.agentic.json): "servers" (list of canonical MCP server
+names), "cloud_assets" (bool), and the optional "transit_project" (string) -
+the Transit project this repo maps to when it differs from the repo name.
+An existing manifest is read-only to align: optional/unknown keys such as
+transit_project always survive a run (pinned in tests/test_align.py).
+
 CLI: align.py <repo-path> [--yes] [--cloud-mcp]. --cloud-mcp prints the
 paste-ready cloud-agent MCP JSON (COPILOT_MCP_* secret names) and exits.
 

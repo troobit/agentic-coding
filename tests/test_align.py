@@ -492,6 +492,50 @@ class FirstRunManifestTest(AlignFixtureCase):
         self.assert_no_user_paths((repo / ".mcp.json").read_text(), ".mcp.json")
 
 
+class ManifestPreservationTest(AlignFixtureCase):
+    """Optional manifest keys (e.g. transit_project) must survive align runs:
+    an existing .agentic.json is read-only to align, never rewritten."""
+
+    def test_transit_project_survives_applying_run(self):
+        repo = self.make_repo("stale-user-path")
+        manifest_path = repo / ".agentic.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "servers": ["devtools"],
+                    "cloud_assets": False,
+                    "transit_project": "my-transit-project",
+                },
+                indent=2,
+            )
+            + "\n"
+        )
+        before = sha256(manifest_path)
+
+        report = self.run_align(repo)
+
+        self.assertTrue(report.applied)
+        self.assertTrue(
+            report.changes,
+            "the fixture has drift; align must have done real work for this "
+            "preservation check to mean anything",
+        )
+        self.assertEqual(
+            sha256(manifest_path), before,
+            "an existing .agentic.json must never be rewritten by align",
+        )
+        manifest = json.loads(manifest_path.read_text())
+        self.assertEqual(manifest["transit_project"], "my-transit-project")
+        self.assertNotIn(".agentic.json", self.change_paths(report))
+
+        second = self.run_align(repo)
+        self.assertEqual(second.changes, [])
+        self.assertEqual(
+            sha256(manifest_path), before,
+            "transit_project must survive repeated align runs",
+        )
+
+
 class NonGitDirectoryTest(AlignFixtureCase):
     def test_refuses_non_git_directory(self):
         repo = self.make_repo("not-a-repo", git=False)
