@@ -164,7 +164,7 @@ references:
   - Blocked-by: rv5n0lj (Implement scripts/align.py)
   - Requirements: [5.3](requirements.md#5.3)
 
-- [ ] 23. Run bootstrap on this machine and verify idempotence <!-- id:rv5n0lu -->
+- [x] 23. Run bootstrap on this machine and verify idempotence <!-- id:rv5n0lu -->
   - Second run must report no changes (AC 8.2)
   - Verify VS Code discovers the PRD agent and skills; ~/.copilot/agents/prd.agent.md removed
   - Existing ~/.claude symlinks and skill names unchanged
