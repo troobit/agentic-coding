@@ -8,6 +8,7 @@ brew "uv"     # Python tool runner used by uvx-launched MCP servers and scripts
 brew "node"   # provides npx for npx-launched MCP servers
 brew "podman" # container runtime for the container-based MCP servers
 brew "go"     # `go install` of orbit and mcp-devtools in bootstrap.sh
+brew "shellcheck" # required by `make lint` (lint-shell)
 brew "arjenschwarz/rune/rune" # rune task CLI (starwave/PRD task files)
 
 # OpenAI Codex CLI — peer review external (peer-review-validator agent).

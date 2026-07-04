@@ -36,8 +36,10 @@ Behavioural contract pinned here (from requirements 5.1-5.3, 6.1 and the design)
 - Managed files ONLY: .mcp.json, .vscode/mcp.json, .agentic.json,
   .github/copilot-instructions.md, .github/agents/prd.agent.md,
   .github/skills/prd/**, plus stale-pack files under .github/agents/.
-- Path fixes produce portable forms (bare PATH-resolved command or a
-  $HOME/~-anchored path) — never a literal substitution of the current username.
+- Path fixes produce portable forms: the bare command name when the basename is
+  PATH-resolvable at fix time, otherwise ${HOME}/... in .mcp.json and
+  ${env:HOME}/... in .vscode/mcp.json — never bare $HOME, never a literal
+  substitution of the current username.
 - Idempotence is the core invariant: an immediate second applying run reports
   zero changes on every drift fixture (warnings may repeat; changes may not).
 - First run with no .agentic.json infers the manifest from default_for rules,
@@ -59,6 +61,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "align"
@@ -128,16 +131,19 @@ class AlignFixtureCase(unittest.TestCase):
     def change_paths(self, report):
         return {change["path"] for change in report.changes}
 
-    def assert_portable_command(self, command):
-        """Portable = bare PATH-resolved name, or a $HOME/~-anchored path."""
+    def assert_portable_command(self, command, home_token):
+        """Portable = bare PATH-resolved name, or exactly the per-target
+        home-token form (${HOME}/... in .mcp.json, ${env:HOME}/... in
+        .vscode/mcp.json). Bare $HOME is never acceptable."""
         self.assertNotIn(
             "/Users/", command,
             f"user-specific absolute path survived or was username-substituted: {command!r}",
         )
-        portable = "/" not in command or command.startswith(
-            ("~", "$HOME", "${HOME}", "${env:HOME}")
-        )
-        self.assertTrue(portable, f"not a portable command form: {command!r}")
+        if "/" in command:
+            self.assertTrue(
+                command.startswith(home_token + "/"),
+                f"expected a {home_token}/... form: {command!r}",
+            )
 
     def assert_no_user_paths(self, text, context):
         self.assertNotIn("/Users/ronan", text, f"stale user path survived in {context}")
@@ -147,16 +153,28 @@ class AlignFixtureCase(unittest.TestCase):
             f"{context} contains {current_user_path!r}: path fixes must be portable, "
             "never a literal substitution of the current username",
         )
+        self.assertNotIn(
+            "$HOME/", text,
+            f"{context} contains bare $HOME: fixes must use ${{HOME}} "
+            "(.mcp.json) or ${{env:HOME}} (.vscode/mcp.json)",
+        )
 
 
 class StaleUserPathTest(AlignFixtureCase):
     """Drift class 1: /Users/ronan/... absolute paths in .mcp.json and .vscode/mcp.json."""
 
+    HOME_TOKENS = {".mcp.json": "${HOME}", ".vscode/mcp.json": "${env:HOME}"}
+
     def test_single_run_fixes_all_stale_paths_portably(self):
         repo = self.make_repo("stale-user-path")
-        report = self.run_align(repo)
+        # Deterministic PATH resolution: mcp-devtools resolves (-> bare
+        # command name); run-local-mcp and everything else does not.
+        with mock.patch.object(
+            align, "_which", lambda name: name == "mcp-devtools"
+        ):
+            report = self.run_align(repo)
 
-        for rel in (".mcp.json", ".vscode/mcp.json"):
+        for rel, home_token in self.HOME_TOKENS.items():
             with self.subTest(file=rel):
                 text = (repo / rel).read_text()
                 self.assert_no_user_paths(text, rel)
@@ -166,7 +184,21 @@ class StaleUserPathTest(AlignFixtureCase):
                     "dev-tools", servers,
                     "non-canonical dev-tools entry must be preserved, not renamed/removed",
                 )
-                self.assert_portable_command(servers["dev-tools"]["command"])
+                self.assertEqual(
+                    servers["dev-tools"]["command"], "mcp-devtools",
+                    "a PATH-resolvable basename must become the bare command name",
+                )
+                self.assert_portable_command(servers["dev-tools"]["command"], home_token)
+                self.assertEqual(
+                    servers["my-scripts"]["command"],
+                    f"{home_token}/tools/run-local-mcp",
+                    f"a non-resolvable path must become the {home_token} form",
+                )
+                self.assertEqual(
+                    servers["my-scripts"]["args"],
+                    ["--config", f"{home_token}/tools/mcp.conf"],
+                    "argument paths get the home-token form too",
+                )
                 self.assertIn(rel, self.change_paths(report), "fix must be reported per file")
 
     def test_unmanaged_files_never_touched(self):
@@ -222,6 +254,33 @@ class InvalidJsonTest(AlignFixtureCase):
             f"expected a non-canonical-entries-in-.bak warning, got: {report.warnings!r}",
         )
         self.assertIn(".vscode/mcp.json", self.change_paths(report))
+
+
+class NonDictRootTest(AlignFixtureCase):
+    """Drift class 2b: parseable JSON whose root is not an object (e.g. a
+    top-level array) must take the backup+regenerate path, never crash."""
+
+    def test_array_root_backed_up_and_regenerated(self):
+        repo = self.make_repo("non-dict-root")
+        report = self.run_align(repo)
+
+        data = json.loads((repo / ".mcp.json").read_text())
+        self.assertIsInstance(data, dict)
+        self.assertIn("devtools", data["mcpServers"])
+
+        backups = [
+            p for p in repo.iterdir() if ".bak" in p.name and p.is_file()
+        ]
+        self.assertTrue(backups, "non-dict root must be backed up as .bak-<date>")
+        self.assertTrue(
+            any("top-level array" in p.read_text() for p in backups),
+            "backup must preserve the original content",
+        )
+        self.assertTrue(
+            any("bak" in w.lower() for w in report.warnings),
+            f"expected a backup warning, got: {report.warnings!r}",
+        )
+        self.assertIn(".mcp.json", self.change_paths(report))
 
 
 class DriftedCanonicalTest(AlignFixtureCase):

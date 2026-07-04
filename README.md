@@ -12,11 +12,11 @@ The repository is the single source of truth for agent tooling across Claude Cod
    - `gh auth login`
    - `claude` (log in on first run)
    - Sign in to GitHub Copilot in VS Code
-   - Provide the GitHub MCP token when a Copilot/VS Code MCP prompt asks for it
+   - `export GITHUB_AUTH_TOKEN="Bearer <PAT>"` for the github MCP server (the `Bearer ` prefix is required), and provide the same `Bearer <PAT>` value when a Copilot/VS Code MCP prompt asks for it
    - `codex login` (restores peer review); optionally install the gemini CLI for a second reviewer
 4. Re-run `scripts/bootstrap.sh` to pick up anything that was skipped for missing authentication.
 
-The script is idempotent — rerunning it on a configured machine reports `already done` for each step.
+The script is safe to re-run: each step reports `did`, `already done`, or `skipped`, and on a fully configured machine a rerun makes no changes — every step reports `already done` and the config generation reports each managed target as already configured.
 
 ## Agents
 

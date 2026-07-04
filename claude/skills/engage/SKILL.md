@@ -32,12 +32,12 @@ For each context H2:
 Contexts run in parallel, one subagent per context. For each context with an incomplete task file:
 
 1. Create a worktree branched from the current working branch:
-   - `git worktree add .claude/worktrees/prd-{prd-name}-{context} -b prd/{prd-name}-{context}`
+   - `git worktree add .claude/worktrees/prd-{prd-name}-{slug} -b prd/{prd-name}-{slug}`
 2. Spawn one subagent per context, all in a single message so they run in parallel. Each subagent prompt MUST include:
-   - The absolute worktree path (it MUST `cd` there first) and its task file path (`specs/{prd-name}/tasks-{context}.md` inside the worktree).
+   - The absolute worktree path (it MUST `cd` there first) and its task file path (`specs/{prd-name}/tasks-{slug}.md` inside the worktree).
    - The instruction to read `prd.md` (the front-matter reference) before implementing.
    - The instruction to apply the **make-it-so delegation loop** against its own task file: `rune next --phase --format json`, stream detection via `rune streams --available --json`, parallel or single-subagent delegation per phase, `rune complete` per task — exactly as make-it-so specifies, with the two overrides below.
-   - **Override 1 — context-qualified inner names**: inner stream branches/worktrees MUST be `stream/{context}-<phase>-<N>` (worktrees `.claude/worktrees/{context}-<phase>-stream-<N>`), NOT make-it-so's plain `stream/<phase>-<N>`. Branch names are repo-global; the unqualified names collide the moment two contexts each have streams.
+   - **Override 1 — context-qualified inner names**: inner stream branches/worktrees MUST be `stream/{slug}-<phase>-<N>` (worktrees `.claude/worktrees/{slug}-<phase>-stream-<N>`), NOT make-it-so's plain `stream/<phase>-<N>`. Branch names are repo-global; the unqualified names collide the moment two contexts each have streams.
    - **Override 2 — nobody touches CHANGELOG.md**: make-it-so's Subagent Commit Conventions apply unchanged EXCEPT that no subagent at any level, and no context, writes to `CHANGELOG.md`. Engage writes one PRD-level changelog entry after integration (Step 4).
    - The STOP protocol below.
    - Report back: context name, branch, completed task IDs, and final status (`done` | `blocked-at-STOP` with the task id | `failed`).
@@ -54,7 +54,7 @@ A context subagent that reaches a ready `STOP — ` task MUST halt that context 
 ## Step 4: Integrate
 
 1. Merge context branches into the working branch **in completion order** (as each context finishes, or sequentially after all return):
-   - `git merge --no-ff prd/{prd-name}-{context} -m "[merge]: prd {prd-name} context {context}"`
+   - `git merge --no-ff prd/{prd-name}-{slug} -m "[merge]: prd {prd-name} context {slug}"`
 2. **Any merge conflict stops integration and is reported** — never auto-resolve conflicts across contexts. Report which branches merged and which remain.
 3. After all merges, run the quality gates ONCE on the integrated branch: `make build`, `make test`, `make lint` (whichever targets the Makefile defines). A context passing in isolation does not make the PRD complete. If the repository has no Makefile, note "no quality gates ran" in the report.
 4. Write ONE PRD-level `CHANGELOG.md` entry summarising the PRD's work and commit it (this is the only changelog write in the entire flow).
@@ -78,9 +78,9 @@ The derived task files are executable by orbit without modification, but paralle
 Run **one orbit process per context, each in its own worktree**:
 
 ```bash
-git worktree add .claude/worktrees/prd-{prd-name}-{context} -b prd/{prd-name}-{context}
-cd .claude/worktrees/prd-{prd-name}-{context}
-orbit run --tasks-file specs/{prd-name}/tasks-{context}.md   # non-interactive: engage --headless STOP semantics apply
+git worktree add .claude/worktrees/prd-{prd-name}-{slug} -b prd/{prd-name}-{slug}
+cd .claude/worktrees/prd-{prd-name}-{slug}
+orbit run --tasks-file specs/{prd-name}/tasks-{slug}.md   # non-interactive: engage --headless STOP semantics apply
 ```
 
 Integration afterwards follows Step 4 unchanged.

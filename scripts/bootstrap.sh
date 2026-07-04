@@ -219,7 +219,8 @@ MANUAL_STEPS+=(
     "gh auth login                     # GitHub CLI"
     "claude                            # Claude Code login on first run"
     "Sign in to GitHub Copilot in VS Code"
-    "Provide the GitHub MCP token when a Copilot/VS Code MCP prompt asks for it"
+    "export GITHUB_AUTH_TOKEN=\"Bearer <PAT>\"   # github MCP server for Claude; the 'Bearer ' prefix is required"
+    "Provide the GitHub MCP token when a Copilot/VS Code MCP prompt asks for it (same 'Bearer <PAT>' value)"
     "codex login                       # restores peer review (peer-review-validator)"
     "Optional: install the gemini CLI for a second peer reviewer"
 )

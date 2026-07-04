@@ -3,7 +3,7 @@ name: prd
 description: "Author a Product Requirements Document (PRD) for autonomous execution: one prd.md targeting this repository, with requirements grouped per application/code context, written so task files can be derived without returning to the author."
 tools: ["search", "edit", "web"]
 ---
-
+<!-- agentic:begin -->
 # PRD Authoring
 
 Produce exactly one PRD document that a coding agent can execute to completion without returning to the author. Follow the PRD skill's outline (`prd` under the skills directories); the outline is inlined below in case the skill is not discoverable in this environment.
@@ -73,3 +73,4 @@ reduce to the same slug.}
 - Reference concrete file paths and existing patterns where they anchor a requirement — the executing agent has the codebase but not this conversation.
 - Group requirements so each context is independently implementable; cross-context dependencies go in Execution notes.
 - Keep the language plain and concise. No hyperbole, no dividers.
+<!-- agentic:end -->

@@ -7,8 +7,10 @@ Fixes agentic drift in a target repo, in pipeline order:
    regenerated from canonical + manifest, with a warning that non-canonical
    entries may remain only in the backup.
 2. Path portability - user-specific absolute paths (/Users/<name>/...) in
-   managed JSON rewritten to $HOME-anchored forms - never a literal
-   substitution of the current username.
+   managed JSON rewritten to portable forms: the bare command name when the
+   basename is PATH-resolvable at fix time, otherwise ${HOME}/... in
+   .mcp.json and ${env:HOME}/... in .vscode/mcp.json - never bare $HOME,
+   never a literal substitution of the current username.
 3. MCP convergence - canonical-named server entries converged to
    mcp/servers.json; non-canonical entries preserved and reported
    (same writer as generate.py).
@@ -55,8 +57,9 @@ DEFAULT_STALE_PACKS_JSON = REPO_ROOT / "scripts" / "stale-packs.json"
 MANAGED_JSON = (".mcp.json", ".vscode/mcp.json")
 PRD_AGENT_REL = ".github/agents/prd.agent.md"
 
-# A macOS home prefix like /Users/ronan; rewritten to $HOME (portable),
-# never to the current user's own /Users/<name> (Req 5.1).
+# A macOS home prefix like /Users/ronan; rewritten to a portable form
+# (bare command or a per-target home token), never to the current user's
+# own /Users/<name> (Req 5.1).
 _USER_HOME_RE = re.compile(r"/Users/[^/]+")
 
 
@@ -91,28 +94,44 @@ def _rel(path, base) -> str:
 
 
 def _harvest(log: list, base: Path, report: AlignReport) -> None:
-    """Sort agentic_lib report strings into the AlignReport buckets."""
+    """Bucket agentic_lib ReportEntry objects into the AlignReport."""
     for entry in log:
-        path_str, _, rest = entry.partition(": ")
-        rel = _rel(path_str, base)
-        if "exists without agentic markers" in entry:
+        rel = _rel(entry.path, base)
+        if entry.kind == "skipped":
             report.skipped.append(rel)
-        elif "invalid JSON" in entry:
-            report.warnings.append(f"{rel}: {rest}")
-        elif "preserved non-canonical entries" in entry:
-            report.preserved.append(f"{rel}: {rest}")
-        else:  # created / updated / managed block rewritten
-            report.changes.append({"path": rel, "action": rest})
+        elif entry.kind == "warning":
+            report.warnings.append(f"{rel}: {entry.detail}")
+        elif entry.kind == "preserved":
+            report.preserved.append(f"{rel}: {entry.detail}")
+        elif entry.kind == "changed":
+            report.changes.append({"path": rel, "action": entry.detail})
+        # "unchanged" entries carry no drift and are dropped.
 
 
-def _fix_user_paths(value):
-    """Recursively rewrite /Users/<name> prefixes in strings to $HOME."""
+# Injection point for tests; align never resolves against anything else.
+_which = shutil.which
+
+
+def _fix_user_paths(value, home_token):
+    """Recursively rewrite /Users/<name> prefixes to portable forms.
+
+    A string that IS a user-anchored absolute path whose basename resolves
+    on PATH at fix time becomes the bare command name; every other
+    occurrence gets the per-target home token (`${HOME}` for .mcp.json,
+    `${env:HOME}` for .vscode/mcp.json) - never bare `$HOME`, never the
+    current username.
+    """
     if isinstance(value, str):
-        return _USER_HOME_RE.sub("$HOME", value)
+        if _USER_HOME_RE.match(value) and "\n" not in value:
+            basename = value.rstrip("/").rsplit("/", 1)[-1]
+            if basename and _which(basename):
+                return basename
+        return _USER_HOME_RE.sub(home_token, value)
     if isinstance(value, list):
-        return [_fix_user_paths(item) for item in value]
+        return [_fix_user_paths(item, home_token) for item in value]
     if isinstance(value, dict):
-        return {key: _fix_user_paths(item) for key, item in value.items()}
+        return {key: _fix_user_paths(item, home_token)
+                for key, item in value.items()}
     return value
 
 
@@ -129,20 +148,31 @@ def _managed_block_of(text: str, src: Path) -> str:
 # ---------------------------------------------------------------------------
 
 def _fix_json_validity(repo: Path, report: AlignReport) -> None:
-    """Step 1: back up unparseable managed JSON; step 3 regenerates it."""
+    """Step 1: back up unparseable managed JSON (or a non-dict root such
+    as a top-level array); step 3 regenerates it."""
     log = []
     for rel in MANAGED_JSON:
         path = repo / rel
         if not path.is_file():
             continue
         try:
-            json.loads(path.read_text())
+            data = json.loads(path.read_text())
         except (json.JSONDecodeError, UnicodeDecodeError):
+            data = None
+        if not isinstance(data, dict):
             lib._backup(path, log,
                         "invalid JSON - regenerated; non-canonical entries "
                         "may remain only in the backup")
             path.unlink()
     _harvest(log, repo, report)
+
+
+# Per-target home token (Req 5.1): Claude expands ${HOME} from the
+# environment; VS Code uses its ${env:HOME} variable syntax.
+_HOME_TOKENS = {
+    ".mcp.json": "${HOME}",
+    ".vscode/mcp.json": "${env:HOME}",
+}
 
 
 def _fix_path_portability(repo: Path, report: AlignReport) -> None:
@@ -152,13 +182,14 @@ def _fix_path_portability(repo: Path, report: AlignReport) -> None:
         if not path.is_file():
             continue
         data = json.loads(path.read_text())  # valid after step 1
-        fixed = _fix_user_paths(data)
+        fixed = _fix_user_paths(data, _HOME_TOKENS[rel])
         if fixed != data:
             lib._write_json(path, fixed)
             report.changes.append({
                 "path": rel,
                 "action": "rewrote user-specific absolute paths to "
-                          "portable $HOME forms",
+                          "portable forms (bare PATH-resolved command or "
+                          f"{_HOME_TOKENS[rel]}-anchored)",
             })
 
 

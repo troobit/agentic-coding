@@ -32,11 +32,17 @@
   (via sync-claude.sh), and removes the one known stale file.
 - `make bootstrap` wraps it. shellcheck was not installed on this machine
   when written; validated with `bash -n` only (make lint-shell will
-  shellcheck it once shellcheck is installed).
+  shellcheck it once shellcheck is installed — the Brewfile now includes
+  `brew "shellcheck"`, so a bootstrapped machine has it).
+- The manual-steps list includes `export GITHUB_AUTH_TOKEN="Bearer <PAT>"`
+  for the github MCP server (Claude expands it from the environment); the
+  VS Code prompt input takes the same `Bearer <PAT>` value (its
+  description in mcp/servers.json says so).
 
 ## Brewfile
 
 - Installed by `scripts/bootstrap.sh` via `brew bundle` (Req 8.1 of toolset-agnostic-starwave).
+- Includes `shellcheck` because `make lint` (lint-shell) hard-fails without it.
 - OpenAI Codex CLI is a Homebrew **cask** named `codex` (prebuilt binary from openai/codex releases) — there is no formula. Verified 2026-07-04.
 - rune comes from the `arjenschwarz/rune` tap; orbit and mcp-devtools are NOT brew — bootstrap `go install`s them (hence `brew "go"`).
 

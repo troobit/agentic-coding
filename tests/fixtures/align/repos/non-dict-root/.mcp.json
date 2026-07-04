@@ -1,0 +1,4 @@
+[
+  "a top-level array is parseable JSON but not a valid managed config",
+  {"mcpServers": {"devtools": {"type": "stdio", "command": "mcp-devtools"}}}
+]

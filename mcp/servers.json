@@ -27,7 +27,10 @@
       "url": "https://api.githubcopilot.com/mcp/"
     },
     "secrets": {
-      "AUTH_TOKEN": {"header": "Authorization"}
+      "AUTH_TOKEN": {
+        "header": "Authorization",
+        "description": "GitHub MCP Authorization header: enter 'Bearer <PAT>' - the 'Bearer ' prefix is required"
+      }
     },
     "surfaces": ["claude", "vscode", "cloud"],
     "default_for": []

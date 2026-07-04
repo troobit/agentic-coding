@@ -6,6 +6,10 @@ target paths are injected).
 
 ## agentic_lib.py — reusable API (align.py imports this)
 
+- Reports are structured: every `report.append` produces a `ReportEntry`
+  with `kind` ("changed" | "unchanged" | "warning" | "preserved" |
+  "skipped"), `path` (str), and `detail`; `str(entry)` is the human line
+  ("{path}: {detail}"). align buckets by `kind` — never parse the strings.
 - Managed block (Decision 15): `BEGIN_MARKER`/`END_MARKER`,
   `write_managed(path, block, report)` rewrites only the block, preserves
   head/tail content verbatim, and skips+reports a markerless existing file.
@@ -21,18 +25,35 @@ target paths are injected).
 - Managed JSON merge `_merge_servers_into`: converges canonical-named entries
   (including ones outside the requested subset — never silently dropped),
   preserves and reports non-canonical entries and unrelated top-level keys;
-  invalid JSON → `.bak-<date>` + regenerate + warning that non-canonical
-  entries may remain only in the backup.
-- Claude user scope: `update_claude_user_config` prefers
-  `claude mcp add-json <name> <json> --scope user` when the CLI is on PATH
-  (`use_cli=None` autodetects; tests pass `use_cli=False`), else managed merge
-  into `~/.claude.json`.
+  invalid JSON OR a non-dict root (e.g. top-level array) → `.bak-<date>` +
+  regenerate + warning that non-canonical entries may remain only in the
+  backup. `_backup` dedupes: when an existing `.bak-*` already holds
+  identical bytes, no new backup is written (the warning still reports,
+  naming the existing backup).
+- Claude user scope: `update_claude_user_config` prefers the claude CLI when
+  on PATH (`use_cli=None` autodetects; tests pass `use_cli=False`), else
+  managed merge into `~/.claude.json`. CLI path is idempotent: the existing
+  definition is read from the config file read-only (comparison only —
+  `claude mcp get` has no machine-readable output); identical → "unchanged"
+  entry, no CLI run; different → `claude mcp remove --scope user` (failure
+  ignored) then `add-json`; an "already exists" add error triggers
+  remove+retry once. Every CalledProcessError becomes a "warning" entry,
+  never a traceback. Tested via a stubbed `claude` executable on PATH
+  (ClaudeCliPathTests).
 - VS Code settings: `merge_vscode_settings(settings_path, repo_root, report)`
   seeds `chat.instructionsFilesLocations` (repo `copilot/instructions/`) and
   the localml entry under `github.copilot.chat.customOAIModels`
   (`LOCALML_PLACEHOLDER_MODEL_ID` = "REPLACE-WITH-SERVED-MODEL-ID", baseUrl
-  `http://127.0.0.1:8080/v1`). Strict JSON only: JSONC/comments → backup +
-  report + no write (never clobbered). Never sets `chat.useClaudeMdFile`.
+  `http://127.0.0.1:8080/v1`). Strict JSON object only: JSONC/comments or a
+  non-object root → backup + report + no write (never clobbered; identical
+  backups do not accumulate). Never sets `chat.useClaudeMdFile`.
+- VS Code promptString inputs: a secret spec may carry an optional
+  `"description"` (used verbatim; falls back to "Secret X for MCP server
+  Y"). The real github AUTH_TOKEN uses it to tell the user the value needs
+  the `Bearer ` prefix.
+- generate.py prints every entry and appends "no changes" when no entry has
+  kind "changed" — a converged `--user` rerun prints per-server
+  "already configured" lines plus "no changes".
 
 ## Secret naming scheme (Req 4.3)
 

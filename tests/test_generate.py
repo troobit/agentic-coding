@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 TESTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TESTS_DIR.parent
@@ -107,7 +108,8 @@ class ManagedBlockWriterTests(unittest.TestCase):
         changed = agentic_lib.write_managed(target, "generated", report)
         self.assertFalse(changed)
         self.assertEqual(target.read_text(), "hand-written, no markers\n")
-        self.assertTrue(any("out.md" in r and "marker" in r.lower() for r in report))
+        self.assertTrue(any("out.md" in str(r) and "marker" in str(r).lower()
+                            for r in report))
 
     def test_rewrite_with_same_content_reports_no_change(self):
         target = self.dir / "out.md"
@@ -217,7 +219,7 @@ class McpMergeTests(unittest.TestCase):
                          existing["mcpServers"]["custom"])
         self.assertEqual(result["mcpServers"]["alpha"],
                          _golden_json("repo-mcp.json")["mcpServers"]["alpha"])
-        self.assertTrue(any("custom" in r for r in report),
+        self.assertTrue(any("custom" in str(r) for r in report),
                         "preserved non-canonical entry must be reported")
         vs = json.loads((repo / ".vscode" / "mcp.json").read_text())
         self.assertEqual(vs, _golden_json("vscode-mcp.json"))
@@ -228,7 +230,7 @@ class McpMergeTests(unittest.TestCase):
         agentic_lib.generate_repo_configs(repo, self.defs, None, [])
         report = []
         agentic_lib.generate_repo_configs(repo, self.defs, None, report)
-        self.assertEqual([r for r in report if "preserved" not in r], [])
+        self.assertEqual([r for r in report if r.kind != "preserved"], [])
 
     def test_invalid_target_json_backed_up_and_regenerated(self):
         import json
@@ -244,8 +246,26 @@ class McpMergeTests(unittest.TestCase):
         self.assertEqual(len(baks), 1)
         self.assertEqual(baks[0].read_text(), bad)
         self.assertTrue(
-            any("non-canonical" in r and "backup" in r for r in report),
+            any(r.kind == "warning" and "non-canonical" in r.detail
+                and "backup" in r.detail for r in report),
             "report must warn that non-canonical entries may be in the backup")
+
+    def test_non_dict_root_backed_up_and_regenerated(self):
+        """A parseable non-object root (top-level array) is invalid for a
+        managed file: backup + regenerate, never AttributeError."""
+        import json
+        repo = self.dir / "repo"
+        repo.mkdir()
+        bad = '["not", "a", "dict"]\n'
+        (repo / ".mcp.json").write_text(bad)
+        report = []
+        agentic_lib.generate_repo_configs(repo, self.defs, None, report)
+        result = json.loads((repo / ".mcp.json").read_text())
+        self.assertEqual(result, _golden_json("repo-mcp.json"))
+        baks = list(repo.glob(".mcp.json.bak-*"))
+        self.assertEqual(len(baks), 1)
+        self.assertEqual(baks[0].read_text(), bad)
+        self.assertTrue(any(r.kind == "warning" for r in report))
 
     def test_claude_user_config_merge_preserves_unrelated_keys(self):
         import json
@@ -270,7 +290,7 @@ class McpMergeTests(unittest.TestCase):
         golden = _golden_json("repo-mcp.json")["mcpServers"]
         for name, spec in golden.items():
             self.assertEqual(result["mcpServers"][name], spec)
-        self.assertTrue(any("custom" in r for r in report))
+        self.assertTrue(any("custom" in str(r) for r in report))
 
     def test_claude_cli_commands_use_user_scope(self):
         cmds = agentic_lib.build_claude_cli_commands(self.defs, None)
@@ -279,6 +299,127 @@ class McpMergeTests(unittest.TestCase):
             self.assertEqual(cmd[:3], ["claude", "mcp", "add-json"])
             self.assertIn("--scope", cmd)
             self.assertEqual(cmd[cmd.index("--scope") + 1], "user")
+
+
+_CLAUDE_STUB = '''#!/usr/bin/env python3
+"""Test stub for the claude CLI: records argv, mutates a fake config."""
+import json, os, sys
+
+with open(os.environ["CLAUDE_STUB_LOG"], "a") as f:
+    f.write(json.dumps(sys.argv[1:]) + "\\n")
+
+cfg = os.environ["CLAUDE_STUB_CONFIG"]
+
+def load():
+    try:
+        with open(cfg) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+def save(data):
+    with open(cfg, "w") as f:
+        json.dump(data, f, indent=2)
+
+args = sys.argv[1:]
+if args[:2] == ["mcp", "add-json"]:
+    if os.environ.get("CLAUDE_STUB_FAIL_ADD"):
+        sys.stderr.write("boom: add-json refused\\n")
+        sys.exit(1)
+    data = load()
+    data.setdefault("mcpServers", {})[args[2]] = json.loads(args[3])
+    save(data)
+elif args[:2] == ["mcp", "remove"]:
+    data = load()
+    servers = data.get("mcpServers", {})
+    if args[2] not in servers:
+        sys.stderr.write("No MCP server found with name: %s\\n" % args[2])
+        sys.exit(1)
+    del servers[args[2]]
+    save(data)
+sys.exit(0)
+'''
+
+
+class ClaudeCliPathTests(unittest.TestCase):
+    """use_cli=True path of update_claude_user_config against a stubbed
+    `claude` executable: fresh add, identical rerun, changed definition."""
+
+    def setUp(self):
+        import os
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        bindir = self.dir / "bin"
+        bindir.mkdir()
+        stub = bindir / "claude"
+        stub.write_text(_CLAUDE_STUB)
+        stub.chmod(0o755)
+        self.config = self.dir / "claude.json"
+        self.log = self.dir / "invocations.log"
+        self.defs = _load_fixture_servers()
+        self.env = {
+            "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}",
+            "CLAUDE_STUB_LOG": str(self.log),
+            "CLAUDE_STUB_CONFIG": str(self.config),
+        }
+        patcher = mock.patch.dict(os.environ, self.env)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def invocations(self):
+        import json as j
+        if not self.log.exists():
+            return []
+        return [j.loads(line) for line in self.log.read_text().splitlines()]
+
+    def clear_log(self):
+        self.log.write_text("")
+
+    def run_update(self):
+        report = []
+        agentic_lib.update_claude_user_config(self.config, self.defs, None,
+                                              report, use_cli=True)
+        return report
+
+    def test_fresh_add_applies_every_server(self):
+        import json as j
+        report = self.run_update()
+        self.assertTrue(all(r.kind == "changed" for r in report))
+        calls = self.invocations()
+        self.assertEqual([c[1] for c in calls], ["add-json"] * 3)
+        self.assertEqual(j.loads(self.config.read_text()),
+                         _golden_json("repo-mcp.json"))
+
+    def test_identical_rerun_reports_no_change(self):
+        self.run_update()
+        self.clear_log()
+        report = self.run_update()
+        self.assertEqual([r.kind for r in report], ["unchanged"] * 3)
+        self.assertEqual(self.invocations(), [],
+                         "an already-converged rerun must not run the CLI")
+
+    def test_changed_definition_is_removed_then_re_added(self):
+        import json as j
+        self.run_update()
+        data = j.loads(self.config.read_text())
+        data["mcpServers"]["alpha"]["command"] = "/Users/ronan/stale/alpha"
+        self.config.write_text(j.dumps(data))
+        self.clear_log()
+        report = self.run_update()
+        kinds = {r.kind for r in report}
+        self.assertIn("changed", kinds)
+        calls = [(c[1], c[2]) for c in self.invocations()]
+        self.assertEqual(calls, [("remove", "alpha"), ("add-json", "alpha")])
+        self.assertEqual(j.loads(self.config.read_text()),
+                         _golden_json("repo-mcp.json"))
+
+    def test_cli_failure_becomes_report_entry_not_traceback(self):
+        import os
+        with mock.patch.dict(os.environ, {"CLAUDE_STUB_FAIL_ADD": "1"}):
+            report = self.run_update()
+        self.assertEqual([r.kind for r in report], ["warning"] * 3)
+        self.assertTrue(all("failed" in r.detail for r in report))
 
 
 class VscodeSettingsMergeTests(unittest.TestCase):
@@ -345,7 +486,39 @@ class VscodeSettingsMergeTests(unittest.TestCase):
         baks = list(self.dir.glob("settings.json.bak-*"))
         self.assertEqual(len(baks), 1)
         self.assertEqual(baks[0].read_text(), jsonc)
-        self.assertTrue(any("settings.json" in r for r in report))
+        self.assertTrue(any("settings.json" in str(r) for r in report))
+
+    def test_repeated_jsonc_backup_does_not_accumulate(self):
+        """A second merge over the same unparseable content must not write
+        another .bak — the identical backup already exists."""
+        jsonc = ('{\n'
+                 '  // still JSONC\n'
+                 '  "editor.fontSize": 13,\n'
+                 '}\n')
+        self.settings.write_text(jsonc)
+        agentic_lib.merge_vscode_settings(self.settings, self.repo_root, [])
+        report = []
+        changed = agentic_lib.merge_vscode_settings(self.settings,
+                                                    self.repo_root, report)
+        self.assertFalse(changed)
+        baks = list(self.dir.glob("settings.json.bak-*"))
+        self.assertEqual(len(baks), 1,
+                         "identical content must not accumulate backups")
+        self.assertTrue(any(r.kind == "warning" for r in report),
+                        "the warning must still be reported on every run")
+
+    def test_non_dict_settings_root_backed_up_and_left_unchanged(self):
+        bad = '["settings", "as", "an", "array"]\n'
+        self.settings.write_text(bad)
+        report = []
+        changed = agentic_lib.merge_vscode_settings(self.settings,
+                                                    self.repo_root, report)
+        self.assertFalse(changed)
+        self.assertEqual(self.settings.read_text(), bad,
+                         "a non-object root must never be clobbered")
+        baks = list(self.dir.glob("settings.json.bak-*"))
+        self.assertEqual(len(baks), 1)
+        self.assertTrue(any(r.kind == "warning" for r in report))
 
     def test_merge_is_idempotent(self):
         agentic_lib.merge_vscode_settings(self.settings, self.repo_root, [])
@@ -420,6 +593,48 @@ class CanonicalServersFileTests(unittest.TestCase):
             self.assertFalse(cmd.startswith("/"),
                              f"{name}: command must be PATH-resolved, not absolute")
             self.assertNotIn("/Users/", str(spec))
+
+    def test_github_vscode_input_description_mentions_bearer_prefix(self):
+        defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
+        inputs = agentic_lib.emit_vscode_mcp(defs, ["github"])["inputs"]
+        self.assertEqual(len(inputs), 1)
+        self.assertIn("Bearer", inputs[0]["description"],
+                      "the prompt input must tell the user to include the "
+                      "'Bearer ' prefix")
+
+
+class SeedSourceMarkerTests(unittest.TestCase):
+    """Sanity checks on the real align seed sources: the body carries
+    managed-block markers so align can converge it, while the frontmatter
+    stays outside the block."""
+
+    SEED_SOURCES = (
+        REPO_ROOT / "copilot" / "agents" / "prd.agent.md",
+        REPO_ROOT / "claude" / "skills" / "prd" / "SKILL.md",
+    )
+
+    def test_seed_sources_carry_markers_with_frontmatter_outside(self):
+        for src in self.SEED_SOURCES:
+            with self.subTest(file=src.relative_to(REPO_ROOT).as_posix()):
+                text = src.read_text()
+                self.assertIn(agentic_lib.BEGIN_MARKER, text)
+                self.assertIn(agentic_lib.END_MARKER, text)
+                head, _, rest = text.partition(agentic_lib.BEGIN_MARKER)
+                self.assertTrue(head.startswith("---\n"),
+                                "frontmatter must open the file")
+                self.assertIn("name: prd", head,
+                              "frontmatter must sit OUTSIDE the managed block")
+                self.assertTrue(head.rstrip().endswith("---"),
+                                "the begin marker must directly follow the "
+                                "closing frontmatter delimiter")
+                self.assertIn(agentic_lib.END_MARKER, rest,
+                              "the end marker must close the body block")
+                block, _, _ = rest.partition(agentic_lib.END_MARKER)
+                self.assertEqual(
+                    block, "\n" + block.strip("\n") + "\n",
+                    "the block must sit flush against the markers (the "
+                    "write_managed normal form) or align's second run "
+                    "rewrites it")
 
 
 if __name__ == "__main__":

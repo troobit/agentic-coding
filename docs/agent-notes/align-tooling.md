@@ -38,12 +38,11 @@ or the real copilot assets. They DO use the real `scripts/stale-packs.json`.
 
 - align reuses agentic_lib for all managed-block and MCP-merge logic
   (`write_managed`, `generate_repo_configs`, `_backup`, `_write_json`,
-  `emit_cloud_json`). Lib functions report plain strings with absolute
-  paths; `_harvest()` classifies them into AlignReport buckets by substring
-  ("invalid JSON" -> warnings, "preserved non-canonical entries" ->
-  preserved, "exists without agentic markers" -> skipped, everything else
-  -> changes) and converts paths to repo-relative posix. If agentic_lib's
-  report wording changes, `_harvest` must follow.
+  `emit_cloud_json`). Lib functions report structured `ReportEntry`
+  objects (kind/path/detail); `_harvest()` buckets by `kind` ("warning" ->
+  warnings, "preserved" -> preserved, "skipped" -> skipped, "changed" ->
+  changes; "unchanged" is dropped) and converts paths to repo-relative
+  posix. No string parsing of report lines anywhere.
 - Plan-only first run: the pipeline executes for real against a shadow copy
   of ONLY the managed file set (`.mcp.json`, `.vscode/mcp.json`, `.github/`
   tree) in a temp dir. That is how the plan lists pending fixes with zero
@@ -51,16 +50,30 @@ or the real copilot assets. They DO use the real `scripts/stale-packs.json`.
 - JSON validity (step 1) backs up an unparseable file AND unlinks it, so
   the merge in step 3 reports "created" and `_load_json_or_backup` does not
   produce a second backup.
-- Path portability rewrites `/Users/<name>` prefixes to `$HOME` recursively
-  over string values in the managed JSON. It runs before the MCP merge;
-  when a file's only drift is a stale path in a NON-canonical entry, the
-  reported change comes solely from the path step (the merge then sees no
-  data diff and does not rewrite).
+- Path portability rewrites `/Users/<name>` prefixes recursively over
+  string values in the managed JSON. Forms: bare command name when the
+  string is a user-anchored path whose basename is PATH-resolvable at fix
+  time (via `align._which`, monkeypatched in tests for determinism);
+  otherwise the per-target home token — `${HOME}/...` in `.mcp.json`,
+  `${env:HOME}/...` in `.vscode/mcp.json`. Never bare `$HOME`, never the
+  current username. It runs before the MCP merge; when a file's only drift
+  is a stale path in a NON-canonical entry, the reported change comes
+  solely from the path step (the merge then sees no data diff and does not
+  rewrite).
+- Step 1 (JSON validity) also treats a parseable non-dict root (top-level
+  array) as invalid: backup + unlink, step 3 regenerates (fixture repo
+  `non-dict-root`). No AttributeError paths remain for non-object roots.
 - Seeding: a missing target gets a verbatim copy of the seed file (this
   preserves front matter that lives OUTSIDE the markers, e.g. the
   prd.agent.md YAML header — `write_managed` on a fresh file would drop
   it); an existing marked target gets `write_managed` with the block
   extracted from between the seed source's markers.
+- The REAL seed sources (`copilot/agents/prd.agent.md`,
+  `claude/skills/prd/SKILL.md`) carry the agentic markers around the BODY,
+  frontmatter outside. Gotcha: the block must sit flush against the markers
+  (no blank line after begin / before end — the `write_managed` normal
+  form), or the run after a verbatim seed rewrites the block once.
+  `SeedSourceMarkerTests` in test_generate.py pins both properties.
 - `.github/agents/prd.agent.md` is excluded from stale-pack candidacy
   entirely: never hash-matched, never counted toward the near-miss warning.
 - Manifest inference: `"*"` always includes; other `default_for` entries

@@ -61,9 +61,11 @@ def main(argv=None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    for line in report:
-        print(line)
-    if not report and not args.cloud:
+    for entry in report:
+        print(entry)
+    changed = any(getattr(entry, "kind", "changed") == "changed"
+                  for entry in report)
+    if not changed and not args.cloud:
         print("no changes")
     return 0
 

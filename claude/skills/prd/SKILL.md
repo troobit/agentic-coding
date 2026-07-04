@@ -2,7 +2,7 @@
 name: prd
 description: Author a Product Requirements Document (PRD) for autonomous execution. Use when the user wants to frame a body of work as a single PRD that a coding agent can take to completion without further steering — e.g. "write a PRD for X", "frame this as a PRD", "PRD lane". NOT part of the gated starwave lane; do not use for features that need requirements/design/tasks approval gates.
 ---
-
+<!-- agentic:begin -->
 # PRD Authoring
 
 Produce exactly one PRD document that a coding agent can execute to completion without returning to the author. The PRD is the alternative lane to spec-driven development: one document in, completed work out.
@@ -78,3 +78,4 @@ reduce to the same slug.}
 - Reference concrete file paths and existing patterns from the target repo where they anchor a requirement — the executing agent has the codebase but not this conversation.
 - Group requirements so each context is independently implementable; put anything that spans contexts into Execution notes as an explicit dependency.
 - Keep the language plain and concise. No hyperbole, no marketing terms, no dividers.
+<!-- agentic:end -->

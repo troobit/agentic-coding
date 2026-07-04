@@ -11,6 +11,14 @@
     "dev-tools": {
       "type": "stdio",
       "command": "/Users/ronan/go/bin/mcp-devtools"
+    },
+    "my-scripts": {
+      "type": "stdio",
+      "command": "/Users/ronan/tools/run-local-mcp",
+      "args": [
+        "--config",
+        "/Users/ronan/tools/mcp.conf"
+      ]
     }
   }
 }

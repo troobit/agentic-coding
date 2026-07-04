@@ -38,6 +38,9 @@ path to the repository you are enabling; the server subset comes from that repo'
 
 ## Notes
 
+- The `Bearer ` prefix rule applies to the local surfaces too: Claude reads the same value
+  from `export GITHUB_AUTH_TOKEN="Bearer <PAT>"`, and the VS Code prompt input expects
+  `Bearer <PAT>` pasted verbatim.
 - **transit is absent by design.** It serves on `http://localhost:3141` (localhost only),
   so it carries no cloud surface and is excluded from `--cloud-mcp` output. The same
   applies to awesome-copilot (VS Code only). This is not an error.

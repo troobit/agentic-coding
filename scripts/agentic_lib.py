@@ -23,6 +23,28 @@ class GenerationError(Exception):
     """Fatal generation problem (e.g. secret with no mechanism for a target)."""
 
 
+class ReportEntry:
+    """Structured report entry: kind + path + detail.
+
+    Kinds: "changed" (file created/updated/block rewritten/CLI applied),
+    "unchanged" (already converged, nothing done), "warning" (backup taken,
+    CLI failure), "preserved" (non-canonical entries kept), "skipped"
+    (markerless hand-written file left alone). str() gives the human line;
+    align.py buckets entries by `kind` instead of parsing strings.
+    """
+
+    def __init__(self, kind: str, path, detail: str):
+        self.kind = kind
+        self.path = str(path)
+        self.detail = detail
+
+    def __str__(self):
+        return f"{self.path}: {self.detail}"
+
+    def __repr__(self):
+        return f"ReportEntry({self.kind!r}, {self.path!r}, {self.detail!r})"
+
+
 # ---------------------------------------------------------------------------
 # Managed-block writer (markdown-ish text files)
 # ---------------------------------------------------------------------------
@@ -42,10 +64,10 @@ def write_managed(path: Path, block: str, report: list) -> bool:
     if path.exists():
         old = path.read_text()
         if BEGIN_MARKER not in old or END_MARKER not in old:
-            report.append(
-                f"{path}: exists without agentic markers - treated as "
-                f"hand-written, skipped"
-            )
+            report.append(ReportEntry(
+                "skipped", path,
+                "exists without agentic markers - treated as "
+                "hand-written, skipped"))
             return False
         head, _, rest = old.partition(BEGIN_MARKER)
         _, _, tail = rest.partition(END_MARKER)
@@ -53,11 +75,11 @@ def write_managed(path: Path, block: str, report: list) -> bool:
         if new == old:
             return False
         path.write_text(new)
-        report.append(f"{path}: managed block rewritten")
+        report.append(ReportEntry("changed", path, "managed block rewritten"))
         return True
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(managed_file_text(block))
-    report.append(f"{path}: created")
+    report.append(ReportEntry("changed", path, "created"))
     return True
 
 
@@ -97,6 +119,13 @@ def generate_conventions(repo_root: Path, report: list) -> None:
 # ---------------------------------------------------------------------------
 
 def _backup(path: Path, report: list, warning: str) -> None:
+    content = path.read_bytes()
+    for existing in sorted(path.parent.glob(path.name + ".bak-*")):
+        if existing.is_file() and existing.read_bytes() == content:
+            report.append(ReportEntry(
+                "warning", path,
+                f"{warning} (identical backup already at {existing.name})"))
+            return
     stamp = datetime.date.today().isoformat()
     bak = path.with_name(path.name + f".bak-{stamp}")
     n = 1
@@ -104,20 +133,25 @@ def _backup(path: Path, report: list, warning: str) -> None:
         bak = path.with_name(path.name + f".bak-{stamp}.{n}")
         n += 1
     shutil.copy2(path, bak)
-    report.append(f"{path}: {warning} (backed up to {bak.name})")
+    report.append(ReportEntry(
+        "warning", path, f"{warning} (backed up to {bak.name})"))
 
 
 def _load_json_or_backup(path: Path, report: list) -> dict:
-    """Parse JSON at path; invalid JSON is backed up and treated as empty."""
+    """Parse JSON at path; invalid JSON (or a non-dict root such as a
+    top-level array) is backed up and treated as empty."""
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text())
+        data = json.loads(path.read_text())
     except (json.JSONDecodeError, UnicodeDecodeError):
-        _backup(path, report,
-                "invalid JSON - regenerated; non-canonical entries may "
-                "remain only in the backup")
-        return {}
+        data = None
+    if isinstance(data, dict):
+        return data
+    _backup(path, report,
+            "invalid JSON - regenerated; non-canonical entries may "
+            "remain only in the backup")
+    return {}
 
 
 def _write_json(path: Path, data: dict) -> None:
@@ -219,11 +253,13 @@ def emit_repo_mcp(defs: dict, subset=None) -> dict:
 def _vscode_inputs(defs: dict, names) -> list:
     inputs = []
     for name in sorted(names):
-        for secret in sorted(defs[name].get("secrets", {})):
+        for secret, mech in sorted(defs[name].get("secrets", {}).items()):
+            description = mech.get("description") or \
+                f"Secret {secret} for MCP server {name}"
             inputs.append({
                 "id": _input_id(name, secret),
                 "type": "promptString",
-                "description": f"Secret {secret} for MCP server {name}",
+                "description": description,
                 "password": True,
             })
     return inputs
@@ -281,12 +317,14 @@ def _merge_servers_into(path: Path, key: str, rendered: dict, defs: dict,
         data["inputs"] = kept + inputs
 
     if preserved:
-        report.append(
-            f"{path}: preserved non-canonical entries: {', '.join(preserved)}")
+        report.append(ReportEntry(
+            "preserved", path,
+            f"preserved non-canonical entries: {', '.join(preserved)}"))
     if json.dumps(data, sort_keys=True) != original or not path.exists():
         existed = path.exists()
         _write_json(path, data)
-        report.append(f"{path}: {'updated' if existed else 'created'}")
+        report.append(ReportEntry(
+            "changed", path, "updated" if existed else "created"))
 
 
 def generate_repo_configs(repo_path: Path, defs: dict, subset,
@@ -311,26 +349,96 @@ def build_claude_cli_commands(defs: dict, subset=None) -> list:
     return commands
 
 
+def _read_claude_user_server(path: Path, name: str):
+    """Read one server definition from the Claude user config, read-only.
+
+    Used only for comparison on the CLI path (`claude mcp get` has no
+    machine-readable output); returns None when the file, the mcpServers
+    key, or the entry is missing or unparseable.
+    """
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    servers = data.get("mcpServers")
+    if not isinstance(servers, dict):
+        return None
+    return servers.get(name)
+
+
 def update_claude_user_config(path: Path, defs: dict, subset, report: list,
                               use_cli=None) -> None:
     """Converge the Claude user-level MCP config.
 
-    Prefers `claude mcp add-json --scope user` when the CLI is on PATH
-    (avoids racing a running Claude Code instance that rewrites
-    ~/.claude.json); falls back to a managed merge that preserves every
-    unrelated key and non-canonical server.
+    Prefers the claude CLI when it is on PATH (avoids racing a running
+    Claude Code instance that rewrites ~/.claude.json); falls back to a
+    managed merge that preserves every unrelated key and non-canonical
+    server.
+
+    CLI path idempotence: the existing definition is read from `path`
+    (read-only, comparison only). Identical -> reported as already
+    configured, nothing run. Different -> `claude mcp remove --scope user`
+    (failure ignored) then `claude mcp add-json --scope user`. Every
+    CalledProcessError becomes a "warning" report entry, never a traceback.
     """
     if use_cli is None:
         use_cli = shutil.which("claude") is not None
-    if use_cli:
-        import subprocess
-        for cmd in build_claude_cli_commands(defs, subset):
-            subprocess.run(cmd, check=True, capture_output=True)
-            report.append(f"claude mcp add-json {cmd[3]} --scope user: applied")
+    if not use_cli:
+        rendered = emit_repo_mcp(defs, subset)["mcpServers"]
+        _merge_servers_into(Path(path), "mcpServers", rendered, defs,
+                            "claude", report)
         return
-    rendered = emit_repo_mcp(defs, subset)["mcpServers"]
-    _merge_servers_into(Path(path), "mcpServers", rendered, defs, "claude",
-                        report)
+
+    import subprocess
+
+    def remove(name):
+        # Best-effort: a missing entry makes remove fail, which is fine.
+        try:
+            subprocess.run(["claude", "mcp", "remove", name,
+                            "--scope", "user"],
+                           check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError:
+            pass
+
+    def add(name, entry):
+        subprocess.run(["claude", "mcp", "add-json", name,
+                        json.dumps(entry), "--scope", "user"],
+                       check=True, capture_output=True, text=True)
+
+    for name, entry in emit_repo_mcp(defs, subset)["mcpServers"].items():
+        existing = _read_claude_user_server(path, name)
+        if existing == entry:
+            report.append(ReportEntry(
+                "unchanged", path,
+                f"claude mcp server {name}: already configured"))
+            continue
+        if existing is not None:
+            remove(name)
+        try:
+            add(name, entry)
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "") + (exc.stdout or "")
+            if "already exists" in stderr:
+                remove(name)
+                try:
+                    add(name, entry)
+                except subprocess.CalledProcessError as exc2:
+                    report.append(ReportEntry(
+                        "warning", path,
+                        f"claude mcp add-json {name} --scope user failed "
+                        f"after remove: {(exc2.stderr or '').strip()}"))
+                    continue
+            else:
+                report.append(ReportEntry(
+                    "warning", path,
+                    f"claude mcp add-json {name} --scope user failed: "
+                    f"{stderr.strip()}"))
+                continue
+        report.append(ReportEntry(
+            "changed", path,
+            f"claude mcp add-json {name} --scope user: applied"))
 
 
 # ---------------------------------------------------------------------------
@@ -372,9 +480,12 @@ def merge_vscode_settings(settings_path: Path, repo_root: Path,
         try:
             data = json.loads(settings_path.read_text())
         except (json.JSONDecodeError, UnicodeDecodeError):
+            data = None
+        if not isinstance(data, dict):
             _backup(settings_path, report,
-                    "not strict JSON (JSONC comments/trailing commas?) - "
-                    "left unchanged; merge the managed keys manually")
+                    "not a strict JSON object (JSONC comments/trailing "
+                    "commas, or a non-object root?) - left unchanged; "
+                    "merge the managed keys manually")
             return False
     else:
         data = {}
@@ -389,7 +500,8 @@ def merge_vscode_settings(settings_path: Path, repo_root: Path,
     if json.dumps(data, sort_keys=True) == original:
         return False
     _write_json(settings_path, data)
-    report.append(f"{settings_path}: managed keys merged")
+    report.append(ReportEntry("changed", settings_path,
+                              "managed keys merged"))
     return True
 
 
