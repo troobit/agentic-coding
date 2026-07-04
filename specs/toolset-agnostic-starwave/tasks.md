@@ -75,7 +75,7 @@ references:
   - Stream: 2
   - Requirements: [5.1](requirements.md#5.1)
 
-- [ ] 11. Implement scripts/align.py <!-- id:rv5n0lj -->
+- [x] 11. Implement scripts/align.py <!-- id:rv5n0lj -->
   - Pipeline order: JSON validity, path portability, MCP convergence, stale-pack deletion, cloud seeding with managed blocks
   - Manifest inference from default_for; --yes applies on first run; --cloud-mcp prints paste-ready JSON with COPILOT_MCP_* secret names
   - Touches managed files only (design Data Models list); refuses non-git directories
