@@ -6,7 +6,7 @@ references:
 
 ## Runbook
 
-- [ ] 1. Write docs/runbooks/process-onboarding.md
+- [x] 1. Write docs/runbooks/process-onboarding.md
   - How a repo joins the process: run align from agentic-coding, plan-only first run, then --yes
   - Names every seeded artifact: .agentic.json, nextup.example.md, gitignore entry, MCP config
   - How the first /nextup session seeds nextup.md
@@ -15,6 +15,6 @@ references:
 
 ## Agent notes
 
-- [ ] 2. Update docs/agent-notes/align-tooling.md for the nextup-template step
+- [x] 2. Update docs/agent-notes/align-tooling.md for the nextup-template step
   - Describe the new pipeline step and the user-zone-preservation rule
   - Explain why target nextup.md itself is never touched
