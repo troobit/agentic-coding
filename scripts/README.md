@@ -113,6 +113,24 @@ python move_code_section.py <source_file> <start_line> <end_line> <dest_file> [-
 python move_code_section.py src/main.go 15 25 src/utils.go --create-if-missing
 ```
 
+### process_status.py
+
+**Purpose**: Read-only process-status report over participating repos — nextup.md machine-zone health, spec-document coverage per `specs/` subfolder, git state, and drift flags. Exposed as `make status`.
+
+**Usage**:
+```bash
+python3 process_status.py [repo ...]   # or: make status [REPOS="path1 path2"]
+```
+
+**Parameters**:
+- `repo ...`: Repo paths to report on. With no arguments it reports this repo plus the checked-in default list (`${HOME}/repos/{medata,netmap,tocs,rtob,localml,loshop}`).
+
+**Behavior**:
+- One summary row per repo: branch, dirty/clean tree, last commit date, nextup.md presence, machine-zone marker (`<!-- LM -->` or legacy equivalents) and newest note date, nextup.example.md and .agentic.json presence, drift flags.
+- Indented detail lines list each `specs/` subfolder with which of requirements.md/design.md/tasks.md/smolspec.md/prd.md it contains.
+- Drift flags: `machine-zone` (zone missing/malformed), `stale-nextup` (newest note >14 days old while the tree is dirty), `spec-gap` (requirements.md without design.md or tasks.md), `no-agentic-json`.
+- Strictly read-only against target repos (`git --no-optional-locks` porcelain reads only); missing paths are reported on their row, never a crash.
+
 ### test-conversion/ (Go Application)
 
 **Purpose**: Converts Go test files from slice-based table-driven tests to map-based table-driven tests for better test isolation and cleaner syntax.
