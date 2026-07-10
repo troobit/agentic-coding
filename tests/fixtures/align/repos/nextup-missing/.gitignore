@@ -1,0 +1,3 @@
+# fixture: this repo already ignores the session-local nextup file
+nextup.md
+*.log

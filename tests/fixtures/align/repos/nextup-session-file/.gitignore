@@ -1,0 +1,3 @@
+# fixture: intentionally no nextup.md entry — a nested "nextup.md" rule
+# here would hide this fixture's tracked nextup.md from the outer repo.
+*.log

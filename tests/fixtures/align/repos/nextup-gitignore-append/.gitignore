@@ -1,0 +1,3 @@
+# fixture: no nextup.md entry yet; align must append exactly one
+*.log
+node_modules/
