@@ -22,10 +22,20 @@ Fixes agentic drift in a target repo, in pipeline order:
    .github/copilot-instructions.md, and .github/skills/prd/** with managed
    blocks; later runs converge only the block. A markerless pre-existing
    target is hand-written: reported and skipped, never overwritten.
+6. Nextup template (PRD nextup-starwave-refinement) - seeds
+   nextup.example.md verbatim from the canonical copy at the seed root when
+   the target lacks it; when present, converges only the machine zone
+   (everything from the first <!-- LM --> marker down) to canonical and
+   preserves the target's user zone byte-for-byte. A markerless target is
+   hand-written: skipped, never overwritten. The step also ensures the
+   target's .gitignore carries a nextup.md entry (appending one, creating
+   .gitignore if absent). nextup.md itself is session-local: align never
+   creates, modifies, or deletes it.
 
 Managed files only (design Data Models): .mcp.json, .vscode/mcp.json,
 .agentic.json, .github/copilot-instructions.md, .github/agents/prd.agent.md,
-.github/skills/prd/**, plus stale-pack files under .github/agents/.
+.github/skills/prd/**, stale-pack files under .github/agents/, plus
+nextup.example.md and the nextup.md entry in .gitignore.
 
 First run with no .agentic.json: the manifest is inferred from default_for
 rules and written, and the plan is reported WITHOUT applying - the user
@@ -62,6 +72,11 @@ DEFAULT_STALE_PACKS_JSON = REPO_ROOT / "scripts" / "stale-packs.json"
 
 MANAGED_JSON = (".mcp.json", ".vscode/mcp.json")
 PRD_AGENT_REL = ".github/agents/prd.agent.md"
+NEXTUP_EXAMPLE = "nextup.example.md"
+
+# Everything from the first LM marker down is the machine zone that align
+# converges; everything above it is the user zone, preserved byte-for-byte.
+NEXTUP_LM_MARKER = "<!-- LM -->"
 
 # A macOS home prefix like /Users/ronan; rewritten to a portable form
 # (bare command or a per-target home token), never to the current user's
@@ -272,6 +287,72 @@ def _seed_file(src: Path, dst: Path, repo: Path, report: AlignReport) -> None:
             {"path": rel, "action": "managed block converged to seed"})
 
 
+def _ensure_nextup_gitignore(repo: Path, report: AlignReport) -> None:
+    """Ensure the target's .gitignore carries a nextup.md entry.
+
+    nextup.md is session-local and must never be committed; align appends
+    exactly one entry when missing and creates .gitignore when absent."""
+    path = repo / ".gitignore"
+    if not path.is_file():
+        path.write_text("nextup.md\n")
+        report.changes.append({
+            "path": ".gitignore",
+            "action": "created with a nextup.md ignore entry",
+        })
+        return
+    text = path.read_text()
+    entries = {line.strip() for line in text.splitlines()}
+    if entries & {"nextup.md", "/nextup.md"}:
+        return
+    separator = "" if (not text or text.endswith("\n")) else "\n"
+    path.write_text(text + separator + "nextup.md\n")
+    report.changes.append({
+        "path": ".gitignore",
+        "action": "appended a nextup.md ignore entry",
+    })
+
+
+def _converge_nextup_template(repo: Path, seed_root: Path,
+                              report: AlignReport) -> None:
+    """Step 6: seed/converge nextup.example.md; nextup.md is never touched.
+
+    A missing target gets a verbatim copy of the canonical template. An
+    existing target keeps its user zone (above the first <!-- LM -->
+    marker) byte-for-byte and converges the machine zone (marker down) to
+    canonical. A markerless target is hand-written: skipped, never
+    overwritten. The .gitignore nextup.md entry is ensured either way."""
+    src = seed_root / NEXTUP_EXAMPLE
+    if not src.is_file():
+        raise AlignError(f"seed root {seed_root} lacks {NEXTUP_EXAMPLE}")
+    canonical = src.read_text()
+    if NEXTUP_LM_MARKER not in canonical:
+        raise AlignError(
+            f"canonical {src} lacks the {NEXTUP_LM_MARKER} marker")
+    dst = repo / NEXTUP_EXAMPLE
+    if not dst.exists():
+        shutil.copy2(src, dst)  # verbatim: byte-identical to canonical
+        report.changes.append({
+            "path": NEXTUP_EXAMPLE,
+            "action": "seeded from the canonical template",
+        })
+    else:
+        existing = dst.read_text()
+        if NEXTUP_LM_MARKER not in existing:
+            report.skipped.append(NEXTUP_EXAMPLE)
+        else:
+            user_zone = existing[:existing.index(NEXTUP_LM_MARKER)]
+            machine_zone = canonical[canonical.index(NEXTUP_LM_MARKER):]
+            merged = user_zone + machine_zone
+            if merged != existing:
+                dst.write_text(merged)
+                report.changes.append({
+                    "path": NEXTUP_EXAMPLE,
+                    "action": "machine zone converged to the canonical "
+                              "template (user zone preserved)",
+                })
+    _ensure_nextup_gitignore(repo, report)
+
+
 def _align_repo(repo: Path, manifest: dict, defs: dict, stale_packs: dict,
                 seed_root: Path, report: AlignReport) -> None:
     _fix_json_validity(repo, report)
@@ -280,6 +361,7 @@ def _align_repo(repo: Path, manifest: dict, defs: dict, stale_packs: dict,
     _delete_stale_packs(repo, stale_packs, report)
     if manifest.get("cloud_assets"):
         _seed_cloud_assets(repo, seed_root, report)
+    _converge_nextup_template(repo, seed_root, report)
 
 
 # ---------------------------------------------------------------------------
@@ -302,7 +384,7 @@ def _infer_manifest(repo: Path, defs: dict) -> dict:
 def _shadow_copy(repo: Path, shadow: Path) -> None:
     """Copy only the managed file set so a plan run has no side effects."""
     shadow.mkdir(parents=True)
-    for rel in MANAGED_JSON:
+    for rel in MANAGED_JSON + (NEXTUP_EXAMPLE, ".gitignore"):
         src = repo / rel
         if src.is_file():
             dst = shadow / rel
@@ -406,7 +488,8 @@ def main(argv=None) -> int:
                         help=f"stale-pack checksums "
                              f"(default: {DEFAULT_STALE_PACKS_JSON})")
     parser.add_argument("--seed-root", type=Path, default=None,
-                        help=f"root holding the cloud seed assets "
+                        help=f"root holding the cloud seed assets and the "
+                             f"canonical nextup.example.md "
                              f"(default: {REPO_ROOT})")
     args = parser.parse_args(argv)
 
