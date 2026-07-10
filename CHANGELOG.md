@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-10]
+
+### Added
+- **Nextup-template align step** (PRD `nextup-starwave-refinement`): `scripts/align.py` pipeline step 6 seeds `nextup.example.md` verbatim into target repos when absent, converges only the machine zone (first `<!-- LM -->` down) while preserving the user zone byte-for-byte, skips markerless targets, ensures a `nextup.md` gitignore entry (append or create), and never touches the session-local `nextup.md`; shadow-copy plan runs cover the new files. 13 new tests over 8 fixture repos
+- **Process status report**: stdlib-only `scripts/process_status.py` behind `make status` (`REPOS=` override) — one read-only row per repo (branch, tree state, last commit, nextup machine-zone marker and newest note date, `nextup.example.md`/`.agentic.json` presence, per-spec-folder document listing) with drift flags `machine-zone`, `stale-nextup`, `spec-gap`, `no-agentic-json`; defaults to this repo plus medata, netmap, tocs, rtob, localml, loshop. 22 fixture-based tests
+- `docs/runbooks/process-onboarding.md`: how a repo joins the nextup/starwave process — plan-only first align run, manifest review, apply run, seeded artifacts, first `/nextup` session, and the lane map (direct, light, PRD, gated starwave)
+
+### Changed
+- `docs/agent-notes/align-tooling.md` documents the nextup-template step (user-zone preservation, markerless skip, gitignore handling, why `nextup.md` is never touched)
+- Rollout: align applied and committed in medata, netmap, and loshop (`[chore]: align nextup/starwave process assets`, unpushed); tocs, rtob, and localml skipped as dirty and left bit-identical
+
 ## [2026-07-05]
 
 ### Added
