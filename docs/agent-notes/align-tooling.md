@@ -91,6 +91,36 @@ or the real copilot assets. They DO use the real `scripts/stale-packs.json`.
   name. Note `make align` passes no repo argument, so runbooks document the
   direct `python3 scripts/align.py <repo>` invocation.
 
+## Nextup-template step (PRD nextup-starwave-refinement)
+
+Pipeline step 6, `_converge_nextup_template`, runs unconditionally (not gated
+on `cloud_assets`) after the other five steps:
+
+- A repo without `nextup.example.md` gets a verbatim `shutil.copy2` of the
+  canonical copy at the seed root (`REPO_ROOT/nextup.example.md` by default;
+  `--seed-root` overrides, and align errors if the seed root lacks the file
+  or the canonical copy lacks the `<!-- LM -->` marker).
+- An existing `nextup.example.md` is split at the FIRST `<!-- LM -->` marker:
+  the user zone (everything above the marker) is preserved byte-for-byte, and
+  the machine zone (marker down) is replaced with the canonical machine zone.
+  No write happens when the merge equals the existing bytes, so a converged
+  file reports no change.
+- A markerless `nextup.example.md` is treated as hand-written: reported under
+  `skipped`, never overwritten — same contract as markerless cloud assets.
+- Either way the step ensures the target's `.gitignore` has a `nextup.md`
+  entry (`nextup.md` or `/nextup.md` both count as present); it appends one
+  line when missing and creates `.gitignore` containing just that line when
+  absent.
+- The target's `nextup.md` is NEVER created, modified, or deleted. It is
+  session-local state (gitignored by the entry above): the first `/nextup`
+  session seeds it from `nextup.example.md`, and after that it holds live
+  user instructions plus the machine-zone progress record — align clobbering
+  it would destroy in-flight session state.
+- Plan-only support: `_shadow_copy` includes `nextup.example.md` and
+  `.gitignore` in the managed file set it copies, so a first run without
+  `--yes` plans the seed/convergence and gitignore fix against the shadow
+  with zero target-side effects (only `.agentic.json` is written).
+
 ## Fixture provenance
 
 - `invalid-json/.vscode/mcp.json` is modeled byte-for-byte on the real sanarte
