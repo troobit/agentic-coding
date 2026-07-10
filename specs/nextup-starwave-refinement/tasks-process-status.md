@@ -6,7 +6,7 @@ references:
 
 ## Status script
 
-- [ ] 1. Create status script with make status target and default repo list <!-- id:xdywp55 -->
+- [x] 1. Create status script with make status target and default repo list <!-- id:xdywp55 -->
   - New Python script in scripts/ accepting repo paths as arguments
   - Defaults to this repo plus a checked-in list: medata netmap tocs rtob localml loshop
   - make status prints one summary row per default repo; explicit paths report only those

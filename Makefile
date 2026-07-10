@@ -5,11 +5,14 @@
 #           copilot/instructions/copilot-instructions.md) and MCP configs
 # sync      create the ~/.claude and VS Code profile symlinks
 # align     align this repository's own agent configs
+# status    read-only process-status report over participating repos
+#           (this repo plus the checked-in default list; pass explicit
+#           paths via REPOS="path1 path2")
 # test      run the Python unittest suite
 # lint      shellcheck all shell scripts + fail if generated files drift
 #           from their sources in shared/ and mcp/
 
-.PHONY: bootstrap generate sync align test lint lint-shell lint-drift
+.PHONY: bootstrap generate sync align status test lint lint-shell lint-drift
 
 bootstrap:
 	scripts/bootstrap.sh
@@ -22,6 +25,9 @@ sync:
 
 align:
 	python3 scripts/align.py
+
+status:
+	python3 scripts/process_status.py $(REPOS)
 
 test:
 	python3 -m unittest discover -s tests
