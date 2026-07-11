@@ -11,7 +11,8 @@
 - Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit
 - After writing code, you MUST ensure you use appropriate linters and validators.
 - When you discover a learning specific to a language that needs to be kept, add it to the related language-rule file (or create a new one if needed).
-- When managing tasks, use the `rune` CLI tool.
+- Manage tasks with the `rune` CLI; task files (`tasks.md` or `tasks-*.md`) MUST live under the feature's `specs/` folder and stay parseable by `rune list`.
+- Committed feature work requires its spec documents to exist in `specs/` first: a design document or PRD, plus the rune task file.
 - When creating GitHub issues, ALWAYS create them in the current repository unless explicitly told otherwise.
 
 # Agent Notes

@@ -6,7 +6,9 @@
 #   2. brew bundle against the repo Brewfile
 #   3. Claude Code via its documented installer (if missing)
 #   4. go install: orbit, mcp-devtools, and rune (rune's brew tap formula
-#      is a broken placeholder — see the Brewfile comment)
+#      is a broken placeholder — see the Brewfile comment); then, when a
+#      local build exists at ~/repos/rune/rune and rune is still not on
+#      PATH, symlink it into ~/.local/bin (agreement-invoice-skills Req 3)
 #   5. mkdir -p ~/.claude and the VS Code User/ settings dir
 #   6. scripts/sync-claude.sh (symlinks)
 #   7. generate.py --user (user MCP configs, conventions, VS Code settings
@@ -176,6 +178,32 @@ go_tool mcp-devtools "github.com/sammcj/mcp-devtools@latest"
 # placeholder that blocked the whole bundle (see the Brewfile comment).
 # Main package at the module root; public tags exist (verified 2026-07-04).
 go_tool rune "github.com/arjenschwarz/rune@latest"
+
+# ------------------------------------------------ 4b. local rune build on PATH
+# A dev machine may carry a local build at ~/repos/rune/rune instead of a
+# go-installed binary. When `which rune` still fails but that build exists,
+# symlink it into ~/.local/bin so rune lands on PATH (Req 3,
+# agreement-invoice-skills). ln -sfn keeps re-runs idempotent.
+step "rune on PATH (local build)"
+LOCAL_RUNE="$HOME/repos/rune/rune"
+LOCAL_BIN="$HOME/.local/bin"
+if command -v rune >/dev/null 2>&1; then
+    already "rune on PATH ($(command -v rune))"
+elif [ ! -x "$LOCAL_RUNE" ]; then
+    skipped "no local build at $LOCAL_RUNE (go install above covers fresh machines)"
+elif [ "$(readlink "$LOCAL_BIN/rune" 2>/dev/null)" = "$LOCAL_RUNE" ]; then
+    already "$LOCAL_BIN/rune -> $LOCAL_RUNE"
+elif [ "$DRY_RUN" -eq 1 ]; then
+    would "symlink $LOCAL_RUNE into $LOCAL_BIN/rune"
+elif mkdir -p "$LOCAL_BIN" && ln -sfn "$LOCAL_RUNE" "$LOCAL_BIN/rune"; then
+    did "symlinked $LOCAL_RUNE -> $LOCAL_BIN/rune"
+    case ":$PATH:" in
+        *":$LOCAL_BIN:"*) ;;
+        *) echo "note: add $LOCAL_BIN to PATH so rune is runnable" ;;
+    esac
+else
+    failed "symlinking $LOCAL_RUNE into $LOCAL_BIN/rune"
+fi
 
 # ------------------------------------------------------ 5. target directories
 step "Target directories"
