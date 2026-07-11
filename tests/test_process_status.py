@@ -1,10 +1,12 @@
-"""Fixture tests for scripts/process_status.py (PRD: nextup-starwave-refinement).
+"""Fixture tests for scripts/process_status.py (PRD: nextup-starwave-refinement;
+rune-drift and PRD-lane visibility from PRD agreement-invoice-skills).
 
 Fixture repos are real git checkouts built in a temp dir (same pattern as
 tests/test_align.py) with pinned commit dates, so every report column can
 be asserted exactly. Drift-flag fixtures are constructed so each drift
 condition produces that flag and only that flag (PRD Req 3), and the
 read-only test pins that a run leaves target trees bit-identical (Req 4).
+RuneDriftTest needs the real rune binary on PATH (bootstrap installs it).
 
 Run with: python3 -m unittest discover -s tests
 """
@@ -19,6 +21,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -29,6 +32,11 @@ TODAY = datetime.date(2026, 7, 10)
 COMMIT_DATE = "2026-07-01T12:00:00 +0000"
 
 GIT_ENV_ARGS = ["-c", "user.name=fixture", "-c", "user.email=fix@example.com"]
+
+# A task file rune parses, and a hand-written checklist it rejects
+# ("invalid task format: missing task number").
+RUNE_TASKS = "# Tasks\n\n- [ ] 1. First thing\n- [x] 2. Done thing\n"
+HAND_TASKS = "# TODO\n\n- [ ] write the thing\n- [x] ship it\n"
 
 
 def nextup_text(marker="<!-- LM -->", note_dates=("2026-07-01",),
@@ -64,12 +72,14 @@ class StatusFixtureCase(unittest.TestCase):
                        check=True, capture_output=True)
 
     def make_repo(self, name, *, nextup=None, example=True, agentic=True,
-                  specs=None, git=True, commit=True, dirty=False):
+                  specs=None, files=None, git=True, commit=True, dirty=False):
         """Build a fixture repo.
 
         nextup: file text or None (file absent). specs: dict of
         subfolder name -> iterable of spec doc filenames to create.
-        The default kwargs produce a repo with zero drift flags.
+        files: dict of repo-relative path -> exact text, for files whose
+        content matters (e.g. rune task files). The default kwargs
+        produce a repo with zero drift flags.
         """
         repo = self.tmp / name
         repo.mkdir(parents=True)
@@ -84,6 +94,10 @@ class StatusFixtureCase(unittest.TestCase):
             sub.mkdir(parents=True)
             for doc in docs:
                 (sub / doc).write_text(f"# {doc}\n")
+        for relpath, text in (files or {}).items():
+            path = repo / relpath
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
         if git:
             self._git(repo, "init", "-q", "-b", "main")
             if commit:
@@ -248,6 +262,61 @@ class DriftFlagTest(StatusFixtureCase):
         self.assertEqual(self.flags(repo), ["no-agentic-json"])
 
 
+class RuneDriftTest(StatusFixtureCase):
+    """PRD agreement-invoice-skills Req 1: rune-drift flag and detail lines."""
+
+    def test_hand_written_tasks_md_is_flagged(self):
+        repo = self.make_repo("hand", nextup=nextup_text(),
+                              files={"specs/feat/tasks.md": HAND_TASKS})
+        info = process_status.collect(repo)
+        self.assertEqual(info["rune_drift"], {"feat": ["tasks.md"]})
+        self.assertFalse(info["rune_missing"])
+        self.assertEqual(self.flags(repo), ["rune-drift"])
+
+    def test_rune_format_file_is_not_flagged(self):
+        repo = self.make_repo("live", nextup=nextup_text(),
+                              files={"specs/feat/tasks.md": RUNE_TASKS})
+        info = process_status.collect(repo)
+        self.assertEqual(info["rune_drift"], {})
+        self.assertEqual(self.flags(repo), [])
+
+    def test_only_the_failing_split_file_is_named(self):
+        repo = self.make_repo(
+            "split", nextup=nextup_text(),
+            files={"specs/feat/tasks.md": RUNE_TASKS,
+                   "specs/feat/tasks-extra.md": HAND_TASKS})
+        info = process_status.collect(repo)
+        self.assertEqual(info["rune_drift"], {"feat": ["tasks-extra.md"]})
+
+    def test_detail_line_names_the_failing_file(self):
+        repo = self.make_repo("named", nextup=nextup_text(),
+                              files={"specs/feat/tasks.md": HAND_TASKS})
+        output = process_status.render([process_status.collect(repo)],
+                                       today=TODAY)
+        self.assertIn("specs/feat: tasks.md [rune-drift: tasks.md]", output)
+        self.assertIn("rune-drift", output.splitlines()[1])
+
+    def test_missing_rune_binary_warns_and_never_flags(self):
+        repo = self.make_repo("no-rune", nextup=nextup_text(),
+                              files={"specs/feat/tasks.md": HAND_TASKS})
+        with mock.patch("process_status.shutil.which", return_value=None):
+            info = process_status.collect(repo)
+        self.assertTrue(info["rune_missing"])
+        self.assertEqual(info["rune_drift"], {})
+        self.assertEqual(process_status.drift_flags(info, today=TODAY), [])
+        output = process_status.render([info], today=TODAY)
+        self.assertIn("warning: rune binary not found; "
+                      "task-file parsing not checked", output)
+
+    def test_repo_without_task_files_never_probes_or_warns(self):
+        repo = self.make_repo("no-tasks", nextup=nextup_text(),
+                              specs={"prd-only": ("prd.md",)})
+        with mock.patch("process_status.shutil.which", return_value=None):
+            info = process_status.collect(repo)
+        self.assertFalse(info["rune_missing"])
+        self.assertEqual(self.flags(repo), [])
+
+
 class ReadOnlyTest(StatusFixtureCase):
     """Req 4: target trees are bit-identical before and after a run."""
 
@@ -311,6 +380,13 @@ class CliTest(StatusFixtureCase):
             self.assertIn(cell, row)
         self.assertIn("specs/feat: requirements.md design.md tasks.md",
                       output)
+
+    def test_prd_only_spec_folder_appears_in_detail_lines(self):
+        # PRD agreement-invoice-skills Req 5: PRD-lane folders are visible.
+        repo = self.make_repo("prd-lane", nextup=nextup_text(),
+                              specs={"autonomous": ("prd.md",)})
+        _, output = self.run_main([str(repo)])
+        self.assertIn("specs/autonomous: prd.md", output)
 
     def test_missing_path_row_is_graceful(self):
         missing = self.tmp / "gone"
