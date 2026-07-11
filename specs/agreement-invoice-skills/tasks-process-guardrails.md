@@ -32,7 +32,7 @@ references:
 
 ## Bootstrap
 
-- [ ] 5. Ensure the rune binary is on PATH via bootstrap <!-- id:022nmxj -->
+- [x] 5. Ensure the rune binary is on PATH via bootstrap <!-- id:022nmxj -->
   - PRD Req 3: in scripts/bootstrap.sh or the Brewfile (whichever fits the existing structure), given ~/repos/rune exists, make which rune succeed (symlink or PATH entry)
   - Re-running bootstrap is idempotent
   - Stream: 3
