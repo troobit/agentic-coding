@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-11]
+
+### Added
+- **Customer-doc skills** (PRD `agreement-invoice-skills`): `agreement`, `invoice`, and `customer-docs-check` skills under `claude/skills/` author and audit the tocs customer documents — SoW agreement YAMLs, invoicer-schema invoice copies, and the two-way `invoice_refs` ↔ `invoice_number` cross-references — from free-form input, running tocs generation to surface schema errors. Schema and referencing rules live once in the tool-neutral `docs/reference/customer-docs-authoring.md` (usable as-is with the Gemini CLI or a localml-served model); `docs/runbooks/customer-docs.md` documents the workflow and backends
+- **Rune guardrails** (same PRD): `make status` gains a `rune-drift` flag — `specs/**` task files that fail `rune list` parsing are flagged per repo with the failing file named in the detail lines (missing binary degrades to a warning; report stays read-only); `shared/conventions.md` now requires rune-managed task files under `specs/` and spec documents before committed feature work (regenerated into `claude/CLAUDE.md` and the copilot instructions); bootstrap step 4b symlinks `~/repos/rune/rune` onto PATH when absent; `docs/runbooks/rune-usage.md` covers day-to-day rune usage and clearing `rune-drift`. Six new process-status tests
+
+### Notes
+- `rune list` exits 0 on files with no task lines, so an empty placeholder `tasks.md` is not flagged as drift — only malformed task lines are
+
 ## [2026-07-10]
 
 ### Added
