@@ -27,6 +27,12 @@
   Go tools are skipped as `already done` when the binary is on PATH or in
   `$(go env GOPATH)/bin` — bootstrap does not upgrade them; re-run
   `go install` manually for that.
+- Step 4b (agreement-invoice-skills Req 3): when `which rune` fails but a
+  local build exists at `~/repos/rune/rune`, symlink it into
+  `~/.local/bin/rune` (`ln -sfn`; a matching existing symlink reports
+  `already done`, and a PATH note prints if `~/.local/bin` is not on PATH).
+  Runs after the go_tool calls, so `go install` remains the fresh-machine
+  path and the symlink only covers the local-dev-build case.
 - Homebrew discovery checks PATH then `/opt/homebrew/bin/brew` and
   `/usr/local/bin/brew` (fresh installs aren't on PATH yet); after the
   Homebrew step it `eval "$($BREW shellenv)"` so the rest of the run sees
