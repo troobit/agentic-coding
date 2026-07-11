@@ -17,7 +17,7 @@ references:
   - Blocked-by: 022nmxf (Add rune-drift flag to scripts/process_status.py)
   - Stream: 1
 
-- [ ] 3. Add unittest coverage for rune-drift and prd.md visibility <!-- id:022nmxh -->
+- [x] 3. Add unittest coverage for rune-drift and prd.md visibility <!-- id:022nmxh -->
   - Fixture repo with a hand-written non-rune tasks.md is flagged rune-drift and names the failing file; a live rune-format file is not flagged
   - Follow the existing fixture pattern in tests/test_process_status.py; make test passes
   - Blocked-by: 022nmxf (Add rune-drift flag to scripts/process_status.py), 022nmxg (Surface prd.md spec folders in status detail lines)
