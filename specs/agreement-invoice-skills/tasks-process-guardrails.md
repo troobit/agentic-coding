@@ -39,7 +39,7 @@ references:
 
 ## Docs
 
-- [ ] 6. Write runbook docs/runbooks/rune-usage.md <!-- id:022nmxk -->
+- [x] 6. Write runbook docs/runbooks/rune-usage.md <!-- id:022nmxk -->
   - PRD Req 4: when task files are created (starwave tasks phase, engage derivation), where they live, day-to-day commands (rune list/add/complete, status updates), what the rune-drift flag means and how to clear it
   - Commands run as written against a real task file, e.g. one under specs/agreement-invoice-skills/
   - Blocked-by: 022nmxf (Add rune-drift flag to scripts/process_status.py)
