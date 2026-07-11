@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Read-only process-status report over participating repos.
 
-(PRD: nextup-starwave-refinement, "Process status".)
+(PRD: nextup-starwave-refinement, "Process status"; rune-drift and PRD-lane
+visibility from PRD agreement-invoice-skills, "Process guardrails".)
 
 Prints one summary row per repo — nextup.md presence, machine-zone marker
 and newest note date, nextup.example.md / .agentic.json presence, current
 branch, dirty/clean tree, last commit date — followed by indented detail
 lines listing each specs/ subfolder and which spec documents it contains.
+Folders carrying only a prd.md (PRD-lane work) appear like any other spec
+folder, so autonomous PRD work is visible alongside starwave specs.
 
 Drift flags per row:
 
@@ -15,6 +18,9 @@ Drift flags per row:
 - stale-nextup      newest note older than 14 days while the tree is dirty
 - spec-gap          a specs/ subfolder has requirements.md but neither
                     design.md nor tasks.md
+- rune-drift        a specs/** task file (tasks.md or tasks-*.md) fails
+                    `rune list` parsing; the spec's detail line names the
+                    failing file(s)
 - no-agentic-json   .agentic.json missing
 
 The machine zone starts at the first line matching any known marker:
@@ -23,8 +29,9 @@ The machine zone starts at the first line matching any known marker:
 
 Strictly read-only against target repos: only `git --no-optional-locks -C
 <repo>` porcelain reads (branch/status/log) are used, so not even the git
-index is refreshed. A missing repo path is reported on its row, never a
-crash.
+index is refreshed, and task files are checked with `rune list`, a pure
+parse. A missing repo path is reported on its row, never a crash; a
+missing rune binary degrades to a per-repo warning detail line.
 
 CLI: process_status.py [repo ...]. With no arguments it reports this repo
 plus the checked-in default list below (resolved via ${HOME}, matching
@@ -39,6 +46,7 @@ import argparse
 import datetime
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -98,6 +106,25 @@ def _git(repo: Path, *args: str):
     return proc.stdout.strip()
 
 
+def _task_files(sub: Path) -> list:
+    """tasks.md / tasks-*.md files anywhere under one specs/ subfolder."""
+    return sorted(set(sub.rglob("tasks.md")) | set(sub.rglob("tasks-*.md")))
+
+
+def _rune_parses(rune: str, path: Path):
+    """Whether `rune list` parses the file (a read-only check).
+
+    Returns True/False, or None when the binary could not be executed
+    (vanished since the `shutil.which` probe) — never raises.
+    """
+    try:
+        proc = subprocess.run([rune, "list", str(path)],
+                              capture_output=True, text=True)
+    except OSError:
+        return None
+    return proc.returncode == 0
+
+
 def _machine_zone(path: Path):
     """Return (zone_label, newest_note_date) for a nextup.md file.
 
@@ -146,6 +173,8 @@ def collect(repo_path) -> dict:
         "example": False,
         "agentic_json": False,
         "specs": {},           # subfolder name -> [present spec docs]
+        "rune_drift": {},      # subfolder name -> [unparseable task files]
+        "rune_missing": False,  # task files exist but rune is not on PATH
         "branch": None,
         "dirty": None,
         "last_commit": None,   # "YYYY-MM-DD"
@@ -162,9 +191,23 @@ def collect(repo_path) -> dict:
 
     specs_dir = repo / "specs"
     if specs_dir.is_dir():
+        rune = shutil.which("rune")
         for sub in sorted(p for p in specs_dir.iterdir() if p.is_dir()):
             info["specs"][sub.name] = [
                 doc for doc in SPEC_DOCS if (sub / doc).is_file()]
+            task_files = _task_files(sub)
+            if task_files and rune is None:
+                info["rune_missing"] = True
+                continue
+            failing = []
+            for path in task_files:
+                parsed = _rune_parses(rune, path)
+                if parsed is None:
+                    info["rune_missing"] = True
+                elif not parsed:
+                    failing.append(path.relative_to(sub).as_posix())
+            if failing:
+                info["rune_drift"][sub.name] = failing
 
     branch = _git(repo, "branch", "--show-current")
     if branch is not None:
@@ -195,6 +238,8 @@ def drift_flags(info: dict, today: datetime.date = None) -> list:
            and "design.md" not in docs and "tasks.md" not in docs
            for docs in info["specs"].values()):
         flags.append("spec-gap")
+    if info["rune_drift"]:
+        flags.append("rune-drift")
     if not info["agentic_json"]:
         flags.append("no-agentic-json")
     return flags
@@ -238,8 +283,15 @@ def _details(info: dict) -> list:
     lines = []
     if not info["git"]:
         lines.append(f"not a git repository: {info['path']}")
+    if info["rune_missing"]:
+        lines.append("warning: rune binary not found; "
+                     "task-file parsing not checked")
     for name, docs in info["specs"].items():
-        lines.append(f"specs/{name}: {' '.join(docs) or '(no spec docs)'}")
+        line = f"specs/{name}: {' '.join(docs) or '(no spec docs)'}"
+        failing = info["rune_drift"].get(name)
+        if failing:
+            line += f" [rune-drift: {' '.join(failing)}]"
+        lines.append(line)
     return lines
 
 
