@@ -6,7 +6,7 @@ references:
 
 ## Reference
 
-- [ ] 1. Write tool-neutral authoring reference docs/reference/customer-docs-authoring.md <!-- id:jzl621k -->
+- [x] 1. Write tool-neutral authoring reference docs/reference/customer-docs-authoring.md <!-- id:jzl621k -->
   - Covers PRD Customer-doc skills Req 1: customers/<slug>/ folder layout; all fields of customer.yaml, agreements/sow-*.yaml, and invoicer-schema invoice YAML; shared line-item shape (type, description, quantity, rate/rate_ref); rate_ref resolution order (customer rate card, then defaults.yaml rates); two-way referencing rules (invoice_refs -> invoice_number, back-reference in line descriptions)
   - Every rule names a concrete tocs file path; ground truth is tocs/customers/example/* and tocs/docs/invoice-linking.md
   - No Claude-specific instructions anywhere - pasteable to Gemini CLI or a localml-served model as-is
