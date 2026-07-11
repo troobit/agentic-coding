@@ -40,7 +40,7 @@ references:
 
 ## Docs
 
-- [ ] 5. Write runbook docs/runbooks/customer-docs.md <!-- id:jzl621o -->
+- [x] 5. Write runbook docs/runbooks/customer-docs.md <!-- id:jzl621o -->
   - PRD Req 6: documents the workflow end to end - the three skills, the authoring reference, and how to drive the same rules from the Gemini CLI or a localml-served model (point the backend at the reference document)
   - Lists each skill with a one-line invocation example; links docs/reference/customer-docs-authoring.md and tocs/docs/invoice-linking.md
   - Blocked-by: jzl621l (Create agreement skill claude/skills/agreement/SKILL.md), jzl621m (Create invoice skill claude/skills/invoice/SKILL.md), jzl621n (Create customer-docs-check skill claude/skills/customer-docs-check/SKILL.md)
