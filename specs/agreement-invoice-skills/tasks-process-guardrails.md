@@ -6,12 +6,12 @@ references:
 
 ## Status
 
-- [ ] 1. Add rune-drift flag to scripts/process_status.py <!-- id:022nmxf -->
+- [x] 1. Add rune-drift flag to scripts/process_status.py <!-- id:022nmxf -->
   - PRD Process guardrails Req 1: a repo whose specs/** task files (tasks.md or tasks-*.md) exist but fail rune list parsing gets a rune-drift flag on its row; per-spec detail lines name the failing file
   - Stays read-only against target repos (existing --no-optional-locks discipline); a missing rune binary degrades to a warning line, never a crash
   - Stream: 1
 
-- [ ] 2. Surface prd.md spec folders in status detail lines <!-- id:022nmxg -->
+- [x] 2. Surface prd.md spec folders in status detail lines <!-- id:022nmxg -->
   - PRD Req 5: repo detail lines list spec folders containing prd.md so PRD-lane work is visible alongside starwave specs
   - make status run from this repo shows agreement-invoice-skills with prd.md in its detail line
   - Blocked-by: 022nmxf (Add rune-drift flag to scripts/process_status.py)
