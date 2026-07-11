@@ -25,7 +25,7 @@ references:
 
 ## Conventions
 
-- [ ] 4. Strengthen the task-management rule in shared/conventions.md and regenerate <!-- id:022nmxi -->
+- [x] 4. Strengthen the task-management rule in shared/conventions.md and regenerate <!-- id:022nmxi -->
   - PRD Req 2: tasks are managed with the rune CLI; task files live under the feature's specs/ folder; committed feature work requires its spec documents (design or PRD, plus tasks) in specs/ first
   - Run make generate so claude/CLAUDE.md and copilot instructions carry the wording; make lint shows no drift
   - Stream: 2
