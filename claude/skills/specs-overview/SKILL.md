@@ -28,7 +28,7 @@ Generate a `specs/OVERVIEW.md` file that catalogues all feature specs in the pro
     - `Planned` — tasks exist but none are completed
     - `No Tasks` — no tasks.md file exists
   - **Summary** — a one-sentence description (max ~15 words) extracted from the first substantive paragraph of the primary document (check in order: requirements.md, smolspec.md, design.md, plan.md, implementation.md)
-  - **Files** — list of all `.md` files in the directory (exclude non-documentation artifacts like `comparison-report` directories)
+  - **Files** — list of all `.md` files in the directory (exclude non-documentation artifacts like `comparison-report` directories, and exclude `explanation.md` — explain-like output is session-scoped, not a spec document)
 
 ### 2. Generate the Overview
 
@@ -63,6 +63,7 @@ One-line summary.
 - Summary line repeated below the heading
 - Bulleted list of all `.md` files in the spec directory, each linking to the file relative to `specs/`
 - Exclude non-markdown items (directories like `comparison-report`, `.DS_Store`, etc.)
+- Exclude `explanation.md` files (session-scoped explain-like output; listing them creates dead links once the session artefact is removed)
 
 ### 3. Write the File
 
