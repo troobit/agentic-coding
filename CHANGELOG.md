@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-23]
+
+### Added
+- **fiscal-probe skill** (PRD `fiscal-probe-skill`): `claude/skills/fiscal-probe/` probes PDF financial statements (AU/NZ/SG/UK/US formats) into a normalised typed ledger and produces reports where every claim carries a `[file p.N]` source reference, targeted at legal briefs in Australian family law property matters. Two deterministic scripts (`extract_transactions.py`, `analyze.py`) with parse-yield verification between them; detects recurring payments, similar-transaction groups, and cross-account transfers. `--json` emits the documented web-frontend contract (`references/json-contract.md`) with stable per-run transaction ids; worked example reports under `references/`. Imported from a packaged `financial-insights.skill` bundle and adapted
+
 ## [2026-07-11]
 
 ### Added
