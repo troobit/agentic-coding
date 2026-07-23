@@ -18,7 +18,7 @@ fi
 REPO_DIR="$HOME/.agentic-coding"
 
 if [[ ! -d "$REPO_DIR" ]]; then
-  git clone --depth 1 https://github.com/ArjenSchwarz/agentic-coding "$REPO_DIR"
+  git clone --depth 1 https://github.com/troobit/agentic-coding "$REPO_DIR"
 fi
 
 bash "$REPO_DIR/scripts/sync-claude.sh"

@@ -9,13 +9,13 @@ This skill writes a markdown note into the user's Obsidian vault capturing reusa
 
 ## Resolving the vault path
 
-The vault is named `Main` but lives at a different absolute path on different machines (e.g. `/Users/arjen/Documents/Obsidian/Main` on one Mac, `/Users/arjenschwarz/Documents/Obsidian/Main/Main` on another). Never hardcode the path. The skill keeps a per-machine cache of the path so it doesn't depend on Obsidian (or its CLI) being available at write time.
+The vault is named `rtob` but lives at a different absolute path on different machines (e.g. `/Users/r/repos/notes/rtob` on one Mac, `/Users/r/Documents/Obsidian/rtob` on another). Never hardcode the path. The skill keeps a per-machine cache of the path so it doesn't depend on Obsidian (or its CLI) being available at write time.
 
 **Cache location:** `~/.config/capture-knowledge/config.json`, with shape:
 
 ```json
 {
-  "vault_path": "/Users/arjen/Documents/Obsidian/Main"
+  "vault_path": "/Users/r/repos/notes/rtob"
 }
 ```
 
@@ -30,7 +30,7 @@ On every invocation, run this in order — stop at the first step that yields a 
    [ -d "$VAULT_PATH" ] || VAULT_PATH=""
    ```
 
-2. **Try the Obsidian CLI** as a one-shot to *propose* a path to the user: `obsidian vaults verbose | awk -F'\t' '$1=="Main"{print $2}'`. If it returns a directory that exists, ask the user "I found your Main vault at `<path>` — save that as the vault path on this machine?" and on yes, write the cache and continue.
+2. **Try the Obsidian CLI** as a one-shot to *propose* a path to the user: `obsidian vaults verbose | awk -F'\t' '$1=="Main"{print $2}'`. If it returns a directory that exists, ask the user "I found your vault at `<path>` — save as the vault path on this machine?" and on yes, write the cache and continue.
 
 3. **Ask the user** outright: "I don't have your Obsidian Main vault path cached yet on this machine. What's the absolute path?" Validate that the directory exists, then write the cache and continue.
 
@@ -52,7 +52,7 @@ If the cache exists but points at a directory that no longer exists (e.g. drive 
 Inside the vault, notes from this skill always go into:
 
 ```
-<VAULT_PATH>/03-Notes/Generated/
+<VAULT_PATH>/ML-Notes/cld/
 ```
 
 Create that folder with `mkdir -p` if it doesn't exist. All notes from this skill go here regardless of project or topic — topic categorization is done via tags, not subfolders, so the user isn't locked into a folder hierarchy that might not fit later.
