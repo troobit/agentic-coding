@@ -6,10 +6,7 @@ references:
 # Nextup Pure Router
 
 - [x] 1. The nextup skill routes without tracking status: claude/skills/nextup/SKILL.md is a pure router under 120 lines <!-- id:va6owt0 -->
-  - Keep: user-zone contract, seeding a missing nextup.md verbatim from nextup.example.md, feature detection (explicit reference, branch, specs/ contents - no machine-zone fallback), the four lanes, job splitting/fan-out, autonomy flag, slimmed close-out sweep (rune tasks, decision_log, /specs-overview).
-  - Drop: machine-zone template, the update-the-machine-zone step, machine-zone hard rules, legacy-marker state parsing; frontmatter description no longer claims a plain-English progress record.
-  - Replacements: fan-out outcomes, undispatched gated jobs, interrupt handoffs, and loose ends without a tasks file are reported in the closing message; a /nextup run after /sendit with no change requests counts as approval.
-  - Verify: grep of the file finds no machine-zone maintenance instructions; wc -l is under 120.
+  - Final state: 129 lines after review fixes (fb5cd2c) - the under-120 target was exceeded to inline the seeding skeleton verbatim per design-critic finding 1; coherence preferred over the line target.
   - References: specs/nextup-pure-router/smolspec.md
 
 - [x] 2. Session templates carry no status block: nextup.example.md and root nextup.md hold only the user zone plus an inert LM marker line <!-- id:va6owt1 -->
