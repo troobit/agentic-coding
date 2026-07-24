@@ -12,7 +12,6 @@ Run with: python3 -m unittest discover -s tests
 """
 
 import contextlib
-import datetime
 import hashlib
 import io
 import os
@@ -28,7 +27,6 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import process_status  # noqa: E402
 
-TODAY = datetime.date(2026, 7, 10)
 COMMIT_DATE = "2026-07-01T12:00:00 +0000"
 
 GIT_ENV_ARGS = ["-c", "user.name=fixture", "-c", "user.email=fix@example.com"]
@@ -39,24 +37,15 @@ RUNE_TASKS = "# Tasks\n\n- [ ] 1. First thing\n- [x] 2. Done thing\n"
 HAND_TASKS = "# TODO\n\n- [ ] write the thing\n- [x] ship it\n"
 
 
-def nextup_text(marker="<!-- LM -->", note_dates=("2026-07-01",),
-                extra_zone_lines=()):
-    """A nextup.md with a user zone, one machine marker, and dated notes."""
-    lines = [
-        "<!-- USER -->",
-        "",
-        "free-form user instructions",
-        "- 2020-01-01 — a decoy note in the USER zone, ignored",
-        "",
-        marker,
-        "",
-        "## Where things stand",
-        "",
-        "**Notes (latest first):**",
-    ]
-    lines += [f"- {date} — did a thing" for date in note_dates]
-    lines += list(extra_zone_lines)
-    return "\n".join(lines) + "\n"
+def nextup_text():
+    """A nextup.md user-intent file: user zone plus the inert marker line."""
+    return ("<!-- USER -->\n"
+            "\n"
+            "free-form user instructions\n"
+            "\n"
+            "<!-- LM -->\n"
+            "\n"
+            "reserved marker for tooling — no session status is kept here\n")
 
 
 class StatusFixtureCase(unittest.TestCase):
@@ -115,8 +104,7 @@ class StatusFixtureCase(unittest.TestCase):
         return repo
 
     def flags(self, repo):
-        return process_status.drift_flags(process_status.collect(repo),
-                                          today=TODAY)
+        return process_status.drift_flags(process_status.collect(repo))
 
 
 class CollectColumnsTest(StatusFixtureCase):
@@ -125,7 +113,7 @@ class CollectColumnsTest(StatusFixtureCase):
     def test_all_columns_match_fixture(self):
         repo = self.make_repo(
             "known",
-            nextup=nextup_text(note_dates=("2026-06-01", "2026-07-01")),
+            nextup=nextup_text(),
             specs={
                 "full": ("requirements.md", "design.md", "tasks.md"),
                 "smol": ("smolspec.md", "tasks.md"),
@@ -137,8 +125,6 @@ class CollectColumnsTest(StatusFixtureCase):
         self.assertTrue(info["git"])
         self.assertEqual(info["name"], "known")
         self.assertTrue(info["nextup"])
-        self.assertEqual(info["zone"], "LM")
-        self.assertEqual(info["newest_note"], datetime.date(2026, 7, 1))
         self.assertTrue(info["example"])
         self.assertTrue(info["agentic_json"])
         self.assertEqual(info["specs"], {
@@ -157,35 +143,10 @@ class CollectColumnsTest(StatusFixtureCase):
                               agentic=False, dirty=True)
         info = process_status.collect(repo)
         self.assertFalse(info["nextup"])
-        self.assertIsNone(info["zone"])
-        self.assertIsNone(info["newest_note"])
         self.assertFalse(info["example"])
         self.assertFalse(info["agentic_json"])
         self.assertEqual(info["specs"], {})
         self.assertTrue(info["dirty"])
-
-    def test_legacy_markers_are_recognised(self):
-        for marker, label in (("<!-- ML -->", "ML"),
-                              ("<!-- nextup:machine -->", "machine"),
-                              ("# What I want", "what-i-want")):
-            repo = self.make_repo(f"legacy-{label}",
-                                  nextup=nextup_text(marker=marker))
-            info = process_status.collect(repo)
-            self.assertEqual(info["zone"], label, marker)
-            self.assertEqual(info["newest_note"], datetime.date(2026, 7, 1))
-
-    def test_first_marker_in_file_order_wins(self):
-        text = nextup_text(marker="<!-- ML -->",
-                           extra_zone_lines=("", "<!-- LM -->"))
-        repo = self.make_repo("two-markers", nextup=text)
-        self.assertEqual(process_status.collect(repo)["zone"], "ML")
-
-    def test_notes_before_the_marker_are_ignored(self):
-        # The decoy 2020 note in the USER zone must not become the newest
-        # note; only zone notes count.
-        repo = self.make_repo("decoy", nextup=nextup_text())
-        info = process_status.collect(repo)
-        self.assertEqual(info["newest_note"], datetime.date(2026, 7, 1))
 
     def test_missing_repo_path_reports_gracefully(self):
         info = process_status.collect(self.tmp / "nope")
@@ -209,39 +170,10 @@ class DriftFlagTest(StatusFixtureCase):
         self.assertEqual(self.flags(self.make_repo("clean",
                                                    nextup=nextup_text())), [])
 
-    def test_machine_zone_missing_file(self):
+    def test_missing_nextup_is_not_flagged(self):
+        # nextup.md is user intent, not tracked state — its absence is
+        # reported in the NEXTUP column but is not drift.
         repo = self.make_repo("no-nextup", nextup=None)
-        self.assertEqual(self.flags(repo), ["machine-zone"])
-
-    def test_machine_zone_missing_marker(self):
-        repo = self.make_repo(
-            "no-marker", nextup="# Notes\n- 2026-07-01 — dated but no zone\n")
-        self.assertEqual(self.flags(repo), ["machine-zone"])
-
-    def test_machine_zone_malformed_without_dated_note(self):
-        repo = self.make_repo(
-            "no-note",
-            nextup="<!-- USER -->\n\n<!-- LM -->\n\n"
-                   "- <date> — seeded from nextup.example.md\n")
-        self.assertEqual(self.flags(repo), ["machine-zone"])
-
-    def test_stale_note_with_dirty_tree(self):
-        old = (TODAY - datetime.timedelta(days=15)).isoformat()
-        repo = self.make_repo("stale-dirty",
-                              nextup=nextup_text(note_dates=(old,)),
-                              dirty=True)
-        self.assertEqual(self.flags(repo), ["stale-nextup"])
-
-    def test_stale_note_with_clean_tree_is_not_flagged(self):
-        old = (TODAY - datetime.timedelta(days=15)).isoformat()
-        repo = self.make_repo("stale-clean",
-                              nextup=nextup_text(note_dates=(old,)))
-        self.assertEqual(self.flags(repo), [])
-
-    def test_note_exactly_fourteen_days_old_is_not_stale(self):
-        edge = (TODAY - datetime.timedelta(days=14)).isoformat()
-        repo = self.make_repo("edge", nextup=nextup_text(note_dates=(edge,)),
-                              dirty=True)
         self.assertEqual(self.flags(repo), [])
 
     def test_spec_gap_requirements_without_design_or_tasks(self):
@@ -291,8 +223,7 @@ class RuneDriftTest(StatusFixtureCase):
     def test_detail_line_names_the_failing_file(self):
         repo = self.make_repo("named", nextup=nextup_text(),
                               files={"specs/feat/tasks.md": HAND_TASKS})
-        output = process_status.render([process_status.collect(repo)],
-                                       today=TODAY)
+        output = process_status.render([process_status.collect(repo)])
         self.assertIn("specs/feat: tasks.md [rune-drift: tasks.md]", output)
         self.assertIn("rune-drift", output.splitlines()[1])
 
@@ -303,8 +234,8 @@ class RuneDriftTest(StatusFixtureCase):
             info = process_status.collect(repo)
         self.assertTrue(info["rune_missing"])
         self.assertEqual(info["rune_drift"], {})
-        self.assertEqual(process_status.drift_flags(info, today=TODAY), [])
-        output = process_status.render([info], today=TODAY)
+        self.assertEqual(process_status.drift_flags(info), [])
+        output = process_status.render([info])
         self.assertIn("warning: rune binary not found; "
                       "task-file parsing not checked", output)
 
@@ -376,7 +307,7 @@ class CliTest(StatusFixtureCase):
             specs={"feat": ("requirements.md", "design.md", "tasks.md")})
         _, output = self.run_main([str(repo)])
         row = output.splitlines()[1]
-        for cell in ("rowcheck", "main", "clean", "2026-07-01", "yes", "LM"):
+        for cell in ("rowcheck", "main", "clean", "2026-07-01", "yes"):
             self.assertIn(cell, row)
         self.assertIn("specs/feat: requirements.md design.md tasks.md",
                       output)

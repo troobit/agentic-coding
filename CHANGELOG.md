@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-25]
+
+### Changed
+- **Nextup pure router** (spec `nextup-pure-router`): `/nextup` no longer keeps any status record — the machine zone in `nextup.md` is removed everywhere. The skill (rewritten, 119 lines) is a pure router: the user-zone contract, seeding from `nextup.example.md`, the four lanes (direct/light/PRD/gated spec), job splitting/fan-out, and the `act autonomously` flag keep their semantics; feature detection is explicit reference → branch → `specs/` contents with no machine-zone fallback; close-out shrinks to the bookkeeping sweep (rune tasks for loose ends, adjudicated decisions to `decision_log.md`, `/specs-overview` regeneration) with no `nextup.md` writes. Fan-out outcomes, undispatched gated jobs, interrupt handoffs, and loose ends without a tasks file are reported in the session's plain-English closing message; a `/nextup` run after a `/sendit` handoff whose user zone carries no change requests counts as approval of the sent docs
+- `nextup.example.md` + session-local `nextup.md`: user zone plus a bare `<!-- LM -->` marker with a single inert line ("reserved marker for tooling — no session status is kept here"). The marker survives as `scripts/align.py`'s convergence anchor (align itself unchanged), which distributes the slimmed template downstream
+- `sendit` skill: never writes `nextup.md` — copy the spec docs to Prism, report loose ends in the closing message, stop; standalone feature resolution keeps explicit reference and branch only
+- `make-it-so` / `next-task` skills: ambiguous target resolution now lists the candidates and asks the user (machine-zone fallback dropped); the `/sendit` gate boilerplate in the four starwave skills no longer mentions nextup machine notes
+- `scripts/process_status.py` (`make status`): ZONE/NOTE columns and the `machine-zone`/`stale-nextup` drift flags removed — `nextup.md` is checked for presence only; remaining flags are `spec-gap`, `rune-drift`, `no-agentic-json`. `tests/test_process_status.py` updated in step
+- Docs (`scripts/README.md`, `docs/runbooks/process-onboarding.md`, `docs/agent-notes/process-status.md`, `docs/agent-notes/align-tooling.md`): progress and status now live in `specs/` (plus `specs/OVERVIEW.md`), rune task lists, and the session's closing message — nothing claims nextup or sendit maintains status in `nextup.md`
+
 ## [2026-07-23]
 
 ### Added
