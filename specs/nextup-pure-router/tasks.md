@@ -42,7 +42,8 @@ references:
   - References: specs/nextup-pure-router/smolspec.md
 
 - [x] 7. Repo-wide sweep confirms removal and the change is logged in CHANGELOG.md <!-- id:va6owt6 -->
-  - Verify: grep -ri "machine zone\|machine-zone" across the repo hits only scripts/align.py, tests/test_align.py and its fixtures, and specs/ history; full test suite passes (make test if present, else python3 -m pytest tests/).
-  - Add a CHANGELOG.md entry describing the nextup-pure-router change.
+  - Verified done 2026-07-25. Full-suite caveat: 5 pre-existing failures in tests/test_generate.py (4) and tests/test_align.py (1)
+  - introduced by commit 0d0f3f4 (agentic_lib.py marker change without golden updates) - confirmed failing identically at base 73355c9
+  - unrelated to this feature. Needs a separate fix-bug follow-up.
   - Blocked-by: va6owt0 (The nextup skill routes without tracking status: claude/skills/nextup/SKILL.md is a pure router under 120 lines), va6owt1 (Session templates carry no status block: nextup.example.md and root nextup.md hold only the user zone plus an inert LM marker line), va6owt4 (sendit closes out without touching nextup.md: no machine-notes step, no machine-zone feature resolution, frontmatter updated), va6owt5 (Downstream skills resolve features without the machine zone: make-it-so and next-task drop the fallback; starwave gate boilerplate no longer mentions nextup machine notes), va6owt2 (make status reports without machine-zone health: process_status.py drops zone parsing, columns, and the machine-zone/stale-nextup flags, with its tests passing), va6owt3 (Project docs describe the new contract: scripts/README.md, process-onboarding runbook, and agent notes no longer claim nextup maintains a machine zone)
   - References: specs/nextup-pure-router/smolspec.md, specs/nextup-pure-router/decision_log.md

@@ -15,13 +15,23 @@ description: The universal entry point for a session. Reads the nextup.md user z
 
 - The **user zone** — everything above the first recognised marker (`<!-- LM -->`; treat legacy `<!-- ML -->`, `<!-- nextup:machine -->`, or a `# What I want` heading as equivalent) — is the user's authoritative intent.
 - Everything below that first marker is **not state**: ignore it — never read it as intent or status. The marker itself is a reserved anchor for tooling (`scripts/align.py` converges the template from it); the only line below it is an inert note saying so.
-- You never modify an existing `nextup.md` — not the user zone, not anything else. The one write allowed: when the file is missing, seed it **verbatim** from `nextup.example.md` (whose user-zone placeholder documents the `act autonomously` flag), or write that same skeleton if the template is absent too.
+- You never modify an existing `nextup.md` — not the user zone, not anything else. The one write allowed: when the file is missing, seed it **verbatim** from `nextup.example.md` (whose user-zone placeholder documents the `act autonomously` flag), or — when the template is absent too — write this skeleton:
+
+  ```markdown
+  <!-- USER -->
+
+  <user inputs for next session — free-form instructions, run as written; add a line `act autonomously` to skip approval gates>
+
+  <!-- LM -->
+
+  reserved marker for tooling — no session status is kept here
+  ```
 
 **Worktrees.** `nextup.md` is gitignored, so it never travels into a linked git worktree. When running in a worktree without one, read the main worktree's `nextup.md` (first entry of `git worktree list`) user zone for intent — do this yourself; the user should never have to ask.
 
 ## Each run: open or close?
 
-- **Close-out** — the user is wrapping up ("close out", "wrap up", "end the session", or user-zone text that asks to close). Run the bookkeeping sweep and stop — see [Close-out mode](#close-out-mode).
+- **Close-out** — the user is wrapping up ("close out", "wrap up", "save where we are", "/nextup close out", "end the session", or user-zone text that asks to close). Run the bookkeeping sweep and stop — see [Close-out mode](#close-out-mode).
 - **Open** (default) — everything else: read the state, route the intent.
 
 ## Open mode — route the intent
@@ -91,7 +101,7 @@ Iterative, in-place improvements to something that already exists stay in the li
 Split the user zone into **jobs**: independently completable pieces that share no files and no ordering. Most runs carry one job — hand it off inline as step 5 routed it. When there are several, route each through step 5 on its own, then split by whether it can run unattended:
 
 - **Unattended-safe jobs** — direct-lane or light-lane work that runs start to finish without stopping to ask the user — fan out in parallel. Spawn one sub-agent per job **in a single message**, each told to invoke that job's routed skill with the job's user-zone text as input. Jobs that mutate files each get an isolated git worktree so parallel commits don't race. You stay on as overseer: wait for all to return, surface any failure plainly instead of masking it, and report every job's outcome in the session's closing message.
-- **Gated jobs** — anything in the spec lane, because requirements and design need user sign-off a sub-agent cannot collect — never go to a sub-agent. Route the most important one inline, and restate the ones you could not dispatch in the closing message so the user can bring them back next run.
+- **Gated jobs** — anything in the spec lane, because requirements and design need user sign-off a sub-agent cannot collect — never go to a sub-agent. Tell the user, before dispatching anything, which gated jobs you are not dispatching — so they can bring them back next run — then route the most important one inline.
 
 A batch of same-shaped bug fixes is not a nextup fan-out — `/bug-blitz` owns that pipeline; route the whole batch there. A job you dispatched belongs to its skill or sub-agent — you don't implement, review, or commit it yourself on top; only a direct-lane job you kept inline is yours to do. Before dispatching, tell the user in one or two plain sentences per job: which job it is, the lane and the skill (or direct execution) you chose, and the deciding signal (a path from the user zone, the branch name, an explicit `/...` directive, the autonomy flag). Then dispatch and **pass the user-zone text as the input** — inline for a single job, via the sub-agent prompts for a fan-out — so the user never retypes their idea. You MUST NOT continue past the dispatch: inline, the routed skill owns the rest of the turn; in a fan-out, your last act is reporting the sub-agents' outcomes. Either way the user returns to `/nextup` next session to pick up again.
 
