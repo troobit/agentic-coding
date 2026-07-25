@@ -19,6 +19,24 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import agentic_lib  # noqa: E402
 
 
+class MarkerContractTests(unittest.TestCase):
+    """Regression test for bugfix golden-test-markers.
+
+    The managed-block marker strings are a compatibility contract
+    (Decision 15, specs/toolset-agnostic-starwave): they identify
+    tool-owned blocks in already-generated and already-seeded files.
+    Changing them orphans every existing managed file, because
+    write_managed/align treat a file without the current markers as
+    hand-written and skip it forever. Commit 0d0f3f4 changed them by
+    accident; this test pins them so any future change fails loudly
+    with this explanation instead of via opaque golden diffs.
+    """
+
+    def test_managed_block_markers_are_stable(self):
+        self.assertEqual(agentic_lib.BEGIN_MARKER, "<!-- agentic:begin -->")
+        self.assertEqual(agentic_lib.END_MARKER, "<!-- agentic:end -->")
+
+
 class ConventionsAssemblyTests(unittest.TestCase):
     """Task 1: conventions assembly from shared fragments."""
 

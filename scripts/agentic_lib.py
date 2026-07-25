@@ -15,8 +15,8 @@ import json
 import shutil
 from pathlib import Path
 
-BEGIN_MARKER = "<!-- LM -->"
-END_MARKER = "EOF"
+BEGIN_MARKER = "<!-- agentic:begin -->"
+END_MARKER = "<!-- agentic:end -->"
 
 
 class GenerationError(Exception):
