@@ -10,7 +10,7 @@ Implement the next unfinished group of tasks from the tasks list. A group of tas
 **Constraints:**
 
 **Task Retrieval:**
-- When no explicit tasks file path was given and more than one spec has an incomplete `tasks.md`, read the active feature from the `nextup.md` machine zone; if still ambiguous, list the candidates and ask the user to confirm — NEVER guess
+- When no explicit tasks file path was given and more than one spec has an incomplete `tasks.md`, list the candidates and ask the user to confirm — NEVER guess
 - The model MUST use the rune skill to retrieve the next task(s) to work on
 - Use `rune next --format json` to get the next incomplete task. This command will indicate when all tasks are complete
 - If the user asks for the entire phase, use `rune next --phase --format json`

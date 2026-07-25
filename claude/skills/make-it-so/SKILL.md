@@ -10,8 +10,7 @@ Implement all the remaining tasks from the spec, one phase at a time. The main a
 **Constraints:**
 
 **Target Resolution (main agent):**
-- When no explicit tasks file path was given and more than one spec has an incomplete `tasks.md`, read the active feature from the `nextup.md` machine zone
-- If that still doesn't resolve to a single spec, list the candidates and ask the user to confirm — NEVER guess (a guessed target can resolve to a stale spec whose next task is a human STOP gate)
+- When no explicit tasks file path was given and more than one spec has an incomplete `tasks.md`, list the candidates and ask the user to confirm — NEVER guess (a guessed target can resolve to a stale spec whose next task is a human STOP gate)
 - Pass the resolved explicit tasks file path to every rune command
 
 **Phase Retrieval (main agent):**

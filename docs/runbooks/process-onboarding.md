@@ -39,10 +39,10 @@ the target repo is never edited by hand.
 - `.agentic.json` — the manifest (first run; read-only to align afterwards).
 - `nextup.example.md` — the tracked session template, copied verbatim from
   this repo's canonical copy when absent. If the target already has one, only
-  the machine zone (everything from the first `<!-- LM -->` marker down) is
-  converged to canonical; the user zone above the marker is preserved
-  byte-for-byte. A file without the marker is treated as hand-written and
-  skipped, never overwritten.
+  the part from the first `<!-- LM -->` marker down is converged to canonical
+  (now just the marker plus an inert reserved-for-tooling line); the user
+  zone above the marker is preserved byte-for-byte. A file without the
+  marker is treated as hand-written and skipped, never overwritten.
 - A `nextup.md` entry in the target's `.gitignore` (appended if missing,
   `.gitignore` created if absent). `nextup.md` itself is session-local and
   never created, modified, or deleted by align.
@@ -58,9 +58,12 @@ the target repo is never edited by hand.
 `nextup.md` is not seeded by align — the first `/nextup` session in the target
 repo does it. `/nextup` looks for `nextup.md` at the repo root and, finding
 none, copies `nextup.example.md` into place and carries on. From then on the
-user writes instructions in the user zone (above `<!-- LM -->`) and `/nextup`
-maintains the machine zone below it. Because `nextup.md` is gitignored, each
-clone seeds its own from the tracked template.
+user writes instructions in the user zone (above `<!-- LM -->`); `/nextup`
+routes them and never writes the file. Below the marker sits only an inert
+reserved-for-tooling line — no session status is kept there; progress lives
+in `specs/` (see `specs/OVERVIEW.md`), rune task lists, and the session's
+closing message. Because `nextup.md` is gitignored, each clone seeds its own
+from the tracked template.
 
 ## The lanes
 

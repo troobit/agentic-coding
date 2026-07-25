@@ -3,6 +3,11 @@
 The module docstring in `scripts/process_status.py` is the authoritative
 spec (columns, drift flags, read-only discipline). Non-obvious points:
 
+- nextup.md is checked for presence only (spec nextup-pure-router): the
+  nextup skill is a pure router and keeps no session status in the file,
+  so the report has no zone/note columns and no flag for a missing or
+  marker-less nextup.md. Drift flags are spec-gap, rune-drift, and
+  no-agentic-json.
 - rune-drift (PRD agreement-invoice-skills Req 1): `collect()` runs
   `rune list` over every `tasks.md` / `tasks-*.md` found by `rglob` under
   each `specs/` subfolder. Non-zero exit = drift; the spec's detail line

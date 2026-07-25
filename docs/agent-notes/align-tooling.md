@@ -102,9 +102,11 @@ on `cloud_assets`) after the other five steps:
   or the canonical copy lacks the `<!-- LM -->` marker).
 - An existing `nextup.example.md` is split at the FIRST `<!-- LM -->` marker:
   the user zone (everything above the marker) is preserved byte-for-byte, and
-  the machine zone (marker down) is replaced with the canonical machine zone.
-  No write happens when the merge equals the existing bytes, so a converged
-  file reports no change.
+  everything from the marker down is replaced with the canonical content —
+  since spec nextup-pure-router that is just the marker plus one inert
+  reserved-for-tooling line, which align distributes downstream over any
+  stale status templates. No write happens when the merge equals the
+  existing bytes, so a converged file reports no change.
 - A markerless `nextup.example.md` is treated as hand-written: reported under
   `skipped`, never overwritten — same contract as markerless cloud assets.
 - Either way the step ensures the target's `.gitignore` has a `nextup.md`
@@ -112,10 +114,9 @@ on `cloud_assets`) after the other five steps:
   line when missing and creates `.gitignore` containing just that line when
   absent.
 - The target's `nextup.md` is NEVER created, modified, or deleted. It is
-  session-local state (gitignored by the entry above): the first `/nextup`
-  session seeds it from `nextup.example.md`, and after that it holds live
-  user instructions plus the machine-zone progress record — align clobbering
-  it would destroy in-flight session state.
+  session-local (gitignored by the entry above): the first `/nextup` session
+  seeds it from `nextup.example.md`, and after that it holds the user's live
+  instructions — align clobbering it would destroy in-flight user intent.
 - Plan-only support: `_shadow_copy` includes `nextup.example.md` and
   `.gitignore` in the managed file set it copies, so a first run without
   `--yes` plans the seed/convergence and gitignore fix against the shadow

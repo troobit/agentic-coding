@@ -4,28 +4,25 @@
 (PRD: nextup-starwave-refinement, "Process status"; rune-drift and PRD-lane
 visibility from PRD agreement-invoice-skills, "Process guardrails".)
 
-Prints one summary row per repo — nextup.md presence, machine-zone marker
-and newest note date, nextup.example.md / .agentic.json presence, current
-branch, dirty/clean tree, last commit date — followed by indented detail
-lines listing each specs/ subfolder and which spec documents it contains.
-Folders carrying only a prd.md (PRD-lane work) appear like any other spec
-folder, so autonomous PRD work is visible alongside starwave specs.
+Prints one summary row per repo — nextup.md presence, nextup.example.md /
+.agentic.json presence, current branch, dirty/clean tree, last commit date
+— followed by indented detail lines listing each specs/ subfolder and
+which spec documents it contains. Folders carrying only a prd.md (PRD-lane
+work) appear like any other spec folder, so autonomous PRD work is visible
+alongside starwave specs.
+
+nextup.md is a user-intent file only (the nextup skill is a pure router
+and keeps no session status in it — spec nextup-pure-router), so the
+report checks its presence and nothing inside it.
 
 Drift flags per row:
 
-- machine-zone      nextup.md missing, no machine-zone marker, or a zone
-                    with no parseable `- YYYY-MM-DD — ...` note line
-- stale-nextup      newest note older than 14 days while the tree is dirty
 - spec-gap          a specs/ subfolder has requirements.md but neither
                     design.md nor tasks.md
 - rune-drift        a specs/** task file (tasks.md or tasks-*.md) fails
                     `rune list` parsing; the spec's detail line names the
                     failing file(s)
 - no-agentic-json   .agentic.json missing
-
-The machine zone starts at the first line matching any known marker:
-`<!-- LM -->`, legacy `<!-- ML -->`, `<!-- nextup:machine -->`, or the
-`# What I want` heading.
 
 Strictly read-only against target repos: only `git --no-optional-locks -C
 <repo>` porcelain reads (branch/status/log) are used, so not even the git
@@ -43,9 +40,7 @@ Python 3 stdlib only (Decision 12). Tests: tests/test_process_status.py.
 from __future__ import annotations
 
 import argparse
-import datetime
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -64,23 +59,9 @@ DEFAULT_REPOS = (
     "${HOME}/repos/loshop",
 )
 
-# Machine-zone markers, matched against stripped lines in file order;
-# the first hit wins (Req 2).
-MACHINE_MARKERS = (
-    ("<!-- LM -->", "LM"),
-    ("<!-- ML -->", "ML"),
-    ("<!-- nextup:machine -->", "machine"),
-    ("# What I want", "what-i-want"),
-)
-
 # Spec documents tracked per specs/ subfolder (Req 2).
 SPEC_DOCS = ("requirements.md", "design.md", "tasks.md", "smolspec.md",
              "prd.md")
-
-# A note line inside the machine zone: `- 2026-07-10 — did a thing`.
-_NOTE_DATE_RE = re.compile(r"^-\s+(\d{4}-\d{2}-\d{2})\b")
-
-STALE_NOTE_DAYS = 14
 
 
 def default_repos() -> list[Path]:
@@ -125,39 +106,6 @@ def _rune_parses(rune: str, path: Path):
     return proc.returncode == 0
 
 
-def _machine_zone(path: Path):
-    """Return (zone_label, newest_note_date) for a nextup.md file.
-
-    zone_label is None when no marker line exists; newest_note_date is the
-    newest parseable ISO date on a note line at or after the marker (None
-    when the zone carries no dated note — treated as malformed).
-    """
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    start = label = None
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        for marker, name in MACHINE_MARKERS:
-            if stripped == marker:
-                start, label = index, name
-                break
-        if start is not None:
-            break
-    if start is None:
-        return None, None
-    newest = None
-    for line in lines[start + 1:]:
-        match = _NOTE_DATE_RE.match(line.strip())
-        if not match:
-            continue
-        try:
-            found = datetime.date.fromisoformat(match.group(1))
-        except ValueError:
-            continue  # shaped like a date but not one (e.g. 2026-13-40)
-        if newest is None or found > newest:
-            newest = found
-    return label, newest
-
-
 def collect(repo_path) -> dict:
     """Gather every report column for one repo. Never raises for a missing
     or non-git path — the row reports the problem instead (Req 1, Req 4)."""
@@ -168,8 +116,6 @@ def collect(repo_path) -> dict:
         "exists": repo.is_dir(),
         "git": False,
         "nextup": False,
-        "zone": None,          # marker label, e.g. "LM"
-        "newest_note": None,   # datetime.date
         "example": False,
         "agentic_json": False,
         "specs": {},           # subfolder name -> [present spec docs]
@@ -182,10 +128,7 @@ def collect(repo_path) -> dict:
     if not info["exists"]:
         return info
 
-    nextup = repo / "nextup.md"
-    info["nextup"] = nextup.is_file()
-    if info["nextup"]:
-        info["zone"], info["newest_note"] = _machine_zone(nextup)
+    info["nextup"] = (repo / "nextup.md").is_file()
     info["example"] = (repo / "nextup.example.md").is_file()
     info["agentic_json"] = (repo / ".agentic.json").is_file()
 
@@ -222,18 +165,11 @@ def collect(repo_path) -> dict:
 # Drift flags (Req 3)
 # ---------------------------------------------------------------------------
 
-def drift_flags(info: dict, today: datetime.date = None) -> list:
+def drift_flags(info: dict) -> list:
     """Drift conditions for one collected row, in report order."""
     if not info["exists"]:
         return []
-    if today is None:
-        today = datetime.date.today()
     flags = []
-    if info["zone"] is None or info["newest_note"] is None:
-        flags.append("machine-zone")
-    elif (info["dirty"]
-          and (today - info["newest_note"]).days > STALE_NOTE_DAYS):
-        flags.append("stale-nextup")
     if any("requirements.md" in docs
            and "design.md" not in docs and "tasks.md" not in docs
            for docs in info["specs"].values()):
@@ -249,19 +185,18 @@ def drift_flags(info: dict, today: datetime.date = None) -> list:
 # Rendering
 # ---------------------------------------------------------------------------
 
-_HEADER = ("REPO", "BRANCH", "TREE", "COMMIT", "NEXTUP", "ZONE", "NOTE",
-           "EXAMPLE", "AGENTIC", "FLAGS")
+_HEADER = ("REPO", "BRANCH", "TREE", "COMMIT", "NEXTUP", "EXAMPLE",
+           "AGENTIC", "FLAGS")
 
 
 def _yes_no(value) -> str:
     return "yes" if value else "no"
 
 
-def _row(info: dict, today) -> tuple:
+def _row(info: dict) -> tuple:
     if not info["exists"]:
-        return (info["name"], "-", "-", "-", "-", "-", "-", "-", "-",
-                "missing-path")
-    flags = drift_flags(info, today)
+        return (info["name"], "-", "-", "-", "-", "-", "-", "missing-path")
+    flags = drift_flags(info)
     return (
         info["name"],
         info["branch"] or "-",
@@ -269,8 +204,6 @@ def _row(info: dict, today) -> tuple:
         ("dirty" if info["dirty"] else "clean"),
         info["last_commit"] or "-",
         _yes_no(info["nextup"]),
-        info["zone"] or "-",
-        info["newest_note"].isoformat() if info["newest_note"] else "-",
         _yes_no(info["example"]),
         _yes_no(info["agentic_json"]),
         ",".join(flags) or "-",
@@ -295,9 +228,9 @@ def _details(info: dict) -> list:
     return lines
 
 
-def render(infos, today: datetime.date = None) -> str:
+def render(infos) -> str:
     """One aligned summary row per repo, spec details indented beneath."""
-    rows = [(_row(info, today), _details(info)) for info in infos]
+    rows = [(_row(info), _details(info)) for info in infos]
     widths = [max(len(cell) for cell in column)
               for column in zip(_HEADER, *(row for row, _ in rows))]
     lines = ["  ".join(cell.ljust(width)

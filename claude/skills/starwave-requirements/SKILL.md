@@ -78,7 +78,7 @@ Before triggering skill reviews, the model MUST verify:
   2. SECOND: Use the Task tool with subagent_type="peer-review-validator" to validate the requirements and critical review findings by consulting external AI systems (Gemini, Codex, Q Developer)
   3. The model MUST synthesize the findings from both reviews and present the key insights, questions, and recommendations to the user
 - After presenting the synthesized review findings, the model MUST ask the user "Do the requirements look good or do you want additional changes?"
-- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder, updates the nextup machine notes, and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
+- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
 - If the user responds with affirmations like "yes", "looks good", "approved", or similar, consider this explicit approval and proceed to the next phase
 - If the user provides feedback or requests changes, the model MUST make the modifications and repeat the review cycle (design-critic → peer-review-validator → user approval)
 - If the user's response is unclear, the model MUST ask a clarifying question before proceeding

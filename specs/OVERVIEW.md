@@ -7,6 +7,7 @@
 | [Nextup Starwave Refinement](#nextup-starwave-refinement) | 2026-07-10 | In Progress | Refines nextup/starwave distribution and observability across the six consumer repos |
 | [Agreement Invoice Skills](#agreement-invoice-skills) | 2026-07-11 | In Progress | Skills and guardrails for authoring customer SoW agreements and invoices with verified cross-references |
 | [Fiscal Probe Skill](#fiscal-probe-skill) | 2026-07-23 | Done | Financial-document probe skill producing reports where every claim carries a source reference |
+| [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth |
 
 ---
 
@@ -51,3 +52,11 @@ Financial-document probe skill producing reports where every claim carries a sou
 
 - [prd.md](fiscal-probe-skill/prd.md)
 - [tasks.md](fiscal-probe-skill/tasks.md)
+
+## Nextup Pure Router
+
+Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth.
+
+- [decision_log.md](nextup-pure-router/decision_log.md)
+- [smolspec.md](nextup-pure-router/smolspec.md)
+- [tasks.md](nextup-pure-router/tasks.md)
