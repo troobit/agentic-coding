@@ -905,6 +905,31 @@ class JanitorSeedingTest(AlignFixtureCase):
                 )
                 self.assertIn(rel, self.change_paths(report))
 
+    def test_seed_root_pollution_is_never_seeded(self):
+        """A seed root polluted by a local `make test` run (__pycache__
+        bytecode) or Finder (.DS_Store) seeds only the real assets."""
+        seed = self.tmp / "polluted-seed-root"
+        shutil.copytree(FIXTURES / "seed-root", seed)
+        janitor = seed / "claude" / "skills" / "spec-janitor"
+        pycache = janitor / "__pycache__"
+        pycache.mkdir()
+        (pycache / "spec_lint.cpython-314.pyc").write_bytes(b"\x00bytecode")
+        (janitor / ".DS_Store").write_bytes(b"\x00finder-cruft")
+        repo = self.make_repo("missing-cloud-assets")
+        self.run_align(repo, seed_root=seed)
+        skills = repo / ".github" / "skills" / "spec-janitor"
+        seeded = {
+            p.relative_to(skills).as_posix()
+            for p in skills.rglob("*") if p.is_file()
+        }
+        self.assertEqual(
+            seeded,
+            {"SKILL.md", "spec_lint.py",
+             "references/spec-conventions.md"},
+            "only real skill assets may be seeded - no __pycache__/*.pyc, "
+            f"no .DS_Store; got: {sorted(seeded)!r}",
+        )
+
     def test_cloud_assets_false_seeds_no_janitor_assets(self):
         repo = self.make_repo("drifted-canonical")  # cloud_assets: false
         self.run_align(repo)
@@ -984,9 +1009,34 @@ class JanitorDriftedAssetsTest(AlignFixtureCase):
         second = self.run_align(repo)
         self.assertEqual(second.changes, [])
         self.assertEqual(
+            second.warnings, [],
+            "a repair-then-realign sequence must settle warning-free: the "
+            ".bak-<date> left by the repair is not a stale-pack candidate; "
+            f"got: {second.warnings!r}",
+        )
+        self.assertEqual(
             self.snapshot(repo), after_first,
             "a second aligned run must not touch any file (no new backups)",
         )
+
+    def test_agent_backup_file_never_triggers_stale_pack_warning(self):
+        """Repairing the drifted agent leaves spec-janitor.agent.md.bak-<date>
+        in .github/agents; the next run must neither warn about it (the
+        forever-warning failure mode) nor delete it."""
+        repo = self.make_repo("janitor-drifted")
+        self.run_align(repo)
+        backups = list((repo / ".github/agents").glob("*.bak-*"))
+        self.assertTrue(
+            backups, "precondition: the drifted agent must be backed up",
+        )
+        second = self.run_align(repo)
+        self.assertFalse(
+            any(".github/agents" in w for w in second.warnings),
+            "backup files are exempt from stale-pack candidacy; got: "
+            f"{second.warnings!r}",
+        )
+        for bak in backups:
+            self.assertTrue(bak.exists(), "backups must never be pruned")
 
 
 if __name__ == "__main__":

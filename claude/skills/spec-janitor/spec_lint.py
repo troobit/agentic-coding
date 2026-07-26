@@ -149,24 +149,60 @@ class _FindingSet:
 
 
 # --------------------------------------------------------------------------
-# discovery (janitor-owned: every leaf directory under specs/)
+# discovery (janitor-owned; conventions "Spec modes")
+
+PRIMARY_DOCS = ("requirements.md", "smolspec.md", "prd.md", "design.md",
+                "report.md")
+
+
+def _is_recognized_doc(name):
+    return (name in PRIMARY_DOCS or name == "tasks.md"
+            or (name.startswith("tasks-") and name.endswith(".md")))
+
+
+def _contains_recognized_doc(directory):
+    return any(
+        child.is_file() and _is_recognized_doc(child.name)
+        for child in directory.iterdir()
+    )
 
 
 def _discover(specs_dir):
-    leaves = []
+    """Spec discovery: a directory under specs/ IS a spec when it directly
+    contains a recognized document (a primary document or a task file); its
+    subdirectories are assets of that spec, never separate specs. A
+    directory with no recognized document is a domain container to descend
+    into; a terminal one is returned anyway (it becomes SJ-MODE-001).
+    specs/bugfixes is never a regular spec: each child directory is a
+    bugfix entry (audited without further descent) and loose files directly
+    under it are returned separately (SJ-MODE-003).
 
-    def walk(directory):
+    Returns (spec_dirs, loose_bugfix_files)."""
+    specs = []
+    loose = []
+
+    def walk(container, in_bugfixes=False):
         subdirs = sorted(
-            child for child in directory.iterdir()
+            child for child in container.iterdir()
             if child.is_dir() and not child.name.startswith(".")
         )
-        if directory is not specs_dir and not subdirs:
-            leaves.append(directory)
         for sub in subdirs:
-            walk(sub)
+            if container is specs_dir and sub.name == "bugfixes":
+                loose.extend(sorted(
+                    f for f in sub.iterdir()
+                    if f.is_file() and not f.name.startswith(".")
+                ))
+                walk(sub, in_bugfixes=True)
+            elif in_bugfixes or _contains_recognized_doc(sub):
+                specs.append(sub)
+            elif any(c.is_dir() and not c.name.startswith(".")
+                     for c in sub.iterdir()):
+                walk(sub)
+            else:
+                specs.append(sub)
 
     walk(specs_dir)
-    return leaves
+    return specs, loose
 
 
 def _recognize_mode(names):
@@ -206,7 +242,9 @@ def _front_matter(lines):
             in_refs = True
             continue
         if in_refs:
-            match = re.match(r"^(\s+)-\s+(.+?)\s*$", line)
+            # List entries may be indented or at column 0 (both are valid
+            # YAML under a `references:` key).
+            match = re.match(r"^(\s*)-\s+(.+?)\s*$", line)
             if match:
                 refs.append((i, match.group(1), match.group(2)))
             else:
@@ -625,13 +663,22 @@ def audit(repo_path, *, fix=False, fix_dirty=False):
                 "recording will back it up and rebuild it."
             )
         excluded_specs = set(store["exclude_specs"])
-        for leaf in _discover(specs_dir):
+        spec_dirs, loose_bugfix_files = _discover(specs_dir)
+        for leaf in spec_dirs:
             if leaf.relative_to(specs_dir).as_posix() in excluded_specs:
                 continue
             _audit_spec(
                 repo, specs_dir, leaf, findings, rune_avail, anchor_cache,
                 ops,
             )
+        if "bugfixes" not in excluded_specs:
+            for path in loose_bugfix_files:
+                findings.add(
+                    "SJ-MODE-003", "bugfixes", path.name, path.name,
+                    _rel(repo, path),
+                    "loose file directly under specs/bugfixes/ - bug work "
+                    "lives in a per-bug entry folder with a report.md",
+                )
         suppressed = set(store["exclude_findings"]) | set(store["raised"])
         if suppressed:
             findings.drop(suppressed)

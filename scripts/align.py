@@ -17,7 +17,8 @@ Fixes agentic drift in a target repo, in pipeline order:
 4. Stale-pack deletion - files under .github/agents/ whose SHA-256 matches
    any hash in scripts/stale-packs.json are deleted; anything else is left
    and reported. Zero matches with candidate files present warns (a
-   near-miss must not silently no-op).
+   near-miss must not silently no-op). Align's own seed targets and
+   backup files (name containing .bak-) are never candidates.
 5. Cloud seeding (cloud_assets: true) - seeds .github/agents/prd.agent.md,
    .github/copilot-instructions.md, and .github/skills/prd/** with managed
    blocks; later runs converge only the block. A markerless pre-existing
@@ -27,6 +28,8 @@ Fixes agentic drift in a target repo, in pipeline order:
    (agentic_lib.seed_verbatim): identical targets are no-ops, differing
    targets - markerless or not - are backed up (.bak-<date>) and
    re-copied byte-identical to the seed (spec spec-janitor, Decision 10).
+   Skill-directory expansion seeds real assets only: __pycache__,
+   *.pyc, and dotfiles/dotdirs (e.g. .DS_Store) are never seeded.
 6. Nextup template (PRD nextup-starwave-refinement) - seeds
    nextup.example.md verbatim from the canonical copy at the seed root when
    the target lacks it; when present, converges only the machine zone
@@ -144,6 +147,22 @@ def _harvest(log: list, base: Path, report: AlignReport) -> None:
 _which = shutil.which
 
 
+def _seed_asset_files(root: Path):
+    """Files under a seed skill directory that are real assets.
+
+    Skips any path with a __pycache__ or dotfile/dotdir component (e.g.
+    .DS_Store) and compiled *.pyc files, so a locally-imported skill never
+    ships bytecode or OS cruft into seeded targets."""
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix == ".pyc":
+            continue
+        rel_parts = path.relative_to(root).parts
+        if any(part == "__pycache__" or part.startswith(".")
+               for part in rel_parts):
+            continue
+        yield path
+
+
 def _fix_user_paths(value, home_token):
     """Recursively rewrite /Users/<name> prefixes to portable forms.
 
@@ -246,6 +265,8 @@ def _delete_stale_packs(repo: Path, stale_packs: dict,
         rel = _rel(path, repo)
         if not path.is_file() or rel in SEEDED_AGENT_RELS:
             continue  # align's own seed targets are not stale-pack candidates
+        if ".bak-" in path.name:
+            continue  # backups from verbatim seeding are never candidates
         if _sha256(path) in known:
             path.unlink()
             matched.append(rel)
@@ -280,7 +301,7 @@ def _seed_cloud_assets(repo: Path, seed_root: Path,
     ]
     skills_src = seed_root / "claude" / "skills" / "prd"
     if skills_src.is_dir():
-        for src in sorted(p for p in skills_src.rglob("*") if p.is_file()):
+        for src in _seed_asset_files(skills_src):
             pairs.append((src, repo / ".github" / "skills" / "prd"
                           / src.relative_to(skills_src)))
     for src, dst in pairs:
@@ -292,7 +313,7 @@ def _seed_cloud_assets(repo: Path, seed_root: Path,
     ]
     janitor_src = seed_root / "claude" / "skills" / "spec-janitor"
     if janitor_src.is_dir():
-        for src in sorted(p for p in janitor_src.rglob("*") if p.is_file()):
+        for src in _seed_asset_files(janitor_src):
             verbatim_pairs.append(
                 (src, repo / ".github" / "skills" / "spec-janitor"
                  / src.relative_to(janitor_src)))

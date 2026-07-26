@@ -274,6 +274,41 @@ class DetectionTest(SpecLintCase):
             "a conforming bugfix entry (with solution-comparison.md) is clean",
         )
 
+    def test_spec_with_assets_subfolder_is_audited_whole(self):
+        # A subdirectory does not split a spec: asset-spec directly contains
+        # smolspec.md, so it IS the spec — its dangling refs are found and
+        # assets/ is an asset folder, never a separate spec (no bogus
+        # SJ-MODE-001 for asset-spec/assets).
+        self.one(
+            self.data, "SJ-REF-001", "asset-spec",
+            "smolspec.md#missing-section",
+        )
+        self.assertEqual(
+            [f for f in self.data["findings"]
+             if f["spec"].startswith("asset-spec/")],
+            [],
+            "a spec's subdirectories are assets, not separate specs",
+        )
+
+    def test_unindented_front_matter_reference_entries_are_parsed(self):
+        # asset-spec's references: entry sits at column 0 — valid YAML,
+        # must be visible to SJ-REF-002 like an indented entry.
+        finding = self.one(
+            self.data, "SJ-REF-002", "asset-spec", "missing-notes.md"
+        )
+        self.assertTrue(
+            finding["demoted"],
+            "zero candidates in the spec folder must demote, not fix",
+        )
+
+    def test_loose_file_directly_under_bugfixes(self):
+        # bugfixes/ itself is never a regular spec: a loose file directly
+        # under it is a bugfix-shape violation, and the container draws no
+        # SJ-MODE-001/-002 of its own.
+        self.one(self.data, "SJ-MODE-003", "bugfixes", "stray-notes.md")
+        self.assertEqual(self.by_rule(self.data, "SJ-MODE-001", "bugfixes"), [])
+        self.assertEqual(self.by_rule(self.data, "SJ-MODE-002", "bugfixes"), [])
+
     def test_bugfix_shaped_folder_outside_bugfixes(self):
         # Recognized as bugfix-shaped, so no SJ-MODE-001; the mis-filing
         # itself is SJ-FILE-001, which belongs to the skill, not the lint.

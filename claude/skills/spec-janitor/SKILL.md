@@ -37,7 +37,7 @@ spec_lint.py <repo-path> mark-raised --finding <finding-id>
 
 ### 2. Mechanical audit
 
-Run `python3 <skill-dir>/spec_lint.py . --json` and present the findings as a human-readable report grouped by spec, each finding tagged with its rule ID and disposition (`auto-fix` | `gated` | `demoted` | `detect-only`). Findings with `demoted: true` are precondition-failed auto-fixes — they join the gated batches in step 5, never guessed at.
+Run `python3 <skill-dir>/spec_lint.py . --json` and present the findings as a human-readable report grouped by spec, each finding tagged with its rule ID and disposition (`auto-fix` | `gated` | `detect-only` — a closed three-value enum). `demoted` is a boolean flag on auto-fix findings, not a disposition: findings with `demoted: true` are precondition-failed auto-fixes — they join the gated batches in step 5, never guessed at.
 
 ### 3. Auto-fix
 

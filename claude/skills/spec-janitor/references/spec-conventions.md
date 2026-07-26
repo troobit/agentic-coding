@@ -29,21 +29,32 @@ are checked only after recognition succeeds:
 
 Recognized extra files that never affect mode recognition: `decision_log.md`,
 `implementation.md`, `review-*.md`, `prerequisites.md`, and verification
-reports. Every leaf directory under `specs/` is audited (dotfolders and the
-janitor's own bookkeeping file `specs/.janitor.json` are exempt); a leaf folder
-containing no recognized primary document is itself a finding — discovery never
-skips a folder for being unrecognizable.
+reports.
+
+Discovery: a directory under `specs/` IS a spec when it directly contains any
+recognized primary document (`requirements.md`, `smolspec.md`, `prd.md`,
+`design.md`, `report.md`, or a task file `tasks*.md`); its subdirectories are
+assets of that spec and are never audited as separate specs. A directory with
+no recognized document is a domain container — discovery descends into it; a
+terminal directory with no recognized document anywhere is itself a finding
+(SJ-MODE-001) — discovery never skips a folder for being unrecognizable.
+Dotfolders and the janitor's own bookkeeping file `specs/.janitor.json` are
+exempt. `specs/bugfixes/` itself is never a regular spec: each of its child
+directories is a bugfix entry checked against the report shape (SJ-MODE-003),
+and a loose file directly under `specs/bugfixes/` also violates SJ-MODE-003.
 
 ### SJ-MODE-001 — folder matches no recognized spec mode
 
 **Audit**: mechanical — disposition: detect-only
 
-Every leaf folder under `specs/` MUST contain the primary documents of exactly
-one recognized mode (full: `requirements.md` and `design.md`; smol:
-`smolspec.md`; PRD lane: `prd.md`; bugfix: `report.md`). A folder holding only
-scratch notes, fragments, or unrecognized files violates this rule. The repair
-requires authored content or a gated move, so the finding is report-only; the
-finding's subject is the folder's repo-relative path under `specs/`.
+Every spec directory under `specs/` MUST contain the primary documents of
+exactly one recognized mode (full: `requirements.md` and `design.md`; smol:
+`smolspec.md`; PRD lane: `prd.md`; bugfix: `report.md`). A terminal folder
+holding only scratch notes, fragments, or unrecognized files violates this
+rule; a spec's asset subdirectories do not (they are part of their spec, not
+folders of their own). The repair requires authored content or a gated move,
+so the finding is report-only; the finding's subject is the folder's
+repo-relative path under `specs/`.
 
 ### SJ-MODE-002 — recognized mode missing its task file
 
@@ -65,7 +76,9 @@ sections include: `Description of the Issue`, `Investigation Summary`,
 (additional sections such as `Affected Files`, `Verification`, `Prevention`,
 and `Related` are conventional; an optional `solution-comparison.md` may sit
 alongside). A bugfixes entry with no `report.md`, or a `report.md` missing
-required sections, violates this rule.
+required sections, violates this rule. A loose file directly under
+`specs/bugfixes/` (outside any entry folder) also violates this rule — bug
+work lives in a per-bug entry folder.
 
 ## Cross-reference integrity (SJ-REF)
 
@@ -95,7 +108,7 @@ is the broken reference text verbatim (`<file>.md#<fragment>`).
 Every `references:` front-matter entry in a task file MUST resolve from the
 repo root. Auto-fix preconditions: the entry has no path separator beyond the
 spec folder (single-segment, folder-relative) AND exactly one existing file in
-the same leaf folder has that basename — the entry is then rewritten to the
+the same spec folder has that basename — the entry is then rewritten to the
 unique candidate's repo-relative path. A cross-folder path, or zero or two
 candidates, demotes the finding to the gated batch with `demoted: true` and no
 write.

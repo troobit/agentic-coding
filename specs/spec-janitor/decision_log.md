@@ -394,3 +394,39 @@ A machine-written, schema-validated store cannot be silently mangled by prose-le
 
 **Negative:**
 - Two more CLI subcommands to test and document
+
+---
+
+## Decision 13: Document-based spec discovery and a seeding exclusion filter
+
+**Date**: 2026-07-26
+**Status**: accepted
+
+### Context
+
+Implementation review surfaced two defects. First, discovery treated every leaf directory under `specs/` as a spec: a spec folder holding any subdirectory (e.g. `assets/`) was no longer a leaf and escaped the audit entirely, while its asset subfolder drew a bogus `SJ-MODE-001`; loose files directly under `specs/bugfixes/` could also make `bugfixes` itself audit as a regular spec. Second, align's verbatim seeding expanded the live skill directory with a bare `rglob`, so a `make test` run's `__pycache__/*.pyc` bytecode (or a `.DS_Store`) was seeded into every target repo.
+
+### Decision
+
+Discovery is document-based: a directory under `specs/` is a spec when it directly contains a recognized primary document (`requirements.md`, `smolspec.md`, `prd.md`, `design.md`, `report.md`, or a `tasks*.md` file); a spec's subdirectories are assets and are never audited separately. Directories with no recognized document are domain containers to descend into; a terminal one is `SJ-MODE-001`. `specs/bugfixes` is never a regular spec — its children are bugfix entries and loose files directly under it are `SJ-MODE-003`. Align's skill-directory seeding expansion skips `__pycache__` components, `*.pyc` files, and dotfiles/dotdirs.
+
+### Rationale
+
+The presence of a recognized document is the property that makes a folder a spec; leaf-ness was only a proxy for it and broke as soon as specs carried asset subfolders. Deciding spec-ness at the folder that owns the documents also gives assets, bugfix entries, and domain containers one consistent rule. For seeding, the seed source is a live, imported Python package directory: build artifacts land in it by normal use, so the expansion must whitelist real assets rather than trust directory contents.
+
+### Alternatives Considered
+
+- **Keep leaf-only discovery and ban asset subfolders**: No code change - Rejected; real specs already carry asset folders, and a convention that fights normal usage produces exactly the silent-escape bug under review
+- **Audit both the spec folder and its subfolders**: Simpler walk - Rejected; asset folders would each need mode recognition, guaranteeing bogus `SJ-MODE-001` findings for every diagram directory
+- **Seed from a build-staged copy of the skill directory**: Guarantees a clean source - Rejected; adds a build step and staging area for what a four-line filter solves in place
+
+### Consequences
+
+**Positive:**
+- Specs with asset subfolders are audited again, and asset folders draw no findings of their own
+- Loose files under `specs/bugfixes/` are surfaced as `SJ-MODE-003` instead of corrupting container discovery
+- Seeded targets receive only real skill assets, byte-identical to source — never bytecode or OS cruft
+
+**Negative:**
+- Discovery now hard-codes the recognized-document list in two places (mode table and discovery), which must stay in sync
+- A folder whose only document is misnamed (e.g. `requirments.md`) is still a terminal `SJ-MODE-001`, not a near-miss suggestion
