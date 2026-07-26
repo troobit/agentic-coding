@@ -140,7 +140,7 @@ references:
 
 ## Integration
 
-- [ ] 17. End-to-end verification and self-audit smoke run <!-- id:a3keeue -->
+- [x] 17. End-to-end verification and self-audit smoke run <!-- id:a3keeue -->
   - make test and make lint pass
   - Smoke: run spec_lint.py against this repo's own specs/ in report-only mode; findings triaged, fallout fixed
   - Verify rune list parses every task file this feature touched
@@ -148,7 +148,7 @@ references:
   - Stream: 1
   - Requirements: [4.1](requirements.md#4.1)
 
-- [ ] 18. Update workflow documentation and agent notes <!-- id:a3keeuf -->
+- [x] 18. Update workflow documentation and agent notes <!-- id:a3keeuf -->
   - spec-workflow.md: janitor section (when to run it, surface capability matrix)
   - docs/agent-notes/spec-janitor.md: architecture, disposition table location, verbatim seeding class, store contract
   - Blocked-by: a3keeue (End-to-end verification and self-audit smoke run)

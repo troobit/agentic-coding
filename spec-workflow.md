@@ -345,6 +345,25 @@ class B orchestrator
 
 **Usage**: Invoke this agent when you want to review local commits before pushing to ensure quality.
 
+### Spec Hygiene (`/spec-janitor`)
+
+**Purpose**: Audit and repair a diluted `specs/` directory — broken cross-references, unparseable task files, duplicate or silently superseded specs, contradictions, mis-filed items.
+
+**When to run**: When the specs directory needs a cleanup or audit pass, typically after messy parallel or autonomous work has layered unreconciled edits onto specs. It is interactive-entry only — no router dispatches it autonomously.
+
+**Process**:
+- Two-tier audit: the mechanical auditor (`spec_lint.py`) finds structural breakage; the skill layers a judgment audit on top (duplicates, supersession gaps, scope mismatch, ghost changes, filing errors)
+- Tiered repair authority: findings with exactly one correct fix are auto-fixed; everything else is gated on explicit batch approval; findings that need authored content are report-only
+- Every finding cites a stable `SJ-*` rule ID from the conventions reference; declined findings can be durably excluded via `specs/.janitor.json`
+
+**Surface capability**:
+
+| Surface | Capability |
+|---------|-----------|
+| Claude Code | Full: audit, auto-fix, gated repair, exclusion triage |
+| VS Code Copilot | Full (same skill via the shared symlink) |
+| Cloud coding agent | Report-only: the seeded agent asset runs the auditor without `--fix` |
+
 ## Skill Reference
 
 ### Starwave Skills (Spec-Driven Development)
@@ -362,3 +381,4 @@ class B orchestrator
 - `/commit` - Stage and commit changes with changelog updates
 - `/release-prep {version}` - Prepare for a new release
 - `/catchup` - Get up to speed on branch changes
+- `/spec-janitor` - Audit and repair the specs directory
