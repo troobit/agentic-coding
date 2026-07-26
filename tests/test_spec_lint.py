@@ -53,6 +53,7 @@ Run with: python3 -m unittest discover -s tests
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -437,6 +438,173 @@ class RuneVerificationTest(SpecLintCase):
         self.assertTrue(
             any("boom" in e["excerpt"] for e in finding["evidence"]),
             "rune's stderr must be carried as evidence",
+        )
+
+
+_ID_MARKER_RE = re.compile(r" <!-- id:[a-z0-9]{7} -->$")
+
+
+class FixTest(SpecLintCase):
+    """Task 4: --fix pipeline, preconditions, demotion, safety guards
+    (Req 3.2-3.4, 4.1-4.3)."""
+
+    def fix_run(self, repo, *extra):
+        proc = self.cli(repo, "--fix", "--json", *extra)
+        self.assertIn(proc.returncode, (0, 1), proc.stderr)
+        return json.loads(proc.stdout)
+
+    def test_ref002_rewritten_to_unique_candidate(self):
+        repo = self.make_repo("survey", git=True)
+        data = self.fix_run(repo)
+        finding = self.one(data, "SJ-REF-002", "captcha", "smolspec.md")
+        self.assertTrue(finding["fix_applied"])
+        self.assertFalse(finding["demoted"])
+        text = (repo / "specs/captcha/tasks.md").read_text()
+        self.assertIn("specs/captcha/smolspec.md", text)
+        self.assertNotIn("\n    - smolspec.md\n", text)
+
+    def test_ref002_precondition_failures_demote_and_never_write(self):
+        repo = self.make_repo("survey", git=True)
+        before_sdd = sha256(repo / "specs/sdd-ui/tasks-agent-bridge.md")
+        before_cross = sha256(repo / "specs/crossref/tasks.md")
+        data = self.fix_run(repo)
+        # Zero candidates in the leaf folder: demoted, not guessed at.
+        finding = self.one(data, "SJ-REF-002", "sdd-ui", "requirements.md")
+        self.assertTrue(finding["demoted"])
+        self.assertFalse(finding["fix_applied"])
+        # Cross-folder path: demoted, not guessed at.
+        finding = self.one(
+            data, "SJ-REF-002", "crossref", "specs/other-spec/requirements.md"
+        )
+        self.assertTrue(finding["demoted"])
+        self.assertFalse(finding["fix_applied"])
+        self.assertEqual(sha256(repo / "specs/sdd-ui/tasks-agent-bridge.md"), before_sdd)
+        self.assertEqual(sha256(repo / "specs/crossref/tasks.md"), before_cross)
+
+    def test_task002_minting_is_purely_additive(self):
+        repo = self.make_repo("survey", git=True)
+        before = (repo / "specs/captcha/tasks.md").read_text().split("\n")
+        data = self.fix_run(repo)
+        finding = self.one(data, "SJ-TASK-002", "captcha", "tasks.md")
+        self.assertTrue(finding["fix_applied"])
+        after = (repo / "specs/captcha/tasks.md").read_text().split("\n")
+        self.assertEqual(len(before), len(after), "minting must not add or drop lines")
+        body_start = after.index("---", 1) + 1  # the REF-002 rewrite owns the
+        for old, new in zip(before[body_start:], after[body_start:]):  # front matter
+            if old == new:
+                continue
+            # The only permitted change: a stable-ID marker appended to a
+            # previously unmarked task line.
+            self.assertTrue(
+                new.startswith(old) and _ID_MARKER_RE.search(new),
+                f"non-additive change: {old!r} -> {new!r}",
+            )
+        # Every top-level task now carries a valid marker; pre-existing
+        # markers are untouched.
+        task_lines = [l for l in after if l.startswith("- [")]
+        for line in task_lines:
+            self.assertRegex(line, r"<!-- id:[a-z0-9]{7} -->$")
+        self.assertIn("<!-- id:c1a2b3c -->", "\n".join(after))
+        ids = [m.group(1) for l in task_lines
+               for m in [re.search(r"id:([a-z0-9]{7})", l)] if m]
+        self.assertEqual(len(ids), len(set(ids)), "minted IDs must be unique")
+
+    @unittest.skipUnless(RUNE_AVAILABLE, "rune CLI not installed")
+    def test_fixed_file_round_trips_rune_list(self):
+        repo = self.make_repo("survey", git=True)
+        self.fix_run(repo)
+        proc = subprocess.run(
+            ["rune", "list", str(repo / "specs/captcha/tasks.md")],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_fix_only_mutates_auto_fix_rules(self):
+        repo = self.make_repo("survey", git=True)
+        before = self.snapshot(repo)
+        self.fix_run(repo)
+        after = self.snapshot(repo)
+        changed = {rel for rel in before if before[rel] != after.get(rel)}
+        self.assertEqual(
+            changed, {"specs/captcha/tasks.md"},
+            "only files with applicable auto-fixes may change",
+        )
+
+    def test_fix_ordering_ref002_before_task002(self):
+        repo = self.make_repo("survey", git=True)
+        proc = self.cli(repo, "--fix")
+        applied = [
+            line for line in proc.stdout.splitlines() if "applied" in line.lower()
+        ]
+        ref = [i for i, l in enumerate(applied) if "SJ-REF-002" in l]
+        task = [i for i, l in enumerate(applied) if "SJ-TASK-002" in l]
+        self.assertTrue(ref and task, f"both applied fixes must be listed: {applied!r}")
+        self.assertLess(max(ref), min(task), "SJ-REF-002 fixes apply before SJ-TASK-002")
+
+    def test_fix_idempotent_rerun_quiet_and_byte_identical(self):
+        repo = self.make_repo("survey", git=True)
+        first = self.fix_run(repo)
+        fixed_ids = {f["id"] for f in first["findings"] if f["fix_applied"]}
+        self.assertTrue(fixed_ids)
+        after_first = self.snapshot(repo)
+        second = self.fix_run(repo)
+        second_ids = {f["id"] for f in second["findings"]}
+        self.assertFalse(
+            fixed_ids & second_ids,
+            "re-run must produce zero findings for fixed items",
+        )
+        self.assertFalse(any(f["fix_applied"] for f in second["findings"]))
+        self.assertEqual(
+            self.snapshot(repo), after_first,
+            "immediate re-run must leave the tree byte-identical",
+        )
+
+    def test_dirty_specs_tree_refuses_fix_but_reports(self):
+        repo = self.make_repo("survey", git=True)
+        (repo / "specs/scratch/notes.md").write_text("uncommitted edit\n")
+        before = self.snapshot(repo)
+        proc = self.cli(repo, "--fix", "--json")
+        self.assertEqual(proc.returncode, 1, "the report is still produced")
+        data = json.loads(proc.stdout)
+        self.assertTrue(data["findings"])
+        self.assertFalse(any(f["fix_applied"] for f in data["findings"]))
+        self.assertEqual(self.snapshot(repo), before, "refusal means no writes")
+        self.assertTrue(
+            any("--fix" in n for n in data["notices"]),
+            f"the refusal must be reported: {data['notices']!r}",
+        )
+
+    def test_fix_dirty_overrides_the_guard(self):
+        repo = self.make_repo("survey", git=True)
+        (repo / "specs/scratch/notes.md").write_text("uncommitted edit\n")
+        data = self.fix_run(repo, "--fix-dirty")
+        self.assertTrue(any(f["fix_applied"] for f in data["findings"]))
+        self.assertIn(
+            "specs/captcha/smolspec.md",
+            (repo / "specs/captcha/tasks.md").read_text(),
+        )
+
+    def test_dirty_outside_specs_does_not_block_fix(self):
+        repo = self.make_repo("survey", git=True)
+        (repo / "README.md").write_text("uncommitted but outside specs/\n")
+        data = self.fix_run(repo)
+        self.assertTrue(any(f["fix_applied"] for f in data["findings"]))
+
+    def test_non_git_directory_refuses_fix(self):
+        repo = self.make_repo("survey", git=False)
+        before = self.snapshot(repo)
+        proc = self.cli(repo, "--fix", "--json")
+        self.assertEqual(proc.returncode, 1)
+        data = json.loads(proc.stdout)
+        self.assertFalse(any(f["fix_applied"] for f in data["findings"]))
+        self.assertEqual(
+            self.snapshot(repo), before,
+            "no git oracle -> treated as dirty -> no writes",
+        )
+        data = self.fix_run(repo, "--fix-dirty")
+        self.assertTrue(
+            any(f["fix_applied"] for f in data["findings"]),
+            "--fix-dirty proceeds even without git",
         )
 
 

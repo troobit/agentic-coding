@@ -34,7 +34,7 @@ references:
   - Stream: 1
   - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [1.6](requirements.md#1.6), [1.7](requirements.md#1.7), [1.8](requirements.md#1.8)
 
-- [ ] 4. Write failing auto-fix and safety-guard tests <!-- id:a3keeu1 -->
+- [x] 4. Write failing auto-fix and safety-guard tests <!-- id:a3keeu1 -->
   - SJ-REF-002 preconditions: single-segment folder-relative ref with exactly one basename candidate; cross-folder path or two candidates -> demoted: true, no write
   - SJ-TASK-002 minting is purely additive; fixed file round-trips rune list when rune present (skip otherwise)
   - Fix ordering REF-002 before TASK-002; idempotence: --fix then re-run gives zero findings for fixed items and byte-identical tree
@@ -43,7 +43,7 @@ references:
   - Stream: 1
   - Requirements: [3.2](requirements.md#3.2), [3.3](requirements.md#3.3), [3.4](requirements.md#3.4), [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.3](requirements.md#4.3)
 
-- [ ] 5. Implement the --fix pipeline to pass the tests <!-- id:a3keeu2 -->
+- [x] 5. Implement the --fix pipeline to pass the tests <!-- id:a3keeu2 -->
   - Snapshot detection, compute fixes, apply in one pass; mid-apply failure aborts remainder and reports which applied
   - Applied fixes listed in report and marked fix_applied in JSON
   - Blocked-by: a3keeu1 (Write failing auto-fix and safety-guard tests)

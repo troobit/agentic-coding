@@ -136,6 +136,9 @@ class _FindingSet:
         item["evidence"].append({"file": evidence_file, "excerpt": excerpt})
         return item
 
+    def mark_fixed(self, fid):
+        self._items[fid]["fix_applied"] = True
+
     def list(self):
         return sorted(self._items.values(), key=lambda f: f["id"])
 
@@ -253,7 +256,8 @@ def _anchors(path, cache):
 # per-spec audit
 
 
-def _audit_spec(repo, specs_dir, leaf, findings, rune_avail, anchor_cache):
+def _audit_spec(repo, specs_dir, leaf, findings, rune_avail, anchor_cache,
+                ops):
     spec = leaf.relative_to(specs_dir).as_posix()
     names = {f.name for f in leaf.iterdir() if f.is_file()}
     task_files = sorted(
@@ -281,7 +285,8 @@ def _audit_spec(repo, specs_dir, leaf, findings, rune_avail, anchor_cache):
 
     for name in task_files:
         _audit_task_file(
-            repo, leaf, spec, leaf / name, findings, rune_avail, anchor_cache
+            repo, leaf, spec, leaf / name, findings, rune_avail,
+            anchor_cache, ops,
         )
 
 
@@ -306,7 +311,7 @@ def _check_bugfix_shape(repo, leaf, spec, names, findings, listing):
 
 
 def _audit_task_file(repo, leaf, spec, path, findings, rune_avail,
-                     anchor_cache):
+                     anchor_cache, ops):
     rel_path = _rel(repo, path)
     text = path.read_text(encoding="utf-8", errors="replace")
     lines = text.split("\n")
@@ -323,12 +328,17 @@ def _audit_task_file(repo, leaf, spec, path, findings, rune_avail,
                 f for f in leaf.iterdir() if f.is_file() and f.name == entry
             ]
             demoted = len(candidates) != 1
-        findings.add(
+        item = findings.add(
             "SJ-REF-002", spec, path.name, entry,
             rel_path, f"references entry does not resolve from the repo "
             f"root: {entry}",
             demoted=demoted,
         )
+        if not demoted and not any(o["fid"] == item["id"] for o in ops):
+            ops.append({
+                "kind": "ref", "fid": item["id"], "path": path,
+                "spec": spec, "entry": entry,
+            })
 
     # SJ-REF-001: markdown anchor links in the body.
     for i in range(body_start, len(lines)):
@@ -361,11 +371,13 @@ def _audit_task_file(repo, leaf, spec, path, findings, rune_avail,
     marked = [t for t in tasks if t["id"]]
     unmarked = [t for t in tasks if not t["id"]]
     if marked and unmarked:
+        item = None
         for task in unmarked:
-            findings.add(
+            item = findings.add(
                 "SJ-TASK-002", spec, path.name, path.name,
                 rel_path, f"task without stable ID: {_excerpt(task['line'])}",
             )
+        ops.append({"kind": "mint", "fid": item["id"], "path": path})
 
     # SJ-TASK-003: out-of-sequence numbering.
     expected = 1
@@ -389,6 +401,94 @@ def _audit_task_file(repo, leaf, spec, path, findings, rune_avail,
 
 
 # --------------------------------------------------------------------------
+# --fix pipeline (Req 3.2-3.4, 4.1-4.3)
+
+
+def _dirty_specs(repo):
+    """Return git's porcelain status for specs/ ('' when clean), or None
+    when there is no git oracle (not a repo, git missing)."""
+    try:
+        proc = subprocess.run(
+            ["git", "status", "--porcelain", "--", "specs/"],
+            cwd=repo, capture_output=True, text=True,
+        )
+    except OSError:
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip()
+
+
+def _mint_id(existing):
+    while True:
+        candidate = "".join(random.choice(_ID_CHARS) for _ in range(7))
+        if candidate not in existing:
+            return candidate
+
+
+def _apply_ref_fix(op):
+    """Rewrite a folder-relative references entry to the unique candidate's
+    repo-relative path. Purely a retarget of the recorded entry."""
+    path, entry, spec = op["path"], op["entry"], op["spec"]
+    lines = path.read_text(encoding="utf-8").split("\n")
+    _, refs = _front_matter(lines)
+    changed = False
+    for index, indent, value in refs:
+        if value == entry:
+            lines[index] = f"{indent}- specs/{spec}/{entry}"
+            changed = True
+    if not changed:
+        raise RuntimeError(
+            f"references entry disappeared between detection and fix: {entry}"
+        )
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _apply_mint_fix(op):
+    """Mint stable IDs for unmarked tasks only - purely additive."""
+    path = op["path"]
+    lines = path.read_text(encoding="utf-8").split("\n")
+    fm_end, _ = _front_matter(lines)
+    tasks, _ = _parse_tasks(lines, fm_end + 1 if fm_end else 0)
+    existing = {t["id"] for t in tasks if t["id"]}
+    changed = False
+    for task in tasks:
+        if task["id"]:
+            continue
+        new_id = _mint_id(existing)
+        existing.add(new_id)
+        lines[task["index"]] = (
+            lines[task["index"]].rstrip() + f" <!-- id:{new_id} -->"
+        )
+        changed = True
+    if changed:
+        path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _apply_fixes(findings, ops, notices):
+    """Apply computed fixes in one pass, SJ-REF-002 before SJ-TASK-002.
+    A mid-apply failure aborts the remainder; already-applied fixes stay
+    reported."""
+    ordered = sorted(
+        ops, key=lambda op: (0 if op["kind"] == "ref" else 1, op["fid"])
+    )
+    for op in ordered:
+        try:
+            if op["kind"] == "ref":
+                _apply_ref_fix(op)
+            else:
+                _apply_mint_fix(op)
+        except Exception as exc:
+            notices.append(
+                f"fix aborted while applying {op['fid']}: {exc}; "
+                "remaining fixes were not applied"
+            )
+            return
+        findings.mark_fixed(op["fid"])
+        notices.append(f"applied {op['fid']}")
+
+
+# --------------------------------------------------------------------------
 # audit entry point
 
 
@@ -401,6 +501,7 @@ def audit(repo_path, *, fix=False, fix_dirty=False):
     findings = _FindingSet()
     anchor_cache = {}
     specs_dir = repo / "specs"
+    ops = []
     if not specs_dir.is_dir():
         notices.append(
             "no specs/ directory found; nothing to audit"
@@ -408,8 +509,23 @@ def audit(repo_path, *, fix=False, fix_dirty=False):
     else:
         for leaf in _discover(specs_dir):
             _audit_spec(
-                repo, specs_dir, leaf, findings, rune_avail, anchor_cache
+                repo, specs_dir, leaf, findings, rune_avail, anchor_cache,
+                ops,
             )
+    if fix and ops:
+        refusal = None
+        if not fix_dirty:
+            dirty = _dirty_specs(repo)
+            if dirty is None:
+                refusal = ("not a git repository; refusing --fix "
+                           "(use --fix-dirty to override)")
+            elif dirty:
+                refusal = ("specs/ has uncommitted changes; refusing --fix "
+                           "(use --fix-dirty to override)")
+        if refusal:
+            notices.append(refusal)
+        else:
+            _apply_fixes(findings, ops, notices)
     if not rune_avail:
         notices.append("rune verification skipped (rune not found on PATH)")
 
