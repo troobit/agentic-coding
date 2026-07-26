@@ -4,10 +4,10 @@
 |------|---------------|--------|---------|
 | [Toolset Agnostic Starwave](#toolset-agnostic-starwave) | 2026-07-04 | Done | Makes agentic-coding the single source of truth for agent tooling across Claude Code and Copilot |
 | [Transit Workflow Integration](#transit-workflow-integration) | 2026-07-05 | Done | Restores dropped Transit conventions and maps Transit's kanban lifecycle onto the SDD workflow |
-| [Nextup Starwave Refinement](#nextup-starwave-refinement) | 2026-07-10 | In Progress | Refines nextup/starwave distribution and observability across the six consumer repos |
+| [Nextup Starwave Refinement](#nextup-starwave-refinement) | 2026-07-10 | In Progress | Refines nextup/starwave distribution and observability across the six consumer repos. Machine-zone status tracking partially superseded by Nextup Pure Router. |
 | [Agreement Invoice Skills](#agreement-invoice-skills) | 2026-07-11 | In Progress | Skills and guardrails for authoring customer SoW agreements and invoices with verified cross-references |
 | [Fiscal Probe Skill](#fiscal-probe-skill) | 2026-07-23 | Done | Financial-document probe skill producing reports where every claim carries a source reference |
-| [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth |
+| [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth. Supersedes the machine-zone portions of Nextup Starwave Refinement. |
 | [Spec Janitor](#spec-janitor) | 2026-07-26 | Done | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
 
 ---
@@ -31,7 +31,7 @@ Restores dropped Transit conventions and maps Transit's kanban lifecycle onto th
 
 ## Nextup Starwave Refinement
 
-Refines nextup/starwave distribution and observability across the six consumer repos.
+Refines nextup/starwave distribution and observability across the six consumer repos. Its machine-zone status tracking (the `machine-zone`/`stale-nextup` flags in `process_status.py` and the align nextup-template content) was later partially superseded by [Nextup Pure Router](#nextup-pure-router).
 
 - [prd.md](nextup-starwave-refinement/prd.md)
 - [tasks-align-tooling.md](nextup-starwave-refinement/tasks-align-tooling.md)
@@ -56,7 +56,7 @@ Financial-document probe skill producing reports where every claim carries a sou
 
 ## Nextup Pure Router
 
-Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth.
+Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth. Supersedes the machine-zone portions of [Nextup Starwave Refinement](#nextup-starwave-refinement).
 
 - [decision_log.md](nextup-pure-router/decision_log.md)
 - [smolspec.md](nextup-pure-router/smolspec.md)

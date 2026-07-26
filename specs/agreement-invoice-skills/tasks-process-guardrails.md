@@ -1,6 +1,6 @@
 ---
 references:
-    - prd.md
+    - specs/agreement-invoice-skills/prd.md
 ---
 # Agreement/invoice authoring skills and process guardrails — Process guardrails
 

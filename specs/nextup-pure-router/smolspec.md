@@ -4,6 +4,8 @@
 
 The `/nextup` skill has grown into a state-tracking workflow: it maintains a "machine zone" in `nextup.md` (feature, stage, progress checkboxes, dated notes) that duplicates what `specs/`, rune task lists, and `docs/agent-notes/` already record. This change strips `/nextup` down to a pure router — read the user's intent, pick the lane and skill, dispatch — and removes machine-zone maintenance from the whole toolchain. Spec documents, task lists, and agent notes become the sole record of progress and context.
 
+**Supersedes**: this spec reverses the machine-zone status tracking introduced by [`nextup-starwave-refinement`](../nextup-starwave-refinement/prd.md) — specifically its "Process status" machine-zone parsing plus the `machine-zone`/`stale-nextup` drift flags and columns in `scripts/process_status.py`, and the machine-zone content of the align nextup-template convergence (the `<!-- LM -->` marker and align.py convergence machinery survive; only the zone's template content becomes an inert marker line). Those portions of `nextup-starwave-refinement` are superseded by this spec.
+
 ## Requirements
 
 - The nextup skill MUST route user intent to a lane and skill (or execute direct instructions) without maintaining any status record of its own — no stage lines, progress checkboxes, or dated session notes.

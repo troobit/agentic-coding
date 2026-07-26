@@ -1,6 +1,6 @@
 ---
 references:
-    - prd.md
+    - specs/nextup-starwave-refinement/prd.md
 ---
 # Nextup/Starwave process refinement — Rollout
 

@@ -1,8 +1,8 @@
 ---
 references:
-    - requirements.md
-    - design.md
-    - decision_log.md
+    - specs/toolset-agnostic-starwave/requirements.md
+    - specs/toolset-agnostic-starwave/design.md
+    - specs/toolset-agnostic-starwave/decision_log.md
 ---
 # Toolset-Agnostic Starwave Implementation
 
@@ -147,7 +147,7 @@ references:
   - Stream: 5
   - Requirements: [3.1](requirements.md#3.1), [3.2](requirements.md#3.2)
 
-- [x] 21. Rework nextup skill for autonomous dispatch
+- [x] 21. Rework nextup skill for autonomous dispatch <!-- id:hjj0412 -->
   - User zone is arbitrary instructions: execute/dispatch directly when no spec work is called for (Req 10.1)
   - Detect PRD references or specs/{name}/prd.md and route to the engage skill (Req 10.2)
   - Act-autonomously flag in the user zone prefers the ungated lane end-to-end (Req 10.3)

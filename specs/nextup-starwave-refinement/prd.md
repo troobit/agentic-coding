@@ -1,5 +1,7 @@
 # PRD: Nextup/Starwave process refinement across consumer repos
 
+> **Partially superseded** by [`nextup-pure-router`](../nextup-pure-router/smolspec.md) (2026-07-25): the machine-zone status tracking this PRD introduced — the "Process status" machine-zone parsing plus the `machine-zone`/`stale-nextup` drift flags and columns in `scripts/process_status.py`, and the machine-zone content of the align nextup-template convergence — was reversed there. The align seeding/gitignore/convergence machinery and the cross-repo status report otherwise stand; only the machine-zone dimension is superseded.
+
 ## Product summary
 
 The nextup/starwave process is owned by this repository (agentic-coding) and consumed by sibling repositories under `~/repos/`. A survey on 2026-07-10 of six consumers (medata, netmap, tocs, rtob, localml, loshop) showed adoption is uneven: medata and rtob are fully wired (`.agentic.json`, maintained nextup machine zones, complete specs), while netmap, tocs, localml and loshop lack `.agentic.json`; no consumer repo has `nextup.example.md`, so hand-created `nextup.md` files drift (netmap and loshop hold stubs with no machine zone); and there is no way to see process health across repos without opening each one.

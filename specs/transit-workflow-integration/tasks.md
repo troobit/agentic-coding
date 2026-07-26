@@ -1,6 +1,6 @@
 ---
 references:
-    - smolspec.md
+    - specs/transit-workflow-integration/smolspec.md
 ---
 # Transit Workflow Integration
 
