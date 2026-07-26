@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-26]
+
+### Added
+- **Spec-janitor spec** (spec `spec-janitor`): full planning artifacts (requirements, design, 18-task plan, 12-entry decision log) for an audit-and-repair toolchain targeting diluted `specs/` directories, grounded in surveys of diluted (medata/sdd-ui/rtob) and clean (rune/orbit/transit) repos. Design: a stdlib `spec_lint.py` mechanical auditor + `/spec-janitor` skill with disposition-tiered repair authority (auto-fix only for deterministic-or-additive transformations; judgment repairs gated; autonomous surfaces report-only), a normative `spec-conventions.md` with stable rule IDs, durable per-spec/per-finding exclusions in `specs/.janitor.json`, a new verbatim-seeding class for align (managed blocks are markdown-only), and prevention guardrail edits across six authoring/implementation skills
+
 ## [2026-07-25]
 
 ### Changed
