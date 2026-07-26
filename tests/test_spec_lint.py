@@ -608,5 +608,215 @@ class FixTest(SpecLintCase):
         )
 
 
+TARGET_FINDING = "SJ-TASK-003:widget:tasks.md:post-implementation"
+
+WIDGET_TASKS = """\
+---
+references:
+    - specs/widget/smolspec.md
+---
+# Widget Tasks
+
+- [x] 1. Build the widget <!-- id:h1a2b3c -->
+  - Assemble the parts
+- [x] 2. Ship the widget <!-- id:h1a2b3d -->
+  - Package and deliver
+- [ ] 5. Post implementation <!-- id:h1a2b3e -->
+  - Cleanup pass appended by a later run
+"""
+
+WIDGET_SMOLSPEC = """\
+# Smolspec: Widget
+
+## Scope
+
+A widget, specified small.
+"""
+
+
+class StoreCase(SpecLintCase):
+    """Task 6 harness: a minimal repo with one stable SJ-TASK-003 finding."""
+
+    def make_widget_repo(self):
+        SpecLintCase._seq += 1
+        repo = self.tmp / f"widget-{SpecLintCase._seq}"
+        spec = repo / "specs" / "widget"
+        spec.mkdir(parents=True)
+        (spec / "smolspec.md").write_text(WIDGET_SMOLSPEC)
+        (spec / "tasks.md").write_text(WIDGET_TASKS)
+        return repo
+
+    def store_path(self, repo):
+        return repo / "specs" / ".janitor.json"
+
+    def read_store(self, repo):
+        return json.loads(self.store_path(repo).read_text())
+
+
+class StoreWriteTest(StoreCase):
+    """exclude / mark-raised are the only writers; schema-validated on
+    write (Req 5.1-5.3, design store contract)."""
+
+    def test_exclude_spec_writes_schema_valid_store_and_skips_spec(self):
+        repo = self.make_widget_repo()
+        proc = self.cli(repo, "exclude", "--spec", "widget")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        store = self.read_store(repo)
+        self.assertEqual(store["version"], 1)
+        self.assertEqual(store["exclude_specs"], ["widget"])
+        self.assertEqual(store["exclude_findings"], [])
+        self.assertEqual(store["raised"], [])
+        self.assertRegex(store["last_run"], r"^\d{4}-\d{2}-\d{2}$")
+        # Recording twice must not duplicate the entry.
+        self.cli(repo, "exclude", "--spec", "widget")
+        self.assertEqual(self.read_store(repo)["exclude_specs"], ["widget"])
+        # The spec is skipped and listed (Req 5.3).
+        data = self.audit(repo)
+        self.assertEqual(
+            [f for f in data["findings"] if f["spec"] == "widget"], []
+        )
+        self.assertIn("widget", data["excluded"]["specs"])
+        report = self.cli(repo).stdout
+        self.assertIn("widget", report)
+
+    def test_exclude_finding_suppresses_and_lists(self):
+        repo = self.make_widget_repo()
+        self.assertIn(
+            TARGET_FINDING, {f["id"] for f in self.audit(repo)["findings"]}
+        )
+        proc = self.cli(repo, "exclude", "--finding", TARGET_FINDING)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(
+            self.read_store(repo)["exclude_findings"], [TARGET_FINDING]
+        )
+        data = self.audit(repo)
+        self.assertNotIn(TARGET_FINDING, {f["id"] for f in data["findings"]})
+        self.assertIn(TARGET_FINDING, data["excluded"]["findings"])
+
+    def test_subcommand_usage_errors_exit_2(self):
+        repo = self.make_widget_repo()
+        self.assertEqual(self.cli(repo, "exclude").returncode, 2)
+        self.assertEqual(
+            self.cli(repo, "exclude", "--spec", "a", "--finding", "b").returncode, 2
+        )
+        self.assertEqual(self.cli(repo, "mark-raised").returncode, 2)
+
+    def test_audit_never_writes_the_store(self):
+        repo = self.make_widget_repo()
+        self.cli(repo, "--json")
+        self.assertFalse(self.store_path(repo).exists())
+        self.cli(repo, "exclude", "--spec", "other")
+        before = sha256(self.store_path(repo))
+        self.cli(repo, "--json")
+        self.assertEqual(sha256(self.store_path(repo)), before)
+
+
+class FindingIdentityTest(StoreCase):
+    """Req 5.4: finding identity survives unrelated edits and line moves
+    (slug subjects, not numbers)."""
+
+    def test_exclusion_survives_line_insertions(self):
+        repo = self.make_widget_repo()
+        self.cli(repo, "exclude", "--finding", TARGET_FINDING)
+        tasks = repo / "specs/widget/tasks.md"
+        text = tasks.read_text().replace(
+            "# Widget Tasks",
+            "# Widget Tasks\n\nA new preamble paragraph.\n\nMore prose.",
+        )
+        tasks.write_text(text)
+        data = self.audit(repo)
+        self.assertEqual(
+            self.by_rule(data, "SJ-TASK-003", "widget"), [],
+            "the excluded finding must keep matching after line insertions",
+        )
+
+    def test_exclusion_survives_task_inserted_above_subject(self):
+        repo = self.make_widget_repo()
+        self.cli(repo, "exclude", "--finding", TARGET_FINDING)
+        tasks = repo / "specs/widget/tasks.md"
+        text = tasks.read_text().replace(
+            "- [ ] 5. Post implementation",
+            "- [x] 3. Document the widget <!-- id:h1a2b3f -->\n"
+            "  - Write the docs\n"
+            "- [ ] 5. Post implementation",
+        )
+        tasks.write_text(text)
+        data = self.audit(repo)
+        self.assertEqual(
+            self.by_rule(data, "SJ-TASK-003", "widget"), [],
+            "a task inserted above the subject must not re-key the finding",
+        )
+
+
+class MarkRaisedTest(StoreCase):
+    """Req 5.6: raised entries are raise-once - never re-raised."""
+
+    def test_mark_raised_records_and_suppresses(self):
+        repo = self.make_widget_repo()
+        proc = self.cli(repo, "mark-raised", "--finding", TARGET_FINDING)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(self.read_store(repo)["raised"], [TARGET_FINDING])
+        self.assertEqual(self.read_store(repo)["exclude_findings"], [])
+        data = self.audit(repo)
+        self.assertNotIn(
+            TARGET_FINDING, {f["id"] for f in data["findings"]},
+            "raised entries suppress re-raising on later runs",
+        )
+
+
+class CorruptStoreTest(StoreCase):
+    """Design store contract: corrupt store -> backup + rebuild on write,
+    prominent report; never silently dropped."""
+
+    def test_corrupt_store_backed_up_and_rebuilt_on_write(self):
+        repo = self.make_widget_repo()
+        self.store_path(repo).parent.mkdir(exist_ok=True)
+        self.store_path(repo).write_text("{ this is not json\n")
+        proc = self.cli(repo, "exclude", "--spec", "widget")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        backups = [
+            p for p in (repo / "specs").iterdir()
+            if p.name.startswith(".janitor.json.bak-")
+        ]
+        self.assertEqual(len(backups), 1, "corrupt store must be backed up")
+        self.assertIn("this is not json", backups[0].read_text())
+        self.assertEqual(self.read_store(repo)["exclude_specs"], ["widget"])
+        combined = proc.stdout + proc.stderr
+        self.assertIn(".bak-", combined, "the backup must be reported prominently")
+
+    def test_schema_invalid_store_treated_as_corrupt(self):
+        repo = self.make_widget_repo()
+        self.store_path(repo).write_text(
+            json.dumps({"version": 1, "exclude_specs": "widget"}) + "\n"
+        )
+        proc = self.cli(repo, "exclude", "--finding", TARGET_FINDING)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        backups = [
+            p for p in (repo / "specs").iterdir()
+            if p.name.startswith(".janitor.json.bak-")
+        ]
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(
+            self.read_store(repo)["exclude_findings"], [TARGET_FINDING]
+        )
+
+    def test_corrupt_store_on_audit_warns_and_never_rewrites(self):
+        repo = self.make_widget_repo()
+        self.store_path(repo).write_text("{ broken\n")
+        before = sha256(self.store_path(repo))
+        proc = self.cli(repo, "--json")
+        self.assertEqual(proc.returncode, 1, "findings are still produced")
+        data = json.loads(proc.stdout)
+        self.assertIn(TARGET_FINDING, {f["id"] for f in data["findings"]})
+        self.assertTrue(
+            any("janitor.json" in n for n in data["notices"]),
+            f"corruption must be reported, got: {data['notices']!r}",
+        )
+        self.assertEqual(
+            sha256(self.store_path(repo)), before,
+            "an audit run must never touch the store, even a corrupt one",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

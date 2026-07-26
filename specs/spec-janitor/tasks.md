@@ -50,7 +50,7 @@ references:
   - Stream: 1
   - Requirements: [3.1](requirements.md#3.1), [3.2](requirements.md#3.2), [3.3](requirements.md#3.3), [3.4](requirements.md#3.4), [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.3](requirements.md#4.3)
 
-- [ ] 6. Write failing exclusion-store tests <!-- id:a3keeu3 -->
+- [x] 6. Write failing exclusion-store tests <!-- id:a3keeu3 -->
   - exclude and mark-raised subcommands are the only writers; schema-validated on write
   - Corrupt store -> backed up to .janitor.json.bak-<date> and rebuilt, reported prominently; never silently dropped
   - Identity stability: excluded finding keeps matching after line insertions AND after inserting a new task above the subject (slug subjects, not numbers)
@@ -59,7 +59,7 @@ references:
   - Stream: 1
   - Requirements: [5.1](requirements.md#5.1), [5.3](requirements.md#5.3), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6)
 
-- [ ] 7. Implement store subcommands and exclusion filtering <!-- id:a3keeu4 -->
+- [x] 7. Implement store subcommands and exclusion filtering <!-- id:a3keeu4 -->
   - specs/.janitor.json: version, exclude_specs (repo-relative paths), exclude_findings, raised, last_run
   - Blocked-by: a3keeu3 (Write failing exclusion-store tests)
   - Stream: 1

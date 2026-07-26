@@ -139,6 +139,11 @@ class _FindingSet:
     def mark_fixed(self, fid):
         self._items[fid]["fix_applied"] = True
 
+    def drop(self, ids):
+        for fid in list(self._items):
+            if fid in ids:
+                del self._items[fid]
+
     def list(self):
         return sorted(self._items.values(), key=lambda f: f["id"])
 
@@ -401,6 +406,110 @@ def _audit_task_file(repo, leaf, spec, path, findings, rune_avail,
 
 
 # --------------------------------------------------------------------------
+# exclusion store - specs/.janitor.json (Req 5)
+#
+# The exclude / mark-raised subcommands are the ONLY writers of the store;
+# the audit path reads it and never writes. A corrupt store is backed up to
+# .janitor.json.bak-<date> and rebuilt on the next subcommand write; an audit
+# run reports the corruption prominently and ignores the store's content.
+
+
+def _default_store():
+    return {
+        "version": 1,
+        "exclude_specs": [],
+        "exclude_findings": [],
+        "raised": [],
+        "last_run": None,
+    }
+
+
+def _valid_store(data):
+    if not isinstance(data, dict) or data.get("version") != 1:
+        return False
+    for key in ("exclude_specs", "exclude_findings", "raised"):
+        value = data.get(key)
+        if not isinstance(value, list):
+            return False
+        if not all(isinstance(item, str) for item in value):
+            return False
+    last_run = data.get("last_run")
+    return last_run is None or isinstance(last_run, str)
+
+
+def _load_store(specs_dir):
+    """Return (store, corrupt). A missing store is the default, not corrupt."""
+    path = specs_dir / STORE_NAME
+    if not path.is_file():
+        return _default_store(), False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return _default_store(), True
+    if not _valid_store(data):
+        return _default_store(), True
+    return data, False
+
+
+def _backup_store(specs_dir):
+    date = datetime.date.today().isoformat()
+    backup = specs_dir / f"{STORE_NAME}.bak-{date}"
+    counter = 2
+    while backup.exists():
+        backup = specs_dir / f"{STORE_NAME}.bak-{date}-{counter}"
+        counter += 1
+    shutil.copy2(specs_dir / STORE_NAME, backup)
+    return backup
+
+
+def _cmd_store_write(repo, command, args):
+    spec = finding = None
+    remaining = list(args)
+    while remaining:
+        arg = remaining.pop(0)
+        if arg == "--spec" and remaining and command == "exclude":
+            spec = remaining.pop(0)
+        elif arg == "--finding" and remaining:
+            finding = remaining.pop(0)
+        else:
+            raise SpecLintError(f"unknown argument for {command}: {arg}")
+    if command == "exclude":
+        if (spec is None) == (finding is None):
+            raise SpecLintError(
+                "exclude requires exactly one of --spec or --finding"
+            )
+    elif finding is None:
+        raise SpecLintError("mark-raised requires --finding <finding-id>")
+
+    specs_dir = repo / "specs"
+    if not specs_dir.is_dir():
+        raise SpecLintError(f"no specs/ directory in {repo}")
+
+    store, corrupt = _load_store(specs_dir)
+    if corrupt:
+        backup = _backup_store(specs_dir)
+        sys.stdout.write(
+            f"WARNING: {STORE_NAME} was corrupt; backed up to "
+            f"{backup.name} and rebuilt from this recording.\n"
+        )
+    if command == "exclude" and spec is not None:
+        key, value = "exclude_specs", spec
+    elif command == "exclude":
+        key, value = "exclude_findings", finding
+    else:
+        key, value = "raised", finding
+    if value not in store[key]:
+        store[key].append(value)
+    store["last_run"] = datetime.date.today().isoformat()
+    assert _valid_store(store)
+    (specs_dir / STORE_NAME).write_text(
+        json.dumps(store, indent=2) + "\n", encoding="utf-8"
+    )
+    sys.stdout.write(f"recorded {key} entry: {value}\n")
+    return 0
+
+
+# --------------------------------------------------------------------------
 # --fix pipeline (Req 3.2-3.4, 4.1-4.3)
 
 
@@ -502,16 +611,31 @@ def audit(repo_path, *, fix=False, fix_dirty=False):
     anchor_cache = {}
     specs_dir = repo / "specs"
     ops = []
+    store = _default_store()
     if not specs_dir.is_dir():
         notices.append(
             "no specs/ directory found; nothing to audit"
         )
     else:
+        store, corrupt = _load_store(specs_dir)
+        if corrupt:
+            notices.append(
+                f"WARNING: specs/{STORE_NAME} is corrupt; exclusions are "
+                "ignored for this run. The next exclude/mark-raised "
+                "recording will back it up and rebuild it."
+            )
+        excluded_specs = set(store["exclude_specs"])
         for leaf in _discover(specs_dir):
+            if leaf.relative_to(specs_dir).as_posix() in excluded_specs:
+                continue
             _audit_spec(
                 repo, specs_dir, leaf, findings, rune_avail, anchor_cache,
                 ops,
             )
+        suppressed = set(store["exclude_findings"]) | set(store["raised"])
+        if suppressed:
+            findings.drop(suppressed)
+            ops = [op for op in ops if op["fid"] not in suppressed]
     if fix and ops:
         refusal = None
         if not fix_dirty:
@@ -533,7 +657,10 @@ def audit(repo_path, *, fix=False, fix_dirty=False):
         "version": VERSION,
         "repo": str(repo),
         "rune_available": rune_avail,
-        "excluded": {"specs": [], "findings": []},
+        "excluded": {
+            "specs": sorted(store["exclude_specs"]),
+            "findings": sorted(store["exclude_findings"]),
+        },
         "findings": findings.list(),
         "notices": notices,
     }
@@ -600,6 +727,9 @@ def _main(argv):
     if not repo.is_dir():
         raise SpecLintError(f"not a directory: {argv[0]}")
     rest = argv[1:]
+
+    if rest[:1] == ["exclude"] or rest[:1] == ["mark-raised"]:
+        return _cmd_store_write(repo, rest[0], rest[1:])
 
     json_out = fix = fix_dirty = False
     for arg in rest:
