@@ -8,7 +8,7 @@ references:
 
 ## Conventions and Auditor
 
-- [ ] 1. Author the conventions reference with stable rule IDs <!-- id:a3keety -->
+- [x] 1. Author the conventions reference with stable rule IDs <!-- id:a3keety -->
   - Create claude/skills/spec-janitor/references/spec-conventions.md
   - Rule families SJ-MODE/REF/TASK/SUP/FILE/DRIFT per the design table; each rule gets a stable ID and a one-paragraph normative statement
   - Mode recognition from primary documents alone (full: requirements+design; smol: smolspec; PRD: prd; bugfix: report); task files checked after recognition
@@ -17,7 +17,7 @@ references:
   - Stream: 1
   - Requirements: [7.1](requirements.md#7.1)
 
-- [ ] 2. Write failing detection tests with the survey fixture corpus <!-- id:a3keetz -->
+- [x] 2. Write failing detection tests with the survey fixture corpus <!-- id:a3keetz -->
   - tests/test_spec_lint.py (stdlib unittest) + fixtures under tests/fixtures/spec_lint/
   - Fixtures reproduce the survey: dangling anchors, mixed-ID task file, out-of-sequence numbering, zero-recognized-document folder (must fire SJ-MODE-001 — pins janitor-owned discovery, not specs-overview discovery), bugfix-shape violations, bugfix-shaped folder outside bugfixes/, nested domains, PRD multi-task-file, clean repo, no-specs repo
   - Pin JSON schema (evidence array, closed 3-value disposition enum), exit codes 0/1/2, dotfolder and .janitor.json exemption, rune-absent skip note with rune_available: false
@@ -25,7 +25,7 @@ references:
   - Stream: 1
   - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [1.6](requirements.md#1.6), [1.7](requirements.md#1.7), [1.8](requirements.md#1.8), [5.5](requirements.md#5.5)
 
-- [ ] 3. Implement spec_lint.py detection to pass the tests <!-- id:a3keeu0 -->
+- [x] 3. Implement spec_lint.py detection to pass the tests <!-- id:a3keeu0 -->
   - claude/skills/spec-janitor/spec_lint.py, stdlib only
   - Detectors SJ-REF-001/002, SJ-TASK-001/002/003, SJ-MODE-001/002/003; anchor grammar per design (a-name anchors + GitHub heading slugs)
   - Human report grouped by spec + --json output; rune verification via shutil.which, failures become SJ-TASK-001 with stderr evidence
