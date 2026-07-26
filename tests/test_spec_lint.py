@@ -818,5 +818,75 @@ class CorruptStoreTest(StoreCase):
         )
 
 
+class RuleIdParityTest(unittest.TestCase):
+    """Task 8 / Req 7.2: bidirectional parity between spec_lint.py and the
+    conventions reference. Every rule ID the auditor can emit exists in
+    spec-conventions.md, and every rule the document marks as mechanical has
+    a detector. Drift in either direction fails."""
+
+    RULE_HEADING_RE = re.compile(r"^### (SJ-[A-Z]+-\d{3})\b.*$", re.M)
+    AUDIT_LINE_RE = re.compile(
+        r"^\*\*Audit\*\*: (mechanical|judgment)[^\n]*"
+        r"disposition: (auto-fix|gated|detect-only)",
+        re.M,
+    )
+
+    def parse_conventions(self):
+        """Map of rule ID -> (audit_class, disposition) from the reference."""
+        text = CONVENTIONS.read_text()
+        rules = {}
+        headings = list(self.RULE_HEADING_RE.finditer(text))
+        for i, match in enumerate(headings):
+            section_end = (
+                headings[i + 1].start() if i + 1 < len(headings) else len(text)
+            )
+            section = text[match.end():section_end]
+            audit = self.AUDIT_LINE_RE.search(section)
+            self.assertIsNotNone(
+                audit,
+                f"rule {match.group(1)} has no parseable **Audit** line",
+            )
+            rules[match.group(1)] = (audit.group(1), audit.group(2))
+        return rules
+
+    def test_every_emitted_rule_id_exists_in_the_conventions(self):
+        documented = self.parse_conventions()
+        for rule in spec_lint.RULES:
+            self.assertIn(
+                rule, documented,
+                f"spec_lint.py emits {rule} but spec-conventions.md does "
+                "not define it",
+            )
+
+    def test_every_mechanical_rule_in_the_doc_has_a_detector(self):
+        documented = self.parse_conventions()
+        mechanical = {
+            rule for rule, (audit, _) in documented.items()
+            if audit == "mechanical"
+        }
+        self.assertEqual(
+            mechanical, set(spec_lint.RULES),
+            "the mechanical rule set must match spec_lint's detectors in "
+            "both directions",
+        )
+
+    def test_dispositions_agree_between_code_and_doc(self):
+        documented = self.parse_conventions()
+        for rule, disposition in spec_lint.RULES.items():
+            self.assertEqual(
+                documented[rule][1], disposition,
+                f"disposition drift for {rule}",
+            )
+
+    def test_judgment_rules_are_documented_for_citation(self):
+        # The skill's findings cite these IDs (Req 2.5); they must exist
+        # even though spec_lint never emits them.
+        documented = self.parse_conventions()
+        for rule in ("SJ-SUP-001", "SJ-SUP-002", "SJ-SCOPE-001",
+                     "SJ-GHOST-001", "SJ-FLOW-001", "SJ-FILE-001",
+                     "SJ-DRIFT-001"):
+            self.assertEqual(documented.get(rule, (None,))[0], "judgment")
+
+
 if __name__ == "__main__":
     unittest.main()

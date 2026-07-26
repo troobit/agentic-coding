@@ -65,7 +65,7 @@ references:
   - Stream: 1
   - Requirements: [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6)
 
-- [ ] 8. Add the bidirectional rule-ID parity test <!-- id:a3keeu5 -->
+- [x] 8. Add the bidirectional rule-ID parity test <!-- id:a3keeu5 -->
   - Every rule ID emitted by spec_lint.py exists in spec-conventions.md; every mechanical rule in the doc has a detector
   - Parses both artifacts; fails on drift in either direction
   - Blocked-by: a3keeu0 (Implement spec_lint.py detection to pass the tests)
