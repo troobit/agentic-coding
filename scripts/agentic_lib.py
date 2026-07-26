@@ -84,6 +84,45 @@ def write_managed(path: Path, block: str, report: list) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Verbatim seeding (spec-janitor Req 9.3, Decision 10)
+# ---------------------------------------------------------------------------
+
+def seed_verbatim(src: Path, dst: Path, report: list) -> bool:
+    """Seed a tool-owned file verbatim: `dst` becomes a byte-identical copy
+    of `src`.
+
+    For files that carry no repo-local hand edits by contract (e.g. the
+    spec-janitor auditor and its conventions reference) the managed-block
+    mechanism does not apply — it is markdown-only by construction, and the
+    markerless-file skip would freeze a seeded copy forever. Instead:
+    destination missing -> copy; identical -> unchanged; differing -> back
+    up (`.bak-<date>`, the same convention as align's JSON-validity step)
+    and re-copy, reported as changed.
+
+    Returns True when the destination changed.
+    """
+    src = Path(src)
+    dst = Path(dst)
+    content = src.read_bytes()
+    if dst.exists():
+        if dst.read_bytes() == content:
+            report.append(ReportEntry(
+                "unchanged", dst, "already identical to the seed source"))
+            return False
+        _backup(dst, report,
+                "differed from the tool-owned seed source - re-copied "
+                "verbatim; previous content remains only in the backup")
+        shutil.copy2(src, dst)
+        report.append(ReportEntry(
+            "changed", dst, "re-copied verbatim from the seed source"))
+        return True
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+    report.append(ReportEntry("changed", dst, "seeded verbatim"))
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Conventions assembly (Req 3.3, Decision 13)
 # ---------------------------------------------------------------------------
 

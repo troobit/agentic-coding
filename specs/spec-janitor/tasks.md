@@ -103,20 +103,20 @@ references:
 
 ## Distribution
 
-- [ ] 12. Write failing seed_verbatim tests <!-- id:a3keeu9 -->
+- [x] 12. Write failing seed_verbatim tests <!-- id:a3keeu9 -->
   - tests/test_align.py additions with hermetic fixtures; existing tests unmodified
   - Cases: destination missing -> copy; identical -> no-op/unchanged; differing -> backup .bak-<date> and re-copy reported as changed
   - Pins that markerless existing janitor targets are NOT skipped as hand-written (the managed-block skip must not apply to verbatim-class seeds)
   - Stream: 2
   - Requirements: [9.3](requirements.md#9.3)
 
-- [ ] 13. Implement agentic_lib.seed_verbatim <!-- id:a3keeua -->
+- [x] 13. Implement agentic_lib.seed_verbatim <!-- id:a3keeua -->
   - scripts/agentic_lib.py; reuses the existing _backup convention and ReportEntry reporting
   - Blocked-by: a3keeu9 (Write failing seed_verbatim tests)
   - Stream: 2
   - Requirements: [9.3](requirements.md#9.3)
 
-- [ ] 14. Write failing align seeding-integration tests <!-- id:a3keeub -->
+- [x] 14. Write failing align seeding-integration tests <!-- id:a3keeub -->
   - Seeding pairs: claude/skills/spec-janitor/** -> .github/skills/spec-janitor/** (verbatim class), copilot/agents/spec-janitor.agent.md -> .github/agents/spec-janitor.agent.md
   - Stale-pack prune exempts .github/agents/spec-janitor.agent.md via SEEDED_AGENT_RELS with no zero-matches warning
   - Second aligned run reports no changes
@@ -124,7 +124,7 @@ references:
   - Stream: 2
   - Requirements: [9.3](requirements.md#9.3), [9.4](requirements.md#9.4)
 
-- [ ] 15. Implement align.py seeding and prune-exemption changes <!-- id:a3keeuc -->
+- [x] 15. Implement align.py seeding and prune-exemption changes <!-- id:a3keeuc -->
   - Generalize PRD_AGENT_REL to a SEEDED_AGENT_RELS set; add janitor pairs to the cloud-seeding step with the verbatim class
   - cloud_assets: true repos only, matching the prd pattern
   - Blocked-by: a3keeub (Write failing align seeding-integration tests)

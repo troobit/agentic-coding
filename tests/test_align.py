@@ -85,6 +85,8 @@ except ImportError as exc:  # pragma: no cover - red phase until task 11 lands
         "docstring. Once scripts/align.py lands, this suite must run green."
     ) from exc
 
+import agentic_lib  # noqa: E402
+
 MARKER_BEGIN = "<!-- agentic:begin -->"
 MARKER_END = "<!-- agentic:end -->"
 
@@ -770,6 +772,221 @@ class StalePacksFileTest(unittest.TestCase):
         custom_hash = sha256(pack_dir / "custom.agent.md")
         all_hashes = {h for hashes in data["packs"].values() for h in hashes}
         self.assertNotIn(custom_hash, all_hashes)
+
+
+class SeedVerbatimTest(unittest.TestCase):
+    """Spec spec-janitor Req 9.3 / Decision 10: agentic_lib.seed_verbatim —
+    the verbatim-seeding class for tool-owned files (no managed blocks).
+
+    Contract: destination missing -> copy; identical -> unchanged (no
+    "changed" entry, returns False); differing -> back up as .bak-<date>
+    (the existing _backup convention) and re-copy, reported as changed.
+    Markerless existing targets are NOT skipped as hand-written: the
+    managed-block skip must not apply to verbatim-class seeds.
+    """
+
+    SEED_CONTENT = (
+        "#!/usr/bin/env python3\n"
+        '"""Tool-owned fixture auditor; no agentic markers anywhere."""\n'
+        'print("canonical")\n'
+    )
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(prefix="seed-verbatim-test-")
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        self.src = self.tmp / "seed" / "spec_lint.py"
+        self.src.parent.mkdir()
+        self.src.write_text(self.SEED_CONTENT)
+        self.dst = self.tmp / "repo" / ".github" / "skills" / "spec_lint.py"
+
+    def kinds(self, report):
+        return [entry.kind for entry in report]
+
+    def test_missing_destination_copied_and_reported_changed(self):
+        report = []
+        changed = agentic_lib.seed_verbatim(self.src, self.dst, report)
+        self.assertTrue(changed, "a fresh copy must be reported as a change")
+        self.assertEqual(
+            self.dst.read_bytes(), self.src.read_bytes(),
+            "seeded file must be byte-identical to the seed source",
+        )
+        self.assertIn("changed", self.kinds(report))
+        self.assertNotIn("skipped", self.kinds(report))
+
+    def test_identical_destination_is_unchanged(self):
+        self.dst.parent.mkdir(parents=True)
+        self.dst.write_text(self.SEED_CONTENT)
+        report = []
+        changed = agentic_lib.seed_verbatim(self.src, self.dst, report)
+        self.assertFalse(changed, "an identical destination is converged")
+        self.assertNotIn("changed", self.kinds(report))
+        self.assertEqual(
+            list(self.dst.parent.glob("*.bak-*")), [],
+            "an identical destination must never be backed up",
+        )
+
+    def test_differing_destination_backed_up_and_recopied(self):
+        self.dst.parent.mkdir(parents=True)
+        stale = "print('hand-modified stale copy')\n"
+        self.dst.write_text(stale)
+        report = []
+        changed = agentic_lib.seed_verbatim(self.src, self.dst, report)
+        self.assertTrue(changed)
+        self.assertEqual(
+            self.dst.read_bytes(), self.src.read_bytes(),
+            "a differing destination must be re-copied verbatim",
+        )
+        backups = list(self.dst.parent.glob(self.dst.name + ".bak-*"))
+        self.assertTrue(
+            backups,
+            "the previous content must be backed up as <name>.bak-<date>",
+        )
+        self.assertEqual(
+            backups[0].read_text(), stale,
+            "the backup must preserve the previous content byte-for-byte",
+        )
+        self.assertIn("changed", self.kinds(report))
+
+    def test_markerless_existing_target_is_not_skipped_as_hand_written(self):
+        """The write_managed markerless skip must NOT apply here: janitor
+        assets are tool-owned by contract, so a markerless existing target
+        (e.g. a previously seeded .py file) is converged, never frozen."""
+        self.dst.parent.mkdir(parents=True)
+        markerless = "# no agentic markers here\nprint('old seeded copy')\n"
+        self.dst.write_text(markerless)
+        report = []
+        changed = agentic_lib.seed_verbatim(self.src, self.dst, report)
+        self.assertTrue(
+            changed,
+            "a markerless verbatim-class target must be converged, not "
+            "skipped as hand-written",
+        )
+        self.assertNotIn("skipped", self.kinds(report))
+        self.assertEqual(self.dst.read_bytes(), self.src.read_bytes())
+
+
+JANITOR_SEED_ROOT = FIXTURES / "seed-root"
+
+# Seeding pairs for the spec-janitor toolchain (spec spec-janitor Req 9.3,
+# 9.4): repo-relative target -> seed source in the fixture seed root. All
+# verbatim class: targets must end byte-identical to their seed source.
+JANITOR_SEEDED = {
+    ".github/agents/spec-janitor.agent.md":
+        JANITOR_SEED_ROOT / "copilot" / "agents" / "spec-janitor.agent.md",
+    ".github/skills/spec-janitor/SKILL.md":
+        JANITOR_SEED_ROOT / "claude" / "skills" / "spec-janitor" / "SKILL.md",
+    ".github/skills/spec-janitor/spec_lint.py":
+        JANITOR_SEED_ROOT / "claude" / "skills" / "spec-janitor"
+        / "spec_lint.py",
+    ".github/skills/spec-janitor/references/spec-conventions.md":
+        JANITOR_SEED_ROOT / "claude" / "skills" / "spec-janitor"
+        / "references" / "spec-conventions.md",
+}
+
+
+class JanitorSeedingTest(AlignFixtureCase):
+    """Spec spec-janitor Req 9.3/9.4: cloud seeding of the janitor
+    toolchain — claude/skills/spec-janitor/** -> .github/skills/spec-janitor/**
+    and copilot/agents/spec-janitor.agent.md -> .github/agents/, verbatim
+    class, cloud_assets: true repos only (the prd pattern)."""
+
+    def test_seeds_janitor_assets_byte_identical(self):
+        repo = self.make_repo("missing-cloud-assets")
+        report = self.run_align(repo)
+        for rel, seed in JANITOR_SEEDED.items():
+            with self.subTest(file=rel):
+                target = repo / rel
+                self.assertTrue(target.exists(), f"{rel} must be seeded")
+                self.assertEqual(
+                    sha256(target), sha256(seed),
+                    f"{rel} is verbatim class: it must be byte-identical "
+                    "to its seed source (no managed-block rewriting)",
+                )
+                self.assertIn(rel, self.change_paths(report))
+
+    def test_cloud_assets_false_seeds_no_janitor_assets(self):
+        repo = self.make_repo("drifted-canonical")  # cloud_assets: false
+        self.run_align(repo)
+        self.assertFalse(
+            (repo / ".github").exists(),
+            "cloud_assets is false: janitor assets must not be seeded",
+        )
+
+    def test_second_aligned_run_reports_no_changes_or_agents_warning(self):
+        repo = self.make_repo("missing-cloud-assets")
+        self.run_align(repo)
+        second = self.run_align(repo)
+        self.assertEqual(second.changes, [], "verbatim seeding must be idempotent")
+        self.assertFalse(
+            any(".github/agents" in w for w in second.warnings),
+            "the seeded spec-janitor.agent.md must not count as a "
+            f"stale-pack near-miss; got: {second.warnings!r}",
+        )
+
+
+class JanitorDriftedAssetsTest(AlignFixtureCase):
+    """A drifted (hand-modified, markerless) janitor asset is tool-owned:
+    align backs it up (.bak-<date>) and re-copies the seed verbatim — the
+    markerless hand-written skip must NOT apply. The stale-pack prune
+    exempts the janitor agent path via SEEDED_AGENT_RELS."""
+
+    DRIFTED = (
+        ".github/agents/spec-janitor.agent.md",
+        ".github/skills/spec-janitor/spec_lint.py",
+    )
+
+    def test_drifted_targets_backed_up_and_recopied_not_skipped(self):
+        repo = self.make_repo("janitor-drifted")
+        originals = {rel: (repo / rel).read_text() for rel in self.DRIFTED}
+        report = self.run_align(repo)
+        for rel in self.DRIFTED:
+            with self.subTest(file=rel):
+                target = repo / rel
+                self.assertEqual(
+                    sha256(target), sha256(JANITOR_SEEDED[rel]),
+                    f"{rel} must be re-copied verbatim from the seed",
+                )
+                backups = list(target.parent.glob(target.name + ".bak-*"))
+                self.assertTrue(
+                    backups,
+                    f"{rel} differed from the seed: the previous content "
+                    "must be backed up as <name>.bak-<date>",
+                )
+                self.assertEqual(
+                    backups[0].read_text(), originals[rel],
+                    "the backup must preserve the drifted content",
+                )
+                self.assertIn(rel, self.change_paths(report))
+                self.assertNotIn(
+                    rel, report.skipped,
+                    "verbatim-class targets must never be skipped as "
+                    "hand-written, markerless or not",
+                )
+
+    def test_prune_exempts_janitor_agent_without_zero_match_warning(self):
+        repo = self.make_repo("janitor-drifted")
+        report = self.run_align(repo)
+        self.assertTrue(
+            (repo / ".github/agents/spec-janitor.agent.md").exists(),
+            "the janitor agent file must be exempt from stale-pack pruning",
+        )
+        self.assertFalse(
+            any("stale-pack" in w for w in report.warnings),
+            "the janitor agent path must not trigger the zero-stale-pack-"
+            f"matches warning; got: {report.warnings!r}",
+        )
+
+    def test_second_aligned_run_reports_no_changes(self):
+        repo = self.make_repo("janitor-drifted")
+        self.run_align(repo)
+        after_first = self.snapshot(repo)
+        second = self.run_align(repo)
+        self.assertEqual(second.changes, [])
+        self.assertEqual(
+            self.snapshot(repo), after_first,
+            "a second aligned run must not touch any file (no new backups)",
+        )
 
 
 if __name__ == "__main__":
