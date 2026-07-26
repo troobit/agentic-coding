@@ -8,7 +8,7 @@
 | [Agreement Invoice Skills](#agreement-invoice-skills) | 2026-07-11 | In Progress | Skills and guardrails for authoring customer SoW agreements and invoices with verified cross-references |
 | [Fiscal Probe Skill](#fiscal-probe-skill) | 2026-07-23 | Done | Financial-document probe skill producing reports where every claim carries a source reference |
 | [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth |
-| [Spec Janitor](#spec-janitor) | 2026-07-26 | Planned | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
+| [Spec Janitor](#spec-janitor) | 2026-07-26 | Done | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
 
 ---
 
