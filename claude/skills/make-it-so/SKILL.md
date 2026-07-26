@@ -87,6 +87,9 @@ The main agent MUST spawn one subagent (Task tool, `general-purpose` unless a mo
 
 The main agent waits for the subagent to return and surfaces any failure to the user before continuing.
 
+**Mid-Implementation Spec Edits:**
+Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`). This applies to the main agent and to every subagent it spawns.
+
 **Review (main agent):**
 - Once the phase is fully integrated (parallel mode) or the single subagent has returned `done` (single-subagent mode), run the design-critic skill over the phase's implementation **diff** (e.g. `git diff` from the phase's starting commit to HEAD) — not a plain read-through of the final state, which reliably finds nothing. Issues detected should be fixed (delegate the fix as a follow-up subagent if it involves code, or update the decision log directly)
 - When relaying the phase's results to the user, include one plain-English line per fix or change on how to verify it (what to do in the running app and what should happen) — dense subagent reports alone leave the user unsure what was actually solved

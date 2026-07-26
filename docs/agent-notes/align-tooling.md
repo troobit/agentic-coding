@@ -74,8 +74,13 @@ or the real copilot assets. They DO use the real `scripts/stale-packs.json`.
   (no blank line after begin / before end — the `write_managed` normal
   form), or the run after a verbatim seed rewrites the block once.
   `SeedSourceMarkerTests` in test_generate.py pins both properties.
-- `.github/agents/prd.agent.md` is excluded from stale-pack candidacy
-  entirely: never hash-matched, never counted toward the near-miss warning.
+- Agent files align itself seeds are excluded from stale-pack candidacy
+  entirely (the `SEEDED_AGENT_RELS` frozenset: `prd.agent.md` and
+  `spec-janitor.agent.md`): never hash-matched, never counted toward the
+  near-miss warning. Note a leftover `.bak-<date>` backup under
+  `.github/agents/` (from a drifted janitor agent) IS a candidate and
+  triggers the zero-matches warning on later runs — accepted noise, same
+  class as other leftover unmatched agent files.
 - Manifest inference: `"*"` always includes; other `default_for` entries
   are `repo.glob(rule)` against the repo root. `cloud_assets` is inferred
   as False — seeding `.github/` stays an explicit opt-in edit.
@@ -90,6 +95,27 @@ or the real copilot assets. They DO use the real `scripts/stale-packs.json`.
   current canonical set `COPILOT_MCP_GITHUB_AUTH_TOKEN` is the only secret
   name. Note `make align` passes no repo argument, so runbooks document the
   direct `python3 scripts/align.py <repo>` invocation.
+
+## Verbatim seeding class (spec spec-janitor, Decision 10)
+
+`agentic_lib.seed_verbatim(src, dst, report)` seeds tool-owned files that
+can never carry repo-local edits: dst missing -> copy; identical ->
+"unchanged" entry, returns False; differing -> `_backup` (`.bak-<date>`,
+warning entry) then re-copy, "changed" entry, returns True. It exists
+because `write_managed` is markdown-only (markers re-emitted bare in a
+`.py` would be a SyntaxError) and `_seed_file`'s markerless skip would
+freeze a seeded `spec_lint.py` at its first copy. The markerless skip
+deliberately does NOT apply to verbatim-class targets.
+
+In `_seed_cloud_assets` (cloud_assets: true only), the janitor pairs seed
+verbatim: `copilot/agents/spec-janitor.agent.md` ->
+`.github/agents/spec-janitor.agent.md` and
+`claude/skills/spec-janitor/**` -> `.github/skills/spec-janitor/**`.
+Missing seed sources are skipped silently (the real assets land with the
+other spec-janitor streams); prd's managed-block seeding is untouched.
+Tests: `SeedVerbatimTest`, `JanitorSeedingTest`, `JanitorDriftedAssetsTest`
+in tests/test_align.py, with janitor fixture assets in the shared
+`tests/fixtures/align/seed-root/` and the `janitor-drifted` fixture repo.
 
 ## Nextup-template step (PRD nextup-starwave-refinement)
 

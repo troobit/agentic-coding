@@ -111,6 +111,28 @@ class TestSyncScriptCompat(unittest.TestCase):
         )
 
 
+class TestSpecJanitorAgentLink(unittest.TestCase):
+    """Pins the VS Code spec-janitor agent symlink (Req 9.1)."""
+
+    def setUp(self):
+        self.script_text = SYNC_SCRIPT.read_text()
+        self.links = parse_links(self.script_text)
+
+    def test_spec_janitor_agent_link_present_and_unchanged(self):
+        target = '"$VSCODE_PROMPTS_DIR/spec-janitor.agent.md"'
+        self.assertIn(
+            target,
+            self.links,
+            "sync-claude.sh no longer creates the VS Code "
+            "spec-janitor.agent.md symlink",
+        )
+        self.assertEqual(
+            '"$REPO_CLAUDE_DIR/../copilot/agents/spec-janitor.agent.md"',
+            self.links[target],
+            "symlink source for the VS Code spec-janitor agent changed",
+        )
+
+
 class TestPreFeatureSkillsPresent(unittest.TestCase):
     def test_baseline_has_no_duplicates(self):
         self.assertEqual(len(PRE_FEATURE_SKILLS), len(set(PRE_FEATURE_SKILLS)))

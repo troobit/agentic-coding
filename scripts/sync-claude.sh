@@ -31,6 +31,9 @@ ln -sfn "$REPO_CLAUDE_DIR/rules" ~/.claude/rules
 # VS Code Copilot: user-level PRD custom agent (Req 3.1, 3.4)
 ln -sfn "$REPO_CLAUDE_DIR/../copilot/agents/prd.agent.md" "$VSCODE_PROMPTS_DIR/prd.agent.md"
 
+# VS Code Copilot: user-level spec-janitor custom agent (Req 9.1)
+ln -sfn "$REPO_CLAUDE_DIR/../copilot/agents/spec-janitor.agent.md" "$VSCODE_PROMPTS_DIR/spec-janitor.agent.md"
+
 echo "Symlinked to ~/.claude:"
 echo "  CLAUDE.md -> $REPO_CLAUDE_DIR/CLAUDE.md"
 echo "  agents/   -> $REPO_CLAUDE_DIR/agents"
@@ -40,3 +43,4 @@ echo "  scripts/  -> $REPO_CLAUDE_DIR/../scripts"
 echo "  rules/    -> $REPO_CLAUDE_DIR/rules"
 echo "Symlinked to VS Code profile:"
 echo "  $VSCODE_PROMPTS_DIR/prd.agent.md -> $REPO_CLAUDE_DIR/../copilot/agents/prd.agent.md"
+echo "  $VSCODE_PROMPTS_DIR/spec-janitor.agent.md -> $REPO_CLAUDE_DIR/../copilot/agents/spec-janitor.agent.md"
