@@ -22,6 +22,11 @@ Fixes agentic drift in a target repo, in pipeline order:
    .github/copilot-instructions.md, and .github/skills/prd/** with managed
    blocks; later runs converge only the block. A markerless pre-existing
    target is hand-written: reported and skipped, never overwritten.
+   The spec-janitor assets (.github/agents/spec-janitor.agent.md,
+   .github/skills/spec-janitor/**) are tool-owned and seed VERBATIM
+   (agentic_lib.seed_verbatim): identical targets are no-ops, differing
+   targets - markerless or not - are backed up (.bak-<date>) and
+   re-copied byte-identical to the seed (spec spec-janitor, Decision 10).
 6. Nextup template (PRD nextup-starwave-refinement) - seeds
    nextup.example.md verbatim from the canonical copy at the seed root when
    the target lacks it; when present, converges only the machine zone
@@ -34,8 +39,9 @@ Fixes agentic drift in a target repo, in pipeline order:
 
 Managed files only (design Data Models): .mcp.json, .vscode/mcp.json,
 .agentic.json, .github/copilot-instructions.md, .github/agents/prd.agent.md,
-.github/skills/prd/**, stale-pack files under .github/agents/, plus
-nextup.example.md and the nextup.md entry in .gitignore.
+.github/agents/spec-janitor.agent.md, .github/skills/prd/**,
+.github/skills/spec-janitor/**, stale-pack files under .github/agents/,
+plus nextup.example.md and the nextup.md entry in .gitignore.
 
 First run with no .agentic.json: the manifest is inferred from default_for
 rules and written, and the plan is reported WITHOUT applying - the user
@@ -71,7 +77,12 @@ DEFAULT_SERVERS_JSON = REPO_ROOT / "mcp" / "servers.json"
 DEFAULT_STALE_PACKS_JSON = REPO_ROOT / "scripts" / "stale-packs.json"
 
 MANAGED_JSON = (".mcp.json", ".vscode/mcp.json")
-PRD_AGENT_REL = ".github/agents/prd.agent.md"
+# Agent files align itself seeds: exempt from stale-pack candidacy so a
+# seeded copy never hash-matches or counts toward the near-miss warning.
+SEEDED_AGENT_RELS = frozenset({
+    ".github/agents/prd.agent.md",
+    ".github/agents/spec-janitor.agent.md",
+})
 NEXTUP_EXAMPLE = "nextup.example.md"
 
 # Everything from the first LM marker down is the machine zone that align
@@ -233,8 +244,8 @@ def _delete_stale_packs(repo: Path, stale_packs: dict,
     matched, unmatched = [], []
     for path in sorted(agents_dir.iterdir()):
         rel = _rel(path, repo)
-        if not path.is_file() or rel == PRD_AGENT_REL:
-            continue  # align's own seed target is not a stale-pack candidate
+        if not path.is_file() or rel in SEEDED_AGENT_RELS:
+            continue  # align's own seed targets are not stale-pack candidates
         if _sha256(path) in known:
             path.unlink()
             matched.append(rel)
@@ -253,7 +264,14 @@ def _delete_stale_packs(repo: Path, stale_packs: dict,
 
 def _seed_cloud_assets(repo: Path, seed_root: Path,
                        report: AlignReport) -> None:
-    """Step 5: seed repo-level Copilot assets with managed blocks (Req 6.1)."""
+    """Step 5: seed repo-level Copilot assets (Req 6.1; spec-janitor 9.3).
+
+    Two seeding classes: prd assets use managed blocks (markerless existing
+    targets are hand-written and skipped); spec-janitor assets are
+    tool-owned and use verbatim seeding (lib.seed_verbatim) — a differing
+    target is backed up and re-copied, never frozen, because the auditor
+    and conventions reference must be byte-identical on every surface.
+    """
     pairs = [
         (seed_root / "copilot" / "agents" / "prd.agent.md",
          repo / ".github" / "agents" / "prd.agent.md"),
@@ -267,6 +285,22 @@ def _seed_cloud_assets(repo: Path, seed_root: Path,
                           / src.relative_to(skills_src)))
     for src, dst in pairs:
         _seed_file(src, dst, repo, report)
+
+    verbatim_pairs = [
+        (seed_root / "copilot" / "agents" / "spec-janitor.agent.md",
+         repo / ".github" / "agents" / "spec-janitor.agent.md"),
+    ]
+    janitor_src = seed_root / "claude" / "skills" / "spec-janitor"
+    if janitor_src.is_dir():
+        for src in sorted(p for p in janitor_src.rglob("*") if p.is_file()):
+            verbatim_pairs.append(
+                (src, repo / ".github" / "skills" / "spec-janitor"
+                 / src.relative_to(janitor_src)))
+    log = []
+    for src, dst in verbatim_pairs:
+        if src.is_file():
+            lib.seed_verbatim(src, dst, log)
+    _harvest(log, repo, report)
 
 
 def _seed_file(src: Path, dst: Path, repo: Path, report: AlignReport) -> None:
