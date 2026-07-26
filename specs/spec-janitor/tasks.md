@@ -74,7 +74,7 @@ references:
 
 ## Skill and Guardrails
 
-- [ ] 9. Author SKILL.md for /spec-janitor <!-- id:a3keeu6 -->
+- [x] 9. Author SKILL.md for /spec-janitor <!-- id:a3keeu6 -->
   - claude/skills/spec-janitor/SKILL.md implementing the 8-step workflow from the design
   - Interactive-entry contract stated: no router dispatches it autonomously; cloud surface uses the report-only agent asset
   - Judgment rules SJ-SUP/SCOPE/GHOST/FLOW/FILE/DRIFT with the finding model (per-family subjects, canonical pair ordering, related_spec/active/pattern/proposal fields)
@@ -84,14 +84,14 @@ references:
   - Stream: 3
   - Requirements: [2.1](requirements.md#2.1), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [3.4](requirements.md#3.4), [3.5](requirements.md#3.5), [3.6](requirements.md#3.6), [4.2](requirements.md#4.2), [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [6.1](requirements.md#6.1), [6.2](requirements.md#6.2), [6.3](requirements.md#6.3), [9.1](requirements.md#9.1)
 
-- [ ] 10. Author the report-only copilot agent asset <!-- id:a3keeu7 -->
+- [x] 10. Author the report-only copilot agent asset <!-- id:a3keeu7 -->
   - copilot/agents/spec-janitor.agent.md: runs python3 .github/skills/spec-janitor/spec_lint.py . (no --fix, no --json, no subcommands) and includes the report in its output
   - States exit 1 = findings, not failure; contains no write path
   - Blocked-by: a3keety (Author the conventions reference with stable rule IDs)
   - Stream: 3
   - Requirements: [9.2](requirements.md#9.2)
 
-- [ ] 11. Apply prevention guardrail edits to the six skills <!-- id:a3keeu8 -->
+- [x] 11. Apply prevention guardrail edits to the six skills <!-- id:a3keeu8 -->
   - engage: PRD-lane task references anchor prd.md sections, never a nonexistent requirements.md
   - starwave-smolspec: direction-changing revision passes mark discarded sections superseded in the same edit, citing SJ-SUP-*
   - starwave-tasks: task list scope matches source document; appended tasks carry the same schema as existing ones

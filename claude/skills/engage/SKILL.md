@@ -29,6 +29,7 @@ For each context H2:
 4. Otherwise create it with the rune skill:
    - `rune create specs/{prd-name}/tasks-{slug}.md --title "{PRD title} — {context name}" --reference prd.md`
    - `rune batch` to add phases and tasks: one phase per requirement cluster within the context; tasks derived from the numbered requirements and their acceptance criteria; `blocked_by` where tasks build on one another; streams where tasks within the context are independent (streams give intra-context parallelism).
+   - Requirement references in derived tasks anchor `prd.md` sections (e.g. `[3](prd.md#api-server)`). A PRD-lane spec contains no `requirements.md` — NEVER emit a `requirements.md#…` reference to a file the spec folder does not contain; it is dangling from birth (spec-conventions `SJ-REF-001`).
 5. Execution notes that require human verification become tasks titled with the `STOP — ` prefix, placed in the affected context's file with `blocked_by`/dependents wired so work that needs the verification cannot start before it.
 6. **Commit the derived files** (`[doc]: derive rune task files for prd {prd-name}`). Step 2's worktrees branch from the working branch — an uncommitted task file never reaches the subagents.
 

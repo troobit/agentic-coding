@@ -49,6 +49,8 @@ The tasks document should be based on the requirement and design documents, so e
   - Be concrete enough that a coding agent can execute them without additional clarification
   - Be scoped to specific coding activities (e.g., "Implement X function" rather than "Support X feature")
 - Tasks MUST build incrementally on previous steps
+- The task list's scope MUST match the source document's scope: no tasks for work the requirements/design do not cover, and no covered work left untasked (spec-conventions `SJ-SCOPE-001`)
+- Tasks appended in later passes MUST carry the same schema as the file's existing tasks — same metadata shape (details, requirement links, `blocked_by`/stream usage) and same stable-ID style (spec-conventions `SJ-TASK-*`)
 
 **Task Granularity — No Inflation:**
 

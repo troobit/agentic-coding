@@ -61,6 +61,8 @@ Do not implement the fix yet. The tests must fail at this point.
 
 Create `specs/bugfixes/<bug-name>/report.md` using the template in `references/report-template.md`. At this stage the "Resolution" section will be empty — it gets filled in after the fix is implemented.
 
+Filing rules (spec-conventions `SJ-MODE-003`/`SJ-FILE-001`): every `specs/bugfixes/` entry follows the report shape — a `report.md` with the template's required sections, optionally a `solution-comparison.md` alongside, nothing else. Non-bug work (cleanups, enhancements, refactors) never lives under `specs/bugfixes/`; if the investigation reveals the request is not actually a bug, stop this workflow and route the work to a regular spec via the starwave-smolspec skill instead.
+
 ### 6. Commit Investigation Checkpoint
 
 Commit everything so far (failing tests + report + any investigation artifacts) using the `/commit` skill. This creates a clean baseline that competing implementations can branch from.
