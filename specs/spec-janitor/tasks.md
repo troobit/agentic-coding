@@ -131,7 +131,7 @@ references:
   - Stream: 2
   - Requirements: [9.3](requirements.md#9.3), [9.4](requirements.md#9.4)
 
-- [ ] 16. Add the VS Code agent symlink to sync-claude.sh with test <!-- id:a3keeud -->
+- [x] 16. Add the VS Code agent symlink to sync-claude.sh with test <!-- id:a3keeud -->
   - One symlink line for copilot/agents/spec-janitor.agent.md into the VS Code prompts dir, same pattern as prd.agent.md
   - tests/test_sync_compat.py addition pinning the new symlink target
   - Blocked-by: a3keeu7 (Author the report-only copilot agent asset)
