@@ -8,7 +8,7 @@ references:
 
 ## Conventions and Auditor
 
-- [ ] 1. Author the conventions reference with stable rule IDs <!-- id:a3keety -->
+- [x] 1. Author the conventions reference with stable rule IDs <!-- id:a3keety -->
   - Create claude/skills/spec-janitor/references/spec-conventions.md
   - Rule families SJ-MODE/REF/TASK/SUP/FILE/DRIFT per the design table; each rule gets a stable ID and a one-paragraph normative statement
   - Mode recognition from primary documents alone (full: requirements+design; smol: smolspec; PRD: prd; bugfix: report); task files checked after recognition
@@ -17,7 +17,7 @@ references:
   - Stream: 1
   - Requirements: [7.1](requirements.md#7.1)
 
-- [ ] 2. Write failing detection tests with the survey fixture corpus <!-- id:a3keetz -->
+- [x] 2. Write failing detection tests with the survey fixture corpus <!-- id:a3keetz -->
   - tests/test_spec_lint.py (stdlib unittest) + fixtures under tests/fixtures/spec_lint/
   - Fixtures reproduce the survey: dangling anchors, mixed-ID task file, out-of-sequence numbering, zero-recognized-document folder (must fire SJ-MODE-001 — pins janitor-owned discovery, not specs-overview discovery), bugfix-shape violations, bugfix-shaped folder outside bugfixes/, nested domains, PRD multi-task-file, clean repo, no-specs repo
   - Pin JSON schema (evidence array, closed 3-value disposition enum), exit codes 0/1/2, dotfolder and .janitor.json exemption, rune-absent skip note with rune_available: false
@@ -25,7 +25,7 @@ references:
   - Stream: 1
   - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [1.6](requirements.md#1.6), [1.7](requirements.md#1.7), [1.8](requirements.md#1.8), [5.5](requirements.md#5.5)
 
-- [ ] 3. Implement spec_lint.py detection to pass the tests <!-- id:a3keeu0 -->
+- [x] 3. Implement spec_lint.py detection to pass the tests <!-- id:a3keeu0 -->
   - claude/skills/spec-janitor/spec_lint.py, stdlib only
   - Detectors SJ-REF-001/002, SJ-TASK-001/002/003, SJ-MODE-001/002/003; anchor grammar per design (a-name anchors + GitHub heading slugs)
   - Human report grouped by spec + --json output; rune verification via shutil.which, failures become SJ-TASK-001 with stderr evidence
@@ -34,7 +34,7 @@ references:
   - Stream: 1
   - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [1.6](requirements.md#1.6), [1.7](requirements.md#1.7), [1.8](requirements.md#1.8)
 
-- [ ] 4. Write failing auto-fix and safety-guard tests <!-- id:a3keeu1 -->
+- [x] 4. Write failing auto-fix and safety-guard tests <!-- id:a3keeu1 -->
   - SJ-REF-002 preconditions: single-segment folder-relative ref with exactly one basename candidate; cross-folder path or two candidates -> demoted: true, no write
   - SJ-TASK-002 minting is purely additive; fixed file round-trips rune list when rune present (skip otherwise)
   - Fix ordering REF-002 before TASK-002; idempotence: --fix then re-run gives zero findings for fixed items and byte-identical tree
@@ -43,14 +43,14 @@ references:
   - Stream: 1
   - Requirements: [3.2](requirements.md#3.2), [3.3](requirements.md#3.3), [3.4](requirements.md#3.4), [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.3](requirements.md#4.3)
 
-- [ ] 5. Implement the --fix pipeline to pass the tests <!-- id:a3keeu2 -->
+- [x] 5. Implement the --fix pipeline to pass the tests <!-- id:a3keeu2 -->
   - Snapshot detection, compute fixes, apply in one pass; mid-apply failure aborts remainder and reports which applied
   - Applied fixes listed in report and marked fix_applied in JSON
   - Blocked-by: a3keeu1 (Write failing auto-fix and safety-guard tests)
   - Stream: 1
   - Requirements: [3.1](requirements.md#3.1), [3.2](requirements.md#3.2), [3.3](requirements.md#3.3), [3.4](requirements.md#3.4), [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.3](requirements.md#4.3)
 
-- [ ] 6. Write failing exclusion-store tests <!-- id:a3keeu3 -->
+- [x] 6. Write failing exclusion-store tests <!-- id:a3keeu3 -->
   - exclude and mark-raised subcommands are the only writers; schema-validated on write
   - Corrupt store -> backed up to .janitor.json.bak-<date> and rebuilt, reported prominently; never silently dropped
   - Identity stability: excluded finding keeps matching after line insertions AND after inserting a new task above the subject (slug subjects, not numbers)
@@ -59,13 +59,13 @@ references:
   - Stream: 1
   - Requirements: [5.1](requirements.md#5.1), [5.3](requirements.md#5.3), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6)
 
-- [ ] 7. Implement store subcommands and exclusion filtering <!-- id:a3keeu4 -->
+- [x] 7. Implement store subcommands and exclusion filtering <!-- id:a3keeu4 -->
   - specs/.janitor.json: version, exclude_specs (repo-relative paths), exclude_findings, raised, last_run
   - Blocked-by: a3keeu3 (Write failing exclusion-store tests)
   - Stream: 1
   - Requirements: [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.4](requirements.md#5.4), [5.6](requirements.md#5.6)
 
-- [ ] 8. Add the bidirectional rule-ID parity test <!-- id:a3keeu5 -->
+- [x] 8. Add the bidirectional rule-ID parity test <!-- id:a3keeu5 -->
   - Every rule ID emitted by spec_lint.py exists in spec-conventions.md; every mechanical rule in the doc has a detector
   - Parses both artifacts; fails on drift in either direction
   - Blocked-by: a3keeu0 (Implement spec_lint.py detection to pass the tests)
