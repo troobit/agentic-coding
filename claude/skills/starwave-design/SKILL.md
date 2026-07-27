@@ -101,7 +101,6 @@ Before triggering skill reviews, the model MUST verify:
 - When asking the user questions and offering options, the model MUST use the AskUserQuestion tool.
 - After updating the design document, the model MUST use the Task tool with subagent_type="general-purpose" to run the design-critic skill (invoke the Skill tool with skill="design-critic"), and the Task tool with subagent_type="peer-review-validator" to review the document and provide its questions to the user.
 - After the review by the skills, the model MUST ask the user "Does the design look good?"
-- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
 - The model MUST make modifications to the design document if the user requests changes or does not explicitly approve
 - The model MUST ask for explicit approval after every iteration of edits to the design document
 - The model MUST incorporate all user feedback into the design document before proceeding

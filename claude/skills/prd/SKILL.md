@@ -1,23 +1,19 @@
 ---
 name: prd
-description: Author a Product Requirements Document (PRD) for autonomous execution. Use when the user wants to frame a body of work as a single PRD that a coding agent can take to completion without further steering — e.g. "write a PRD for X", "frame this as a PRD", "PRD lane". NOT part of the gated starwave lane; do not use for features that need requirements/design/tasks approval gates.
+description: Author a standalone Product Requirements Document (PRD) describing a whole small system. Use when the user wants a small project or a first MVP framed as a single document — e.g. "write a PRD for X", "frame this as a PRD". Authoring ends at the document; there is no execution step. NOT part of the gated starwave lane; do not use for features that need requirements/design/tasks approval gates, or for work that must react to change and growing complexity.
 ---
 <!-- agentic:begin -->
 # PRD Authoring
 
-Produce exactly one PRD document that a coding agent can execute to completion without returning to the author. The PRD is the alternative lane to spec-driven development: one document in, completed work out.
+Produce exactly one PRD document describing a whole small system — a first MVP or a small project — clearly enough that a reader can act on it without returning to the author. This skill is **authoring only**: it ends at the document. Nothing derives a task file from a PRD, so work that must react to change or growing complexity belongs in spec-driven development instead.
 
 ## Hard Rules
 
 - **One PRD targets exactly one repository.** Contexts are applications or modules *within* that repository. Multi-repo efforts use one PRD per repo — offer to write them separately.
 - **Output is a single file**: `specs/{prd-name}/prd.md` in the target repository. Nothing else is created — no task files, no GitHub issues, no linked spec or ticket.
 - **A PRD stands alone.** Creating one MUST NOT require a linked spec, ticket, or prior starwave phase.
-- **Derivability is the quality bar.** The PRD MUST be written so that rune task files (or full specs) can be derived from it by a fresh session without asking the author anything. If a requirement would need clarification at derivation time, it is not done.
+- **Derivability is the quality bar.** The PRD MUST be written so that rune task files (or full specs) could be derived from it by a fresh session without asking the author anything. If a requirement would need clarification at derivation time, it is not done.
 - Do NOT include user personas, success-metrics boilerplate, milestones, or team-sizing sections unless the author explicitly asks for them.
-
-## Transit (Optional)
-
-When the user gives a `T-<id>` reference, or the target repo's `.agentic.json` sets `transit_project` and the user references a ticket: move the ticket to `planning` status via `mcp__transit__update_task_status` when authoring starts, with a comment (e.g. "Moving to planning — PRD authoring started"). The PRD lane has no spec gate, so `planning` is the only status the prd skill sets; the engage skill takes over from execution. Skip this entirely when no ticket applies — a PRD never requires one.
 
 ## Workflow
 
@@ -33,7 +29,7 @@ When the user gives a `T-<id>` reference, or the target repo's `.agentic.json` s
 
 ## PRD Outline
 
-The file MUST use this structure. The reserved section headings (`Product summary`, `Goals`, `Non-goals`, `Execution notes`) are fixed; every other H2 is a **context heading** — one per application or code context in the target repository. The execution skill (engage) treats any non-reserved H2 as a context, so do not add extra prose H2s.
+The file MUST use this structure. The reserved section headings (`Product summary`, `Goals`, `Non-goals`, `Execution notes`) are fixed; every other H2 is a **context heading** — one per application or code context in the target repository. Anyone deriving work from the PRD reads a non-reserved H2 as a context, so do not add extra prose H2s.
 
 ```markdown
 # PRD: {title}
@@ -48,7 +44,7 @@ The file MUST use this structure. The reserved section headings (`Product summar
 
 ## Non-goals
 
-- {What will NOT be done. Be explicit — this is what stops scope creep during autonomous execution.}
+- {What will NOT be done. Be explicit — this is what stops scope creep once work starts.}
 
 ## {Context name}
 
@@ -79,7 +75,7 @@ reduce to the same slug.}
 
 - Requirements are numbered per context and use MUST/SHOULD language; each has at least one acceptance criterion describing observable behavior.
 - Acceptance criteria describe WHAT is observable, not HOW to implement it.
-- Reference concrete file paths and existing patterns from the target repo where they anchor a requirement — the executing agent has the codebase but not this conversation.
+- Reference concrete file paths and existing patterns from the target repo where they anchor a requirement — a later reader has the codebase but not this conversation.
 - Group requirements so each context is independently implementable; put anything that spans contexts into Execution notes as an explicit dependency.
 - Keep the language plain and concise. No hyperbole, no marketing terms, no dividers.
 <!-- agentic:end -->

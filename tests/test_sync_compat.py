@@ -3,8 +3,13 @@
 Asserts that scripts/sync-claude.sh still creates the six original
 ~/.claude symlinks with unchanged sources, and that every pre-feature
 skill directory still exists under claude/skills/. New additions (extra
-links such as the VS Code prd.agent.md one, or new skills like prd and
-engage) are allowed; removals and renames of the originals are not.
+links such as the VS Code prd.agent.md one, or new skills like prd) are
+allowed; removals and renames of the originals are not.
+
+Deliberately retired skills are listed in RETIRED_SKILLS and excluded
+from the baseline: `sendit` and `transit` were removed when the workflow
+reverted to plain approve-and-continue gates and Transit ticket tracking
+was dropped from this branch.
 """
 
 import re
@@ -26,10 +31,18 @@ ORIGINAL_LINKS = {
     "~/.claude/rules": '"$REPO_CLAUDE_DIR/rules"',
 }
 
+# Skills deliberately removed from this branch. Excluded from the
+# baseline below so their absence is an asserted expectation rather than
+# a silent gap. Restoring one means deleting it from this list.
+RETIRED_SKILLS = [
+    "sendit",
+    "transit",
+]
+
 # Every skill directory that existed under claude/skills/ before the
-# toolset-agnostic-starwave feature. The feature's new skills (prd,
-# engage) are deliberately NOT in this baseline: their presence is
-# allowed but not required by this test.
+# toolset-agnostic-starwave feature, minus RETIRED_SKILLS. The feature's
+# new skills (prd) are deliberately NOT in this baseline: their presence
+# is allowed but not required by this test.
 PRE_FEATURE_SKILLS = [
     "blitz-merge",
     "bug-blitz",
@@ -56,7 +69,6 @@ PRE_FEATURE_SKILLS = [
     "project-init",
     "release-prep",
     "rune",
-    "sendit",
     "specs-overview",
     "starwave-creating-spec",
     "starwave-design",
@@ -65,7 +77,6 @@ PRE_FEATURE_SKILLS = [
     "starwave-tasks",
     "swiftui-forms",
     "systematic-debugger",
-    "transit",
     "ui-ux-reviewer",
 ]
 
@@ -147,6 +158,23 @@ class TestPreFeatureSkillsPresent(unittest.TestCase):
             [],
             missing,
             f"pre-feature skill directories missing from claude/skills/: {missing}",
+        )
+
+    def test_retired_skills_are_absent_and_not_in_baseline(self):
+        still_present = [
+            name for name in RETIRED_SKILLS if (SKILLS_DIR / name).is_dir()
+        ]
+        self.assertEqual(
+            [],
+            still_present,
+            "retired skills are back under claude/skills/; remove them from "
+            f"RETIRED_SKILLS if that is intended: {still_present}",
+        )
+        overlap = sorted(set(RETIRED_SKILLS) & set(PRE_FEATURE_SKILLS))
+        self.assertEqual(
+            [],
+            overlap,
+            f"skills cannot be both retired and required: {overlap}",
         )
 
 

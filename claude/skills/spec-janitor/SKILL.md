@@ -11,7 +11,7 @@ The normative rules live in [references/spec-conventions.md](references/spec-con
 
 ## Entry Contract
 
-This is an **interactive-entry skill**: no router (nextup, engage, orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
+This is an **interactive-entry skill**: no router (nextup, orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
 
 ## The Auditor
 
@@ -54,7 +54,7 @@ Read and reason over spec content — this is the half the auditor cannot do.
 
 - Read `last_run` from `specs/.janitor.json`; fall back to **45 days** (the default constant) when the store or field is absent.
 - Per spec: `git log --format=%ad --date=short -- specs/<dir>` — specs touched since the cutoff are marked `active: true` and audited first.
-- For active drift, name the development pattern that produced it from the commit sequence (e.g. `autonomous-run-layering` for repeated make-it-so/engage passes stacking unreconciled edits, `parallel-spec-authoring` for sibling specs created concurrently without cross-references) in the finding's `pattern` field.
+- For active drift, name the development pattern that produced it from the commit sequence (e.g. `autonomous-run-layering` for repeated make-it-so passes stacking unreconciled edits, `parallel-spec-authoring` for sibling specs created concurrently without cross-references) in the finding's `pattern` field.
 - Shallow or missing git history: note it in the report, skip the scan, and treat all specs as active — never a hard stop.
 
 **Check the judgment rules** against the conventions reference:
@@ -109,7 +109,7 @@ Report, with every item citing its rule ID:
 
 - Auto-fixes applied (each one listed).
 - Gated batches applied, declined, and excluded (with the granularity recorded).
-- Detect-only findings with their proposed follow-ups (`SJ-GHOST-001` follow-up specs, `SJ-MODE-002` task authoring via the tasks/engage workflows, `SJ-DRIFT-001` normalization only if the user asks).
+- Detect-only findings with their proposed follow-ups (`SJ-GHOST-001` follow-up specs, `SJ-MODE-002` task authoring via the tasks workflow, `SJ-DRIFT-001` normalization only if the user asks).
 - Excluded specs and findings (from the store), and whether the overview was created or regenerated.
 
 ## Constraints

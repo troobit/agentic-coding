@@ -13,15 +13,11 @@ The workflow follows a four-phase approach:
 This is constantly being worked on, and will evolve over time. There are two lanes, with different tool support:
 
 - **Gated starwave lane** (this document): Claude Code only. The approval gates, sub-agent reviews, and skills below are not ported to other tools.
-- **PRD lane**: toolset-agnostic. Works in Claude Code (the `prd` and `engage` skills), VS Code Copilot (the same skills via the shared `~/.claude/skills` link), the cloud coding agent (via the assets `scripts/align.py` seeds into a repo), and orbit as a headless local executor.
+- **PRD authoring**: toolset-agnostic. Works in Claude Code (the `prd` skill), VS Code Copilot (the same skills via the shared `~/.claude/skills` link), the cloud coding agent (via the assets `scripts/align.py` seeds into a repo), and orbit as a headless local executor.
 
-### The PRD Lane
+### PRDs
 
-When work should run to completion without approval gates, skip starwave and use the PRD lane: `/prd` authors a single PRD (`specs/{prd-name}/prd.md`, one PRD per repository) and `/engage` derives rune task files per application/code context and executes them in parallel worktrees. See `claude/skills/prd/SKILL.md` and `claude/skills/engage/SKILL.md` for the details. The rest of this document describes the gated starwave lane.
-
-## Transit Tickets
-
-Work in either lane can be tracked as a Transit ticket (`T-<id>`). Each repository maps to one Transit project, and the workflow skills move the ticket through Transit's statuses as the work progresses — from `idea` capture through `planning`, `spec`, implementation, and review, with comments on every transition. The full lifecycle table (status → stage → driving skill → trigger), the branch and commit conventions, and the opt-in rule live in `docs/agent-notes/transit-integration.md`. The `/transit` skill routes a ticket to the right workflow by its task type.
+For a small project or a first MVP, skip starwave and use `/prd`: it authors a single standalone PRD (`specs/{prd-name}/prd.md`, one PRD per repository) describing the whole system, and ends there. There is no execution step — nothing derives a task file from a PRD — so work that must react to change or growing complexity belongs in the chain below. See `claude/skills/prd/SKILL.md` for the details. The rest of this document describes the gated starwave lane.
 
 ## Getting Started
 

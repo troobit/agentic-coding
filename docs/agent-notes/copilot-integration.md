@@ -15,7 +15,7 @@ Facts verified against live docs/issues during the toolset-agnostic-starwave spe
 ## Executors
 
 - orbit: public, `go install github.com/arjenschwarz/orbit/cmd/orbit@latest`; auto-detects tasks file from branch; `.orbit/run.lock` is per checkout, so parallel orbit runs need one worktree each.
-- make-it-so stream branches (`stream/<phase>-<N>`) are repo-global — parallel multi-context execution must context-qualify names (see engage skill design).
+- make-it-so stream branches (`stream/<phase>-<N>`) are repo-global — parallel multi-context execution must context-qualify names.
 
 ## Session tooling state (2026-07-04)
 

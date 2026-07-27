@@ -30,9 +30,6 @@ Keep notes factual and concise. Organise by topic or module (e.g., `auth.md`, `a
 
 # Project Conventions
 
-- References in the form `T-<id>` are Transit tickets. Transit is the project tracker; query and update tickets through its MCP server when it is available.
-- When changing a Transit ticket's status, ALWAYS add a comment explaining why the status was changed (e.g., "Moving to spec — scope assessment approved", "Marking done — all tasks implemented and tests passing").
-- Each repository maps to exactly one Transit project. The project name defaults to the repository name; a repository can override this with the optional `transit_project` field in its `.agentic.json`.
 - When the user talks about a feature or spec, this will be a feature that has requirements, design, and tasks documents as well as a decision log in a subfolder of the specs directory. The feature's name will be that of the subfolder. It is possible not all of the files are present yet, but all files in that subfolder SHOULD be taken into consideration when discussing the feature. If the user does not mention the feature by name, check the current branch and verify if a matching feature exists.
 - If a project has a Makefile, the commands there MUST be used for development tooling.
 

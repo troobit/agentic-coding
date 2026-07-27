@@ -16,11 +16,6 @@ When managing tasks, prefer the rune skill over calling the CLI directly.
 
 - If `.claude/scripts/README.md` exists in the project, you SHOULD use the tools mentioned in there for their intended purposes.
 
-# Transit (Claude Specifics)
-
-- Query and update Transit tickets with the `mcp__transit__*` tools: `mcp__transit__query_tasks`, `mcp__transit__update_task_status` (identify tasks by `displayId`, the numeric part of the T-number), and `mcp__transit__create_task`.
-- Use the `transit` skill to route a `T-<id>` ticket to the appropriate workflow; the target skill owns the status transitions from there.
-
 # Decision Log Format Reference
 
 When creating or updating decision log entries, follow the format in `rules/references/decision-log-format.md`. Read the format file before creating entries.

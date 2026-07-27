@@ -168,7 +168,6 @@ Before presenting to user, the model MUST verify:
 **4. Review Phase:**
 - Present the smolspec document to the user (after design-critic review, incorporation, and self-review)
 - Ask "Does this smolspec look good?"
-- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
 - Make modifications based on user feedback
 - A revision pass that changes the spec's direction MUST mark the discarded design's sections superseded **in the same edit** — annotate, don't delete. Two mutually exclusive designs coexisting in one smolspec without supersession markers is exactly the drift the spec-janitor flags (spec-conventions `SJ-SUP-002`)
 - Repeat until explicit approval is received
@@ -193,7 +192,6 @@ Before presenting to user, the model MUST verify:
   - [ ] No coherent change is fragmented across trivial substeps (setup/implement/wire)
   - [ ] No task implements or prepares for anything listed in the smolspec's Out of Scope section
 - Ask "Do these tasks look good?"
-- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
 - Make modifications if needed and repeat until explicit approval
 
 ## Additional Constraints

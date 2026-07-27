@@ -63,7 +63,7 @@ repo-relative path under `specs/`.
 A folder recognized as a full, smol, or PRD-lane spec MUST contain its mode's
 task file: `tasks.md`, or one or more `tasks-<context>.md` files for
 multi-context specs. Bugfix entries need no task file. Task authoring belongs
-to the tasks/engage workflows, so the janitor reports the gap and proposes a
+to the tasks workflow, so the janitor reports the gap and proposes a
 follow-up rather than generating tasks.
 
 ### SJ-MODE-003 — bugfix entry does not match the report shape

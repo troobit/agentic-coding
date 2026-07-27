@@ -7,18 +7,6 @@ description: Systematic bug investigation, resolution, and documentation. Use wh
 
 Fix bugs systematically while ensuring proper test coverage and documentation. Simple bugs are fixed directly; complex bugs get multiple competing implementations to find the best solution.
 
-## Transit Integration
-
-If a `T-[number]` ticket is mentioned (e.g., `T-42`), track it throughout the workflow:
-- Extract the display ID from the reference
-- Automatically create a branch named `T-{number}/bugfix-{bug-name}` (no user prompt needed)
-- Move the ticket to `in-progress` status after branch creation. Add a comment: "Starting bugfix — investigating on branch T-{number}/bugfix-{bug-name}"
-- Move the ticket to `ready-for-review` status after the PR is created. Add a comment: "Fix ready for review — PR #{pr-number}"
-
-Use `mcp__transit__update_task_status` with the display ID to update status. Always include a comment when changing status.
-
-If no Transit ticket is mentioned, skip all Transit-related steps.
-
 ## Workflow
 
 ### 1. Bug Name
@@ -27,9 +15,7 @@ Determine a concise, descriptive bug name (kebab-case) for the report directory.
 
 ### 2. Branch Creation
 
-**When a Transit ticket is present:** If the current branch already matches `T-{number}/bugfix-*` (e.g., in a worktree), skip branch creation. Otherwise, automatically create a branch named `T-{number}/bugfix-{bug-name}` and switch to it. Do not ask for permission. Move the ticket to `in-progress` status.
-
-**When no Transit ticket is present:** Use AskUserQuestion to offer branch naming options:
+If the current branch already matches `bugfix-*` or `bugfix/*` (e.g., in a worktree), skip branch creation. Otherwise use AskUserQuestion to offer branch naming options:
 - `bugfix/{bug-name}` - Standard bugfix branch
 - Skip branch creation
 
@@ -238,19 +224,16 @@ Review and update any affected documentation:
 
 Update `specs/bugfixes/<bug-name>/report.md` — fill in the Resolution section now that the fix is implemented. If the complex path was used, reference the solution comparison report.
 
-### 12. Commit and PR (Transit bugs only)
+### 12. Commit and PR (only when asked)
 
-When a Transit ticket is present, after all checks pass:
+Do not commit or create a PR unless the user asks. When they do, after all checks pass:
 1. Commit all changes using the `/commit` skill
 2. Push the branch to the remote
 3. Create a PR using `gh pr create` with:
-   - Title: `Fix T-{number}: {bug-name-in-title-case}`
+   - Title: `Fix: {bug-name-in-title-case}`
    - Body: Summary of the bug, root cause, and fix (reference the bugfix report)
-4. Move the Transit ticket to `ready-for-review` status. Add a comment with the PR URL.
 
-When no Transit ticket is present, do not commit or create a PR unless asked.
-
-### 13. Automated Review Fix (Transit bugs only)
+### 13. Automated Review Fix (only when a PR was created)
 
 After the PR is created, wait 10 minutes for CI checks and automated reviews to come in, then run the `/pr-review-fixer` skill to address any feedback from the first round automatically.
 
@@ -262,5 +245,4 @@ Upon completion:
 3. Full test suite passes
 4. Report exists at `specs/bugfixes/<bug-name>/report.md`
 5. If complex path was used: comparison report at `specs/bugfixes/<bug-name>/solution-comparison.md`
-6. If a Transit ticket was tracked: changes committed, PR created, first review round addressed, ticket moved to `ready-for-review`
-7. If no Transit ticket: code is ready for commit (do not commit unless asked)
+6. Code is ready for commit (do not commit unless asked); if a PR was requested, it is created and the first review round is addressed

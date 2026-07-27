@@ -166,7 +166,6 @@ If any check fails, the model MUST fix the issue and re-run the checks before pr
 
 **Approval Workflow:**
 - After updating the tasks document, the model MUST ask the user "Do the tasks look good?"
-- The **default action** at this gate is `/sendit`. Offer it as the recommended choice (alongside approving now to continue, or requesting changes inline): `/sendit` copies the spec docs to the user's Prism review folder and closes out the session so the user can review the document at their leisure. If the user picks `/sendit`, invoke the sendit skill and stop.
 - The model MUST make modifications to the tasks document if the user requests changes or does not explicitly approve
 - The model MUST ask for explicit approval after every iteration of edits to the tasks document
 - The model MUST NOT consider the workflow complete until receiving clear approval (such as "yes", "approved", "looks good", etc.)

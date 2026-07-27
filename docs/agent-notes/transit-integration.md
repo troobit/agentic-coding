@@ -1,5 +1,22 @@
 # Transit Integration
 
+> **Status: not in use on this branch (as of 2026-07-27).** The Transit skill and
+> the ticket-tracking instructions were removed from the workflow skills and from
+> `shared/conventions.md` — the overhead was not justified while no `T-<id>`
+> tickets are being raised. Transit is expected to return; this note is kept as
+> the blueprint for re-enabling it. The MCP server definition in
+> `mcp/servers.json` and the optional `transit_project` field in `.agentic.json`
+> were deliberately left in place, so restoring the integration means re-adding
+> the skill and the convention text, not rebuilding the plumbing.
+>
+> Still Transit-coupled and therefore dormant: `claude/skills/bug-blitz/` and
+> `claude/skills/blitz-merge/`, which source their bug list from Transit.
+> `/nextup` no longer routes to them.
+>
+> Note: the `/engage` rows in the tables below are obsolete regardless of
+> Transit. That skill was deleted outright when the PRD lane was cut back to
+> standalone authoring; it is not coming back with Transit.
+
 Transit is the project tracker, accessed over its MCP server. Tickets use the
 `T-<id>` format (e.g. T-42); the numeric part is the `displayId` used by the MCP
 tools. Transit tracks **projects** — one per repository (see Cross-repo linking).

@@ -46,9 +46,8 @@ The framework includes Claude Code skills for the complete feature development w
 - **`next-task`** - Execute the next group of tasks from the implementation plan
 - **`make-it-so`** - Implement all remaining tasks from the spec automatically
 
-**PRD Lane Skills (not part of the gated starwave lane):**
-- **`prd`** - Author a single PRD document (`specs/{prd-name}/prd.md`) targeting exactly one repository, written so task files can be derived without returning to the author
-- **`engage`** - Execute a PRD to completion: derive rune task files per application/code context, run the contexts in parallel worktrees via the make-it-so delegation loop, integrate, and report
+**PRD Skill (not part of the gated starwave lane):**
+- **`prd`** - Author a single standalone PRD document (`specs/{prd-name}/prd.md`) targeting exactly one repository, for a small project or a first MVP. Authoring only — there is no execution step
 
 **Utility Skills:**
 - **`catchup`** - Get up to speed on branch changes by analyzing commits and modified files (inspired by [Shrivu Shankar](https://blog.sshh.io/p/how-i-use-every-claude-code-feature))
@@ -71,9 +70,9 @@ Then implement using `/next-task` and commit with `/commit`.
 
 Each phase requires explicit user approval before proceeding to ensure quality and alignment.
 
-### The PRD Lane
+### PRDs
 
-For work that should run to completion without approval gates, use the PRD lane instead: `/prd` writes one PRD for one repository, and `/engage` derives rune task files per application/code context and executes them in parallel worktrees. Orbit can run the derived task files as an alternative local executor (one orbit process per context, each in its own worktree), and the cloud coding agent can execute a PRD directly through its native loop. See [spec-workflow](spec-workflow.md) for the split between the two lanes.
+For a small project or a first MVP, `/prd` writes a single standalone PRD for one repository — one document describing the whole system. It is authoring only and closes out at the document; nothing derives a task file from it. Work that must react to change or growing complexity belongs in the starwave chain instead. See [spec-workflow](spec-workflow.md) for the split.
 
 ## File Structure
 

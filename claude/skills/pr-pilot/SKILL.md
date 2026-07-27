@@ -1,6 +1,6 @@
 ---
 name: pr-pilot
-description: Push a branch, create a PR, iterate on reviews until clean, then squash-merge. Runs /pr-review-fixer in a loop until no blockers/critical/major issues remain, rebases onto latest origin/main, and squash-merges. Works with or without Transit tickets. Use when you want to shepherd a PR from push to merge, e.g. "push and merge this", "get this PR merged", "review-fix-merge loop".
+description: Push a branch, create a PR, iterate on reviews until clean, then squash-merge. Runs /pr-review-fixer in a loop until no blockers/critical/major issues remain, rebases onto latest origin/main, and squash-merges. Use when you want to shepherd a PR from push to merge, e.g. "push and merge this", "get this PR merged", "review-fix-merge loop".
 # model: inherit
 # allowed-tools: Read,Write,Edit,Bash,Grep,Glob,Task
 ---
@@ -14,11 +14,9 @@ Push a branch, create a PR, loop through reviews until clean, then squash-merge.
 The skill works in the current working directory (or a specified worktree path). It needs:
 
 - A branch with committed changes ready to push
-- Optionally a Transit ticket reference (`T-{id}`) for status tracking
 - Optionally an existing PR number (skips push and PR creation)
 
 If invoked with arguments, parse them for:
-- `T-{number}` — Transit ticket to track
 - `#{number}` or a PR number — existing PR to work with
 - A path — working directory override
 
@@ -83,8 +81,6 @@ After the skill completes, evaluate the results:
 
 Cap the loop at 5 iterations. If still not clean after 5 rounds, inform the user and stop. Do not merge.
 
-If a Transit ticket is tracked, add a comment: "Automated review loop did not converge after 5 iterations — manual review needed."
-
 ### 3. Rebase and Merge
 
 #### 3.1 Rebase onto Latest Main
@@ -124,22 +120,11 @@ Then run `/pr-review-fixer` to check for new review comments and CI failures —
 gh pr merge {pr_number} --squash --delete-branch
 ```
 
-### 4. Update Transit Ticket
-
-If a Transit ticket is being tracked, move it to `done`:
-
-```
-mcp__transit__update_task_status(displayId={id}, status="done", comment="Merged via squash-and-merge — PR #{pr_number}", authorName="claude[bot]")
-```
-
-If no Transit ticket is tracked, skip this step.
-
-### 5. Summary
+### 4. Summary
 
 Report the outcome:
 
 ```
 PR #{pr_number} — {MERGED|FAILED}
 - Review rounds: N
-- Transit: T-{id} → done (or N/A)
 ```

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-07-27]
+
+### Removed
+- **`sendit` and `engage` skills deleted; `/prd` cut back to standalone authoring** (decision `toolset-agnostic-starwave` D17). The four starwave approval gates (requirements, design, tasks, smolspec) revert to plain approve-and-continue → design/tasks/make-it-so — the `/sendit` default-action lines were pure insertions, so removing them restores the prior flow exactly. `/prd` now authors `specs/{name}/prd.md` for a small project or first MVP and ends at the document: there is no PRD execution step, nothing derives a task file from a PRD, and `/nextup` does not route an existing `prd.md` onward. Work that must react to change or growing complexity goes through the starwave chain instead. The `act autonomously` flag now only suppresses starwave's gates and auto-dispatches `/make-it-so` on a complete spec. `nextup`, `prd`, `spec-janitor`, `README.md`, `spec-workflow.md`, and the runbooks updated to match
+- **Transit workflow layer removed from this branch** (decision `transit-workflow-integration` D4). Deleted `claude/skills/transit/` and stripped ticket-tracking steps from `fix-bug`, `starwave-creating-spec`, `pr-pilot`, `code-audit`, and `prd`; removed the Transit sections from `shared/conventions.md` and `shared/claude-wrapper.md` so the `T-<id>` conventions no longer generate into every repo's `CLAUDE.md` and Copilot instructions. Inert plumbing deliberately kept: the `transit` entry in `mcp/servers.json`, `transit_project` in `.agentic.json`, and `docs/agent-notes/transit-integration.md` as the restoration blueprint. `bug-blitz` and `blitz-merge` are left intact but dormant — Transit is their bug *source* — and `/nextup`'s light lane now fans a batch of bugs out as parallel `/fix-bug` jobs rather than routing to them
+- `tests/test_sync_compat.py`: `sendit` and `transit` moved out of the `PRE_FEATURE_SKILLS` baseline into a new `RETIRED_SKILLS` list, with a test asserting they are absent and that no skill is both retired and required — so the removals are an asserted expectation rather than a relaxed guardrail
+
 ## [2026-07-26]
 
 ### Fixed

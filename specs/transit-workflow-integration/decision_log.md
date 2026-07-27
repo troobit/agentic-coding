@@ -162,3 +162,86 @@ would be dead weight that fails on every run.
   perfect autonomous runs.
 
 ---
+
+---
+
+## Decision 4: Remove the Transit Workflow Layer, Keep the Plumbing
+
+**Date**: 2026-07-27
+**Status**: accepted
+
+### Context
+
+Decisions 1–3 wired Transit ticket tracking through the workflow: a `/transit`
+routing skill, `T-<id>` status transitions inside `fix-bug`, `starwave-creating-spec`,
+`pr-pilot`, `code-audit` and `prd`, and the `T-<id>` conventions in
+`shared/conventions.md` and `shared/claude-wrapper.md` — the latter generated into
+every repository's `CLAUDE.md` and Copilot instructions, so they loaded into every
+session.
+
+No `T-<id>` tickets are currently being raised. The instructions were therefore
+consuming context in every session and constraining every workflow skill for a
+tracker not in use. Transit is expected to return, so this is a suspension rather
+than an abandonment.
+
+### Decision
+
+Remove the Transit **workflow layer** only: delete `claude/skills/transit/`, strip
+the ticket-tracking steps from the five workflow skills, and remove the Transit
+sections from `shared/conventions.md` and `shared/claude-wrapper.md` (regenerating
+`claude/CLAUDE.md` and the Copilot instructions).
+
+Deliberately **keep** the inert plumbing: the `transit` entry in `mcp/servers.json`
+and the optional `transit_project` key in `.agentic.json`, along with
+`docs/agent-notes/transit-integration.md` as the restoration blueprint.
+
+`bug-blitz` and `blitz-merge` are left untouched with their Transit calls intact —
+Transit is their bug *source*, not an optional tracker. They are dormant, and
+`/nextup` no longer routes to them; a batch of bugs fans out as parallel
+`/fix-bug` jobs instead.
+
+### Rationale
+
+The cost being removed is context and coupling, both of which live entirely in the
+skill instructions and the generated convention text. The MCP server definition and
+the manifest key cost nothing until enabled, and they are pinned by golden-file
+tests in `test_generate.py` — removing them would mean churning those fixtures for
+no benefit and more work to restore later.
+
+Leaving the blitz skills intact rather than rewiring them to GitHub issues keeps
+them faithful to the tracker they will use again, at the cost of two skills that
+cannot run meanwhile. Routing was changed instead so `/nextup` never dispatches to
+a skill that cannot execute.
+
+### Alternatives Considered
+
+- **Remove everything including `mcp/servers.json` and `.agentic.json` plumbing**: Complete removal - Rejected because it requires updating `test_generate.py`'s canonical server list and its golden JSON fixtures, and makes restoration harder, for no context saving
+- **Delete only `claude/skills/transit/`**: Fastest - Rejected because the `T-<id>` conventions would keep loading into every session through the generated `CLAUDE.md`, which is the actual cost
+- **Rewire `bug-blitz` / `blitz-merge` to GitHub issues**: Preserves the batch-fix capability now - Rejected on the user's call: Transit is returning, and rewiring then re-rewiring is churn
+- **Delete `bug-blitz` / `blitz-merge`**: Consistent with removing Transit-dependent surface - Rejected for the same reason; they are dormant, not obsolete
+
+### Consequences
+
+**Positive:**
+- Every session's `CLAUDE.md` drops the Transit conventions
+- Five workflow skills lose their ticket-status branching and read more simply
+- Restoring Transit means re-adding the skill and convention text, not rebuilding plumbing
+- `/nextup` no longer routes to skills that cannot run
+
+**Negative:**
+- `bug-blitz` and `blitz-merge` are unreachable until Transit returns
+- `docs/agent-notes/transit-integration.md` documents an integration that is not currently wired, and its `/engage` rows are permanently obsolete (that skill was deleted — see toolset-agnostic-starwave Decision 17)
+- `mcp/servers.json` advertises a server the workflow no longer uses
+- The removal is branch-local by intent; upstream retains the integration, so the two will diverge until Transit is restored
+
+### Impact
+
+`claude/skills/transit/` deleted. Transit steps removed from `fix-bug`,
+`starwave-creating-spec`, `pr-pilot`, `code-audit`, `prd`. Transit sections removed
+from `shared/conventions.md` and `shared/claude-wrapper.md`; `claude/CLAUDE.md` and
+`copilot/instructions/copilot-instructions.md` regenerated. `transit` added to
+`RETIRED_SKILLS` in `tests/test_sync_compat.py`. `nextup` light-lane routing
+updated. Unchanged: `mcp/servers.json`, `.agentic.json`, `bug-blitz`,
+`blitz-merge`, `test_generate.py`.
+
+---

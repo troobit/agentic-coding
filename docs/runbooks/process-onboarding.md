@@ -67,13 +67,13 @@ from the tracked template.
 
 ## The lanes
 
-`/nextup` routes each session's intent down one of four lanes, preferring the
-lightest that fits. The **direct** lane executes plain instructions inline,
+`/nextup` routes each session's intent to the lightest destination that fits.
+The **direct** lane executes plain instructions inline,
 exactly like any prompt — no spec folder. The **light** lane sends bounded
 jobs to a focused skill (`/fix-bug`, `/starwave:smolspec`, and similar)
-without requirements/design ceremony. The **PRD** lane runs a body of work
-ungated to completion: `/prd` authors `specs/{name}/prd.md`, then `/engage`
-executes it in parallel worktrees. The **gated starwave** lane is the
+without requirements/design ceremony. **`/prd`** authors a standalone
+`specs/{name}/prd.md` for a small project or first MVP and closes out there —
+authoring only, with no execution step. The **gated starwave** lane is the
 spec-driven chain (`/starwave:creating-spec` through requirements, design,
 and tasks, each with an approval gate) recommended for substantial
 feature-shaped work — a recommendation, never an enforcement.

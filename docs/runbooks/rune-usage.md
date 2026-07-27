@@ -9,7 +9,7 @@ file format: `rune list <file>` parses it.
 - **Starwave tasks phase** — the `starwave-tasks` skill (step 3 of the gated
   spec lane) writes `specs/<feature>/tasks.md` after requirements and design
   are approved.
-- **Engage derivation** — `/engage` derives one task file per PRD context
+- **PRD derivation** — one task file per PRD context, when derived by hand
   from `specs/<prd-name>/prd.md`, named `specs/<prd-name>/tasks-<context>.md`
   (e.g. `specs/agreement-invoice-skills/tasks-process-guardrails.md`).
 

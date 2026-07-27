@@ -4,7 +4,7 @@ description: >-
   Parallel code audit combining simplification and design critique analysis.
   Spawns two subagents (code-simplifier and design-critic) to independently
   review the current directory, consolidates findings into a prioritised report,
-  and offers to create Transit tasks for actionable items. Use when you want a
+  and offers to record follow-up tasks for actionable items. Use when you want a
   broad quality review of a codebase, e.g. "audit this code", "review codebase
   quality", "find improvements", "code audit".
 # model: inherit
@@ -68,11 +68,10 @@ Present findings to the user in this format:
 
 Each finding should include: location, description, and suggested action.
 
-### Phase 4: Transit Tasks
+### Phase 4: Follow-Up Tasks
 
-After presenting the report, ask the user if they want Transit tasks created for any findings. If yes:
+After presenting the report, ask the user if they want follow-up tasks recorded for any findings. If yes:
 
 - Create one task per actionable finding (or group related findings into a single task)
-- Use type `chore` for simplification items, `bug` for design issues that could cause problems
 - Include the finding details in the task description
-- Use `mcp__transit__create_task` to create tasks
+- Add them to the relevant feature's rune task file via the `rune` skill

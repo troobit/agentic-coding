@@ -22,17 +22,6 @@ Each phase builds on the previous one and requires explicit user approval before
 
 Every phase of this workflow is specification, not implementation. You MUST NOT edit source files — even when a task looks like "purely a code edit". The deliverables are documents under `specs/{feature_name}/` and the task list, nothing else. Instrumentation, logging, or probes added "to gather information for the spec" count as implementation — record them as tasks instead. Doing the work here forces the user to revert it.
 
-## Transit Integration
-
-If a `T-[number]` ticket is mentioned (e.g., `T-42`), track it throughout the workflow:
-- Extract the display ID from the reference
-- Move the ticket to `spec` status after the scope assessment is approved (before Phase 2 or smolspec starts). Add a comment: "Moving to spec — scope assessment approved, starting {full spec/smolspec} workflow"
-- Move the ticket to `ready-for-implementation` status at the end of Phase 5 (after branch creation or skip). Add a comment: "Ready for implementation — spec complete, tasks defined on branch {branch-name}"
-
-Use `mcp__transit__update_task_status` with the display ID to update status. Always include a comment when changing status.
-
-If no Transit ticket is mentioned, skip all Transit-related steps.
-
 ## Phase 1: Scope Assessment
 
 Before starting the spec workflow, assess the implementation size to determine the appropriate path.
@@ -70,9 +59,8 @@ Use **full spec workflow** (continue to Phase 2) when ANY of these apply:
 2. Present sizing assessment with metrics (estimated LOC, file count, complexity factors)
 3. Recommend either smolspec or full spec workflow
 4. Get user approval for the recommended path
-5. If a Transit ticket is tracked, move it to `spec` status via `mcp__transit__update_task_status`
-6. If smolspec approved: run `/starwave:smolspec`, then continue to Phase 5 (Branch Creation)
-7. If full spec approved: continue to Phase 2
+5. If smolspec approved: run `/starwave:smolspec`, then continue to Phase 5 (Branch Creation)
+6. If full spec approved: continue to Phase 2
 
 ---
 
@@ -112,16 +100,14 @@ After tasks are approved (or after smolspec completion), offer to create a featu
 **Process:**
 1. Use the AskUserQuestion tool to offer branch naming options
 2. Include these options:
-   - `T-{number}/{spec-name}` - When a Transit ticket is tracked (recommended)
    - `feature/{spec-name}` - Standard feature branch
    - `specs/{spec-name}` - Spec-focused branch
-   - `{ticket-number}/{spec-name}` - If a non-Transit ticket number was mentioned (e.g., ABC-123)
+   - `{ticket-number}/{spec-name}` - If a ticket number was mentioned (e.g., ABC-123)
    - Allow user to provide a custom branch name
 3. If the user approves, create the branch and switch to it
 4. If the user declines, skip branch creation
-5. If a Transit ticket is tracked, move it to `ready-for-implementation` status via `mcp__transit__update_task_status`
 
-**Note:** Only offer ticket-based branch names if a ticket was explicitly mentioned during the conversation. The Transit option should be listed first (as recommended) when a Transit ticket is present.
+**Note:** Only offer ticket-based branch names if a ticket was explicitly mentioned during the conversation.
 
 ---
 

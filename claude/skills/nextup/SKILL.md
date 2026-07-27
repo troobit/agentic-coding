@@ -1,13 +1,13 @@
 ---
 name: nextup
-description: The universal entry point for a session. Reads the nextup.md user zone, works out where you are, and routes each job to the right next step — execute the user's instructions directly, run a PRD to completion via engage, honour an act-autonomously flag, resume a spec phase, start a fresh spec, send a small job straight to a focused skill, fan several independent small jobs out to parallel sub-agents, recommend implementation, or close out the session. Use when the user says "/nextup", "run nextup", "what's next", "pick up where we left off", "close out", "wrap up", or starts a session without saying which command to run.
+description: The universal entry point for a session. Reads the nextup.md user zone, works out where you are, and routes each job to the right next step — execute the user's instructions directly, author a standalone PRD, honour an act-autonomously flag, resume a spec phase, start a fresh spec, send a small job straight to a focused skill, fan several independent small jobs out to parallel sub-agents, recommend implementation, or close out the session. Use when the user says "/nextup", "run nextup", "what's next", "pick up where we left off", "close out", "wrap up", or starts a session without saying which command to run.
 ---
 
 # Nextup — a pure router
 
 `/nextup` is the front door to a session: the user thinks outside Claude, writes instructions into `nextup.md`, and enters — the user zone is arbitrary instructions, treated like any prompt. `/nextup` routes: read the intent, pick the lane and the skill, dispatch. It keeps **no status record of its own** — the files in `specs/`, rune task lists, and `docs/agent-notes/` are the only record of progress, and anything the router itself learns or produces is said in plain English in this conversation. Run it from any branch, at any time; the branch is one signal for finding your feature, never a gate. The user has to be able to trust the routing blind, so every dispatch names the lane, the skill, and the one signal that decided it.
 
-`/nextup` is the **boundary** between the gated and ungated worlds. On one side is heavyweight, spec-driven development — the `/starwave` chain, with its approval gates. On the other is everything ungated: direct execution of whatever the user wrote, lighter focused skills (fix a bug, make a small change, improve an existing file), and the PRD lane (`/prd` → `/engage`) that runs a body of work to completion without gates. Weigh the intent and send it down the right lane, preferring the lightest that genuinely fits; the gated lane is a recommendation for feature-shaped work, never an enforcement. The audience is often **non-technical**: every message you show the user is plain English — where they are and what happens next, no jargon.
+`/nextup` is the **boundary** between the gated and ungated worlds. On one side is heavyweight, spec-driven development — the `/starwave` chain, with its approval gates. On the other is everything ungated: direct execution of whatever the user wrote, lighter focused skills (fix a bug, make a small change, improve an existing file), and `/prd`, which authors a standalone PRD document for a small project or a first MVP. Weigh the intent and send it down the right lane, preferring the lightest that genuinely fits; the gated lane is a recommendation for feature-shaped work, never an enforcement. The audience is often **non-technical**: every message you show the user is plain English — where they are and what happens next, no jargon.
 
 ## `nextup.md`
 
@@ -45,14 +45,12 @@ A missing `nextup.md` never blocks — seed it and carry on. An empty user zone 
 In priority order:
 
 1. **Explicit reference in the user zone wins.** If the user names a spec folder (`specs/foo/...`, `specs/bugfixes/baz/...`), that is the feature — read every file in it before deciding.
-2. **Branch.** Run `git rev-parse --abbrev-ref HEAD`; if the name maps to an existing `specs/<name>` folder (stripping any `specs/` or `T-<n>/` prefix), that is the feature.
+2. **Branch.** Run `git rev-parse --abbrev-ref HEAD`; if the name maps to an existing `specs/<name>` folder (stripping any `specs/` prefix), that is the feature.
 3. **Fresh idea.** If nothing matches, treat the user-zone text as a fresh idea — step 5 picks the lane. The first spec of a project is conventionally the **MVP** (`specs/mvp/`), the smallest first version. A stub-only `specs/mvp/` gives the name but no intent: if the user zone describes the MVP, dispatch `/starwave:creating-spec` and pass it through; if the user zone is also empty, ask for the MVP first.
 
 ### 3. Read the true state
 
-The files in `specs/{feature}/` are the source of truth for how far the work has got. Read what is present. A `prd.md` in the folder marks the work as PRD-lane — step 5 routes it to `/engage`. If `decision_log.md` exists, read it and mention you did.
-
-**After a `/sendit` handoff:** when the previous session ended with `/sendit` shipping spec docs for review and this run's user zone carries no change requests, that **counts as approval** of the documents that were sent — continue to the next phase. No review state is stored anywhere; the user zone is the whole signal.
+The files in `specs/{feature}/` are the source of truth for how far the work has got. Read what is present. A `prd.md` in the folder means the work was framed as a standalone PRD rather than a spec — see step 5. If `decision_log.md` exists, read it and mention you did.
 
 ### 4. Honour explicit skill directives
 
@@ -64,11 +62,11 @@ Pick a **lane** by the weight of the intent, then route within it. Don't push a 
 
 **Direct lane — instructions that don't call for spec work.** Most user-zone text is just instructions: run this, update that, investigate the other. Execute or dispatch them exactly as you would any prompt — no spec folder, no starwave routing. This is the one lane where you may do the work inline yourself.
 
-**PRD lane — a written PRD runs ungated to completion.** When the user zone references a PRD, or `specs/{name}/prd.md` exists for the named work, route it to `/engage`. When the user zone asks for a PRD that doesn't exist yet, route to `/prd` to author it.
+**`/prd` — a standalone document, not a lane.** When the user zone asks for a PRD, route to `/prd`; it authors `specs/{name}/prd.md` and closes out there. A PRD suits a small project or a first MVP, where one document can describe a whole system. It has no execution step of its own: nothing derives a task file from it, so do not route an existing `prd.md` onward to `/make-it-so`. Work that must react to change or growing complexity belongs in the spec lane instead.
 
-**The autonomy flag.** A user-zone line reading `act autonomously` (canonical; treat obvious variants like `autonomous: true` the same) flips the preference to the ungated lane end-to-end, because approval gates block fanning out parallel development attempts. With the flag set: feature-shaped work goes down the PRD lane — derive `specs/{name}/prd.md` from the user-zone text via `/prd` with no review pauses (the user zone stands in for the clarifying answers), then execute via `/engage`, one dispatch carrying both steps — and a complete gated spec dispatches straight to `/make-it-so` instead of stopping at a recommendation. No approval gates anywhere: the flag is the user's sign-off in writing. Route into the gated lane only when the user zone explicitly demands a spec.
+**The autonomy flag.** A user-zone line reading `act autonomously` (canonical; treat obvious variants like `autonomous: true` the same) flips the preference to the ungated lane end-to-end, because approval gates block fanning out parallel development attempts. With the flag set: the starwave chain runs without pausing at its approval gates (the user zone stands in for the answers), and a complete spec dispatches straight to `/make-it-so` instead of stopping at a recommendation. No approval gates anywhere: the flag is the user's sign-off in writing. Route into the gated lane only when the user zone explicitly demands a spec.
 
-For work that isn't plain instructions or a PRD, weigh intent by concrete signals, not vibes:
+For work that isn't plain instructions or a PRD request, weigh intent by concrete signals, not vibes:
 
 - **Light signals:** names an existing file or a specific defect; verbs like fix, tweak, rename, adjust, clean up; bounded to a few files; adds no new capability.
 - **Spec signals:** a new capability or feature; several components touched; open design decisions or trade-offs; words like build, MVP, feature.
@@ -79,10 +77,12 @@ For work that isn't plain instructions or a PRD, weigh intent by concrete signal
 | Intent | Route to |
 |---|---|
 | A specific bug to fix | `/fix-bug` |
-| "Fix all the bugs" / a batch of open bugs | `/bug-blitz` (or `/blitz-merge` to fix and merge) |
+| "Fix all the bugs" / a batch of open bugs | `/fix-bug` per bug — fan them out per §5b |
 | A minor change, or an iterative improvement to an existing file | `/starwave:smolspec` |
 
 Iterative, in-place improvements to something that already exists stay in the light lane. If you're unsure whether a change is "minor", start at `/starwave:smolspec` — it escalates to a full spec when the work turns out bigger than it looked.
+
+**Note on the blitz skills.** `/bug-blitz` and `/blitz-merge` draw their bug list from Transit, which is not in use on this branch. Do not route to them until Transit is re-enabled; until then a batch of bugs fans out as parallel `/fix-bug` jobs.
 
 **Spec lane — substantial features are recommended into the starwave chain.** Route by the earliest unmet need:
 
@@ -94,7 +94,7 @@ Iterative, in-place improvements to something that already exists stay in the li
 | `smolspec.md`, no `tasks.md` | `/starwave:tasks` |
 | spec complete (`requirements.md` + `design.md` + `tasks.md`, or `smolspec.md` + `tasks.md`) | **Recommend implementation** (below) |
 
-**When the spec is complete**, tell the user in plain English that it's ready and recommend `/make-it-so` to build all tasks, or `/next-task` to do them one at a time. Recommend; do not invoke — execution is the user's call. (With the autonomy flag set, that call is already in writing: dispatch `/make-it-so` instead of stopping.) If the user zone carries a `T-<number>` ticket, pass it through to the dispatched skill so its Transit integration can move the ticket — do not call `mcp__transit__*` yourself.
+**When the spec is complete**, tell the user in plain English that it's ready and recommend `/make-it-so` to build all tasks, or `/next-task` to do them one at a time. Recommend; do not invoke — execution is the user's call. (With the autonomy flag set, that call is already in writing: dispatch `/make-it-so` instead of stopping.)
 
 ### 5b. One job or many?
 
@@ -103,7 +103,7 @@ Split the user zone into **jobs**: independently completable pieces that share n
 - **Unattended-safe jobs** — direct-lane or light-lane work that runs start to finish without stopping to ask the user — fan out in parallel. Spawn one sub-agent per job **in a single message**, each told to invoke that job's routed skill with the job's user-zone text as input. Jobs that mutate files each get an isolated git worktree so parallel commits don't race. You stay on as overseer: wait for all to return, surface any failure plainly instead of masking it, and report every job's outcome in the session's closing message.
 - **Gated jobs** — anything in the spec lane, because requirements and design need user sign-off a sub-agent cannot collect — never go to a sub-agent. Tell the user, before dispatching anything, which gated jobs you are not dispatching — so they can bring them back next run — then route the most important one inline.
 
-A batch of same-shaped bug fixes is not a nextup fan-out — `/bug-blitz` owns that pipeline; route the whole batch there. A job you dispatched belongs to its skill or sub-agent — you don't implement, review, or commit it yourself on top; only a direct-lane job you kept inline is yours to do. Before dispatching, tell the user in one or two plain sentences per job: which job it is, the lane and the skill (or direct execution) you chose, and the deciding signal (a path from the user zone, the branch name, an explicit `/...` directive, the autonomy flag). Then dispatch and **pass the user-zone text as the input** — inline for a single job, via the sub-agent prompts for a fan-out — so the user never retypes their idea. You MUST NOT continue past the dispatch: inline, the routed skill owns the rest of the turn; in a fan-out, your last act is reporting the sub-agents' outcomes. Either way the user returns to `/nextup` next session to pick up again.
+A batch of same-shaped bug fixes fans out here as one `/fix-bug` sub-agent per bug, each in its own worktree — `/bug-blitz` would normally own that pipeline, but it is out of service while Transit is off. A job you dispatched belongs to its skill or sub-agent — you don't implement, review, or commit it yourself on top; only a direct-lane job you kept inline is yours to do. Before dispatching, tell the user in one or two plain sentences per job: which job it is, the lane and the skill (or direct execution) you chose, and the deciding signal (a path from the user zone, the branch name, an explicit `/...` directive, the autonomy flag). Then dispatch and **pass the user-zone text as the input** — inline for a single job, via the sub-agent prompts for a fan-out — so the user never retypes their idea. You MUST NOT continue past the dispatch: inline, the routed skill owns the rest of the turn; in a fan-out, your last act is reporting the sub-agents' outcomes. Either way the user returns to `/nextup` next session to pick up again.
 
 ## Close-out mode
 

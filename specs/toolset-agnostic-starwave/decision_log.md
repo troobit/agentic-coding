@@ -516,3 +516,82 @@ Direct user steering. The spec-driven gates exist to keep a human in the loop, w
 - Nextup's routing rules grow more complex; misreading intent now has an ungated failure mode (mitigated by requiring the explicit flag for autonomy)
 
 ---
+
+---
+
+## Decision 17: Retire `/sendit` and `/engage`; `/prd` Becomes Standalone Authoring
+
+**Date**: 2026-07-27
+**Status**: accepted
+
+### Context
+
+Decision 16 and the surrounding work built two ungated paths on top of the gated
+starwave chain: `/sendit`, offered as the **default action** at all four approval
+gates (requirements, design, tasks, smolspec), which copied spec documents to an
+external Prism review folder and closed the session; and the PRD lane `/prd` →
+`/engage`, where `/engage` derived rune task files per PRD context and executed
+them in parallel worktrees.
+
+In practice `/sendit` was not used — the review-in-Prism round trip it assumed
+did not happen, so making it the recommended choice at every gate added a step
+that reviewers skipped. Separately, the PRD lane overlapped the starwave chain
+without being better at the thing starwave is for: a PRD can describe a whole
+system up front, but it does not react to change or growing complexity the way an
+iterated requirements/design/tasks spec does.
+
+### Decision
+
+Delete the `sendit` and `engage` skills. Restore the four starwave approval gates
+to plain approve-and-continue, flowing to design → tasks → make-it-so as before
+`/sendit` was inserted. Keep `/prd` as a **standalone authoring skill**: it
+produces `specs/{name}/prd.md` for a small project or first MVP and ends at the
+document. There is no PRD execution step, and `/nextup` does not route an
+existing `prd.md` onward.
+
+### Rationale
+
+The gate lines added by the `/sendit` commit were pure insertions, so removing
+them restores the prior flow exactly — the approve-and-continue logic underneath
+them was never modified.
+
+Keeping `/prd` while dropping `/engage` deliberately leaves the PRD without an
+executor. That is the point: a PRD is right when one document can describe a
+whole small system, and wrong when the work must absorb change. Wiring an
+executor back onto it would re-create the overlap with starwave that made the
+lane redundant. Anything needing iteration goes through the spec chain, which is
+built for it.
+
+`/starwave:tasks` was considered as the missing derivation step (it would have
+needed relaxing to accept `prd.md` in place of `requirements.md` + `design.md`)
+and rejected — see Alternatives.
+
+### Alternatives Considered
+
+- **Teach `/starwave:tasks` to accept a `prd.md` as source**: Would have closed the derivation gap with a single edit and kept a working PRD-to-execution path - Rejected because it re-creates the redundant second lane; the PRD is meant to terminate at the document, and a PRD that feeds the task chain is just a worse `requirements.md`
+- **Teach `/make-it-so` to derive a task file when only `prd.md` exists**: Keeps the two-step `/prd` → `/make-it-so` shape - Rejected for the same overlap reason, and it grows the execution skill with authoring concerns
+- **Keep `/sendit` but demote it from default to an offered option**: Less disruptive - Rejected because the skill's premise (an external reviewer reading markdown in Prism) is not how reviews actually happen; an unused option at four gates is still four lines of noise
+- **Keep `/engage` dormant like the blitz skills**: Consistent with the Transit treatment - Rejected because, unlike the blitz skills, `/engage` has no external dependency waiting to return; the lane itself was judged redundant
+
+### Consequences
+
+**Positive:**
+- Approval gates read as they did originally — approve and continue, no third path
+- One execution route (`/make-it-so` / `/next-task` over a rune ledger) instead of two competing ones
+- `/prd` has a sharp, honest boundary: whole-system description for small work, no implied automation
+- Four skills' gate boilerplate and the router's lane logic get shorter
+
+**Negative:**
+- Ungated end-to-end execution from a PRD is gone; a PRD's tasks must be derived by hand or via the spec chain
+- The `act autonomously` flag now only suppresses starwave's gates and auto-dispatches `/make-it-so` on a complete spec — it no longer has a PRD path
+- Historical specs and CHANGELOG entries still reference both skills; they are left as written since they record what was true then
+
+### Impact
+
+`claude/skills/{sendit,engage}/` deleted. Gate lines removed from
+`starwave-{requirements,design,tasks,smolspec}`. `nextup` rewritten around
+`/prd`-as-document. `prd` reframed as authoring-only. `spec-janitor`,
+`README.md`, `spec-workflow.md`, and the runbooks updated. `sendit` added to
+`RETIRED_SKILLS` in `tests/test_sync_compat.py`.
+
+---
