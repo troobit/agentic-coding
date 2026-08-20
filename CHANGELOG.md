@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-08-20]
+
+### Added
+- **Spout skill** (`/spout`): An orientation tool that reads the repo and reports a single `SPOUT.md` at the root, answering three questions — what state is every spec in, what are the discrete next steps with exact invocations and goals, and where new uncovered work belongs. Produces a person-readable document (prose, tables, lists) that serves as a summation before acting; runs read-only over the repo and never dispatches work itself. Operates outside the spec workflow but is aware of it, defaulting uncovered work to starwave when a spec is needed and naming exceptions explicitly. Can be scoped to a single spec or focused on a goal (`/spout "<intent>"`); chains `/explain-like` for ambiguities
+
+### Changed
+- **Language rules**: Added Python language rules documenting a gotcha with `@dataclass(frozen=True, slots=True)` and Svelte 5 language rules covering reactivity effects, SvelteKit server exports, and testing gotchas (CSS imports in jsdom, Web Storage on Node ≥22, effect compilation in node environment)
+- **README.md**: Documented the spout skill under a new "Orientation Skill" section, clarifying that it sits alongside the spec workflow as a read-only guidance tool
+- **.gitignore**: Added `SPOUT.md` as a generated scratch report (stale as soon as HEAD moves)
+
 ## [2026-07-27]
 
 ### Removed

@@ -33,7 +33,7 @@ The framework provides specialized AI agents for different aspects of developmen
 
 ## Skills
 
-The framework includes Claude Code skills for the complete feature development workflow (detailed in [spec-workflow](spec-workflow.md)):
+The framework includes Claude Code skills for the complete feature development workflow (detailed in [spec-workflow](spec-workflow.md)), plus skills that sit alongside that workflow rather than inside it:
 
 **Starwave Skills (Spec-Driven Development):**
 - **`starwave:creating-spec`** - Main entry point that orchestrates the complete spec-driven workflow. Assesses scope, routes to appropriate workflow, and guides through all phases with built-in review gates.
@@ -48,6 +48,11 @@ The framework includes Claude Code skills for the complete feature development w
 
 **PRD Skill (not part of the gated starwave lane):**
 - **`prd`** - Author a single standalone PRD document (`specs/{prd-name}/prd.md`) targeting exactly one repository, for a small project or a first MVP. Authoring only — there is no execution step
+
+**Orientation Skill (outside the spec workflow, but aware of it):**
+- **`spout`** - Summarise the lay of the land and write it to a single `SPOUT.md` at the repo root: what state each spec is in, the discrete next steps with the exact command and the goal each serves, and where uncovered work belongs — an existing spec, a new spec, or (with a named reason) neither. Read-only; it reports and guides, never dispatches or edits
+
+  Complex codebases outrun anyone's working memory — the code areas, the drivers behind them, and the reasons a thing is half-finished need summarising for experts and newcomers alike. `/spout` produces that summation on demand, written for a person to read and act on. Invoke it bare for the general picture, or with an intent (`/spout "ship the estimation rework"`) to have every step reported against that goal. It knows the starwave process and defaults to it when guiding new work, but it is not a stage of it: run it at any time, on any branch, without starting or advancing a spec.
 
 **Utility Skills:**
 - **`catchup`** - Get up to speed on branch changes by analyzing commits and modified files (inspired by [Shrivu Shankar](https://blog.sshh.io/p/how-i-use-every-claude-code-feature))

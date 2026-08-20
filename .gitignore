@@ -3,4 +3,6 @@ __pycache__/
 # Local working file for /nextup (template is nextup.example.md).
 # Anchored to the repo root so align test fixtures can track a nextup.md.
 /nextup.md
+# Regenerated scratch report from /spout; stale as soon as HEAD moves.
+/SPOUT.md
 *.pyc
