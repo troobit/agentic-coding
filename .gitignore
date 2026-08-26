@@ -6,3 +6,4 @@ __pycache__/
 # Regenerated scratch report from /spout; stale as soon as HEAD moves.
 /SPOUT.md
 *.pyc
+.worktrees/*

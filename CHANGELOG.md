@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Backlog skill specification** (`specs/backlog-skill/`): Complete specification for the `/backlog` skill that consolidates and replaces the sunset `nextup` and `spout` skills. Captures ideas, loose notes, and audit findings into a tracked, rune-parseable `specs/BACKLOG.md`, routes items to existing spec tasks, requirement amendments, or the backlog, and enables automated sunset of retired skills with decision_mode configuration for overwrite-vs-supersede decision log behavior
+  - **requirements.md**: Five acceptance-criterion groups (AC 1–6) covering capture mechanics, routing rules, BACKLOG.md contract with rune-strict schema, source file cleanup, decision_mode configuration, and complete sunset of nextup/spout toolchain
+  - **design.md**: Skill workflow (preflight, reconcile, gather, route, file, clear phases), BACKLOG.md data model (rune-strict H1/H2 phases with detail-line grammar), decision_mode plumbing across conventions and per-skill edits (spec-janitor, make-it-so, next-task), hybrid schema check in process_status.py, and comprehensive reference audit for sunset requirement
+  - **decision_log.md**: 12-entry decision log covering skill scope, spec-named vs backlog-filed items, reconciliation triggers, single-vs-multi-file tasks, schema stability, decision ID preservation across rewrites, transit-integration timing, and superseding-vs-overwrite modes (Decision 14)
+  - **rollout.md**: Post-build per-repo administration (enrollment, decision_mode configuration, `/backlog` migration run, residual cleanup, process-status verification, Codex toolchain refresh)
+  - **tasks.md**: 18 rune-managed implementation tasks with stream assignments and blocked-by dependencies encoding the required commit ordering (skill commit → sunset commit)
+
+- **Orbit integration**: `.orbit.yaml` configuration file enabling backlog-skill distribution via the Codex toolchain
+
+- **Specs overview update**: `specs/OVERVIEW.md` with backlog-skill spec entry and status tracking
+
+### Changed
+- **.gitignore**: Added `.worktrees/*` for git worktree isolation pattern used by parallel execution skills
+
 ## [2026-08-26]
 
 ### Added

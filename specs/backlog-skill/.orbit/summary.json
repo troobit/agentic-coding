@@ -1,0 +1,10 @@
+{
+  "started_at": "2026-08-26T23:28:43.40117+10:00",
+  "status": "running",
+  "phases_completed": 0,
+  "total_cost_usd": 0,
+  "total_duration_ms": 0,
+  "sessions": [],
+  "run_number": 1,
+  "branch_name": "specs/backlog-skill"
+}

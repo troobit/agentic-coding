@@ -9,6 +9,7 @@
 | [Fiscal Probe Skill](#fiscal-probe-skill) | 2026-07-23 | Done | Financial-document probe skill producing reports where every claim carries a source reference |
 | [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth. Supersedes the machine-zone portions of Nextup Starwave Refinement. |
 | [Spec Janitor](#spec-janitor) | 2026-07-26 | Done | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
+| [Backlog Skill](#backlog-skill) | 2026-08-26 | Planned | A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources; includes the full toolchain sunset and a per-repo decision overwrite mode |
 
 ---
 
@@ -70,3 +71,13 @@ Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical au
 - [design.md](spec-janitor/design.md)
 - [requirements.md](spec-janitor/requirements.md)
 - [tasks.md](spec-janitor/tasks.md)
+
+## Backlog Skill
+
+A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources. Includes the full toolchain sunset (align seeding, process-status columns, sync prune, tests and fixtures, documentation) and a per-repo `decision_mode` convention read from `.agentic.json`. Rollout administration is deliberately role-based in the committed documents.
+
+- [decision_log.md](backlog-skill/decision_log.md)
+- [design.md](backlog-skill/design.md)
+- [requirements.md](backlog-skill/requirements.md)
+- [rollout.md](backlog-skill/rollout.md)
+- [tasks.md](backlog-skill/tasks.md)
