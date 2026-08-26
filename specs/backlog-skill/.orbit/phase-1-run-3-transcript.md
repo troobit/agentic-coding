@@ -1,0 +1,4608 @@
+# Phase 1 Session Transcript
+
+**Session ID:** `1dac717f-390f-46a3-9c2e-26471586109f`
+
+---
+
+## 👤 User · 2026-08-26T23:33:30+10:00
+
+Run /next-task --phase and when complete run /commit
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:33:34+10:00
+
+<details>
+<summary>🔧 Skill: next-task</summary>
+
+Base directory for this skill: /Users/r/.claude/skills/next-task
+
+### 4. Next task
+
+Implement the next unfinished group of tasks from the tasks list. A group of tasks is a set of tasks that start with the same number like 1.1, 1.2, but NOT 2.1.
+
+**Constraints:**
+
+**Task Retrieval:**
+- When no explicit tasks file path was given and more than one spec has an incomplete `tasks.md`, list the candidates and ask the user to confirm — NEVER guess
+- The model MUST use the rune skill to retrieve the next task(s) to work on
+- Use `rune next --format json` to get the next incomplete task. This command will indicate when all tasks are complete
+- If the user asks for the entire phase, use `rune next --phase --format json`
+- If the retrieved result contains only a single top-level task (without subtasks like "1" instead of "1.1"), rerun with `rune next --phase --format json` to retrieve the full phase of tasks
+
+**Stream Detection for Parallel Execution:**
+- When retrieving a phase, the model MUST check for multiple work streams using `rune streams --available --json`
+- If multiple streams have ready tasks, parallel execution is possible
+- If only one stream has ready tasks, sequential execution within that stream is used
+
+**Task Execution:**
+- The model MUST read all files referenced in the front_matter_references
+- The selected tasks MUST be added to the internal TODO list for tracking and implemented in the order specified
+- The model MUST implement all of the selected tasks, including all subtasks
+- Once a subtask or task is completed, use the rune skill to mark it complete (e.g., `rune complete specs/{feature}/tasks.md 1.1`)
+- The model MUST NOT proceed past the selected task. Once a task is done, it needs to be put up for review by the user
+- Use tools and skills as appropriate while implementing the task. For example, if you need to know the capabilities of a library, use context7, and if you want to verify your code is efficient, use the efficiency-optimizer skill
+
+**Mid-Implementation Spec Edits:**
+Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`).
+
+**Parallel Execution with Multiple Streams:**
+When a phase is pulled in and multiple streams have ready tasks:
+1. The model MUST use `rune streams --available --json` to identify streams with ready work
+2. If there are 2 or more streams with ready tasks:
+   - The model SHOULD spawn subagents (using the Task tool) to handle each stream in parallel
+   - Each subagent receives instructions to:
+     - Retrieve all phase tasks for their stream using `rune next --phase --stream N --format json`
+     - Read all referenced files from front_matter_references
+     - Implement the tasks in dependency order
+     - Mark tasks complete as they finish using `rune complete <tasks-file-path> <task-id>`
+     - Report back when all tasks in the stream are done or blocked
+   - The main agent coordinates by:
+     - Monitoring subagent progress
+     - Handling any cross-stream dependencies that become unblocked
+     - Aggregating results for user review
+3. If there is only 1 stream with ready tasks:
+   - Execute tasks sequentially within that stream as normal
+   - No subagents are needed
+
+**Subagent Instructions Template:**
+When spawning a subagent for a stream, provide these instructions:
+- Stream number to work on
+- Path to the tasks file
+- List of front_matter_references to read
+- Instruction to use `rune next --phase --stream N --format json` to retrieve all tasks for the stream
+- Instruction to mark tasks complete using `rune complete <tasks-file-path> <task-id>`
+- Instruction to stop when all tasks in the stream are complete or blocked by tasks in other streams
+
+**Cross-Stream Coordination:**
+- When a subagent completes a task that unblocks tasks in another stream, that stream's agent will pick up the newly unblocked work on their next `rune next --phase --stream N` call
+- If all streams become blocked waiting on each other, this indicates a circular dependency problem that should be reported to the user
+- The main agent should periodically check `rune streams --json` to monitor overall progress
+
+**Headless Runs (no human present):**
+When running non-interactively — e.g. driven by an external runner rather than a live user:
+- The model MUST NEVER call AskUserQuestion; there is no one to answer and the questions are dismissed unanswered
+- If the next task is blocked, requires user approval, or there is nothing left to do: write `.orbit/halt` in the repo root containing a one-line reason, print `ORBIT-HALT: <reason>` as the final line of output, then stop
+- Keep the sentinel file name (`.orbit/halt`) and output prefix (`ORBIT-HALT:`) exactly as written — external tooling matches on them
+
+**Specs Overview Update:**
+- After completing all tasks in the current group, check if `specs/OVERVIEW.md` exists in the project
+- If it exists, run `/specs-overview` once to regenerate it — it derives spec statuses and file lists from the tree. Never hand-edit `OVERVIEW.md`
+
+
+ARGUMENTS: --phase
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: List backlog-skill spec dir and find task files</summary>
+
+**Command:**
+```bash
+ls specs/backlog-skill/ 2>/dev/null && echo "---" && find specs -maxdepth 2 -name "tasks*.md" 2>/dev/null
+```
+
+**Result:**
+```
+decision_log.md
+design.md
+requirements.md
+rollout.md
+tasks.md
+---
+specs/toolset-agnostic-starwave/tasks.md
+specs/spec-janitor/tasks.md
+specs/agreement-invoice-skills/tasks-process-guardrails.md
+specs/agreement-invoice-skills/tasks-customer-doc-skills.md
+specs/fiscal-probe-skill/tasks.md
+specs/nextup-starwave-refinement/tasks-process-status.md
+specs/nextup-starwave-refinement/tasks-align-tooling.md
+specs/nextup-starwave-refinement/tasks-rollout.md
+specs/nextup-starwave-refinement/tasks-documentation.md
+specs/transit-workflow-integration/tasks.md
+specs/nextup-pure-router/tasks.md
+specs/backlog-skill/tasks.md
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash: Get next phase of tasks for backlog-skill</summary>
+
+**Command:**
+```bash
+which rune && rune next --phase --format json specs/backlog-skill/tasks.md 2>&1 | head -100
+```
+
+**Result:**
+```
+/Users/r/repos/rune/rune
+{
+  "success": true,
+  "count": 3,
+  "phase_name": "Skill and Conventions",
+  "tasks": [
+    {
+      "id": "1",
+      "title": "Author claude/skills/backlog/SKILL.md",
+      "status": "Pending",
+      "stream": 1,
+      "blocked": false,
+      "details": [
+        "Six-step workflow per design: preflight parse gate (rune list; missing rune = no BACKLOG writes, no deletions), reconcile (spec folders authoritative, OVERVIEW.md a hint), gather (root nextup.md any tracked status user-zone-only; markers LM/ML/nextup:machine end the zone, USER belongs to it, none = whole file; exclude SPOUT.md, BACKLOG.md, OVERVIEW.md), route (task-file selection rule; per-item confirmation before requirement amendments; no anchor renumbering; staleness task), file (max-existing + 1), clear (per-source outcome listing always; tracked sources retained; one approval per run)",
+        "Embed the normative BACKLOG.md grammar: H1, phases Idea then Needs Spec always both present, one-line entries, detail line \u003csource\u003e, \u003cYYYY-MM-DD\u003e with arrow-spec suffix only on Needs Spec entries",
+        "Duplicate criterion is repo-realized (Decision 13); never run rune write commands on BACKLOG.md; never delete tracked files"
+      ]
+    },
+    {
+      "id": "2",
+      "title": "decision_mode in generated conventions",
+      "status": "Pending",
+      "stream": 1,
+      "blocked": false,
+      "children": [
+        {
+          "id": "2.1",
+          "title": "Update test_generate goldens to expect decision_mode rules in all three outputs (red)",
+          "status": "Pending",
+          "stream": 1,
+          "blocked": false
+        },
+        {
+          "id": "2.2",
+          "title": "Add decision_mode rules to shared/conventions.md and the decision-log format reference; run make generate (green)",
+          "status": "Pending",
+          "stream": 1,
+          "blocked": true,
+          "blockedBy": [
+            "2.1"
+          ],
+          "details": [
+            "conventions.md Documentation Standards: read .agentic.json decision_mode before revising a decision; overwrite = edit in place same ID new date; supersede/absent = current behavior",
+            "decision-log-format.md gains a Revising a decision section covering both modes and the manifest read"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Per-skill decision_mode edits in supersede-mandating skills",
+      "status": "Pending",
+      "stream": 1,
+      "blocked": true,
+      "blockedBy": [
+        "2"
+      ],
+      "details": [
+        "spec-janitor/SKILL.md:97 and spec-janitor/references/spec-conventions.md: audit must not flag overwrite-mode logs as drift; also reword its nextup mention",
+        "make-it-so/SKILL.md:91 and next-task/SKILL.md:33: mid-implementation edit clauses defer to the repo declared mode",
+        "One sentence each; behavior-scoped list per Decision 14"
+      ]
+    }
+  ],
+  "streams_summary": [
+    {
+      "id": 1,
+      "ready": [
+        "1",
+        "2",
+        "2.1",
+        "7",
+        "7.1"
+      ],
+      "blocked": [
+        "2.2",
+        "3",
+        "7.2"
+      ],
+      "active": [],
+      "available": true
+    },
+    {
+      "id": 2,
+      "ready": [
+        "4",
+        "4.1",
+        "5",
+        "5.1",
+        "6",
+        "6.1"
+      ],
+      "blocked": [
+        "4.2",
+        "5.2",
+        "6.2"
+      ],
+      "active": [],
+      "available": true
+    }
+  ],
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash: Check available work streams for backlog-skill tasks</summary>
+
+**Command:**
+```bash
+rune streams --available --json specs/backlog-skill/tasks.md 2>&1
+```
+
+**Result:**
+```
+{
+  "streams": [
+    {
+      "id": 1,
+      "ready": [
+        "1",
+        "2",
+        "2.1",
+        "7",
+        "7.1"
+      ],
+      "blocked": [
+        "2.2",
+        "3",
+        "7.2"
+      ],
+      "active": []
+    },
+    {
+      "id": 2,
+      "ready": [
+        "4",
+        "4.1",
+        "5",
+        "5.1",
+        "6",
+        "6.1"
+      ],
+      "blocked": [
+        "4.2",
+        "5.2",
+        "6.2"
+      ],
+      "active": []
+    }
+  ],
+  "available": [
+    1,
+    2
+  ]
+}
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:49:00+10:00
+
+No response requested.
+
+---
+
+## 👤 User · 2026-08-26T23:49:01+10:00
+
+Run /next-task --phase and when complete run /commit
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:49:10+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>specs/backlog-skill/tasks.md</code></summary>
+
+```
+1	---
+2	references:
+3	    - specs/backlog-skill/requirements.md
+4	    - specs/backlog-skill/design.md
+5	    - specs/backlog-skill/decision_log.md
+6	---
+7	# backlog-skill Implementation Tasks
+8	
+9	## Skill and Conventions
+10	
+11	- [ ] 1. Author claude/skills/backlog/SKILL.md <!-- id:dd74a8k -->
+12	  - Six-step workflow per design: preflight parse gate (rune list; missing rune = no BACKLOG writes, no deletions), reconcile (spec folders authoritative, OVERVIEW.md a hint), gather (root nextup.md any tracked status user-zone-only; markers LM/ML/nextup:machine end the zone, USER belongs to it, none = whole file; exclude SPOUT.md, BACKLOG.md, OVERVIEW.md), route (task-file selection rule; per-item confirmation before requirement amendments; no anchor renumbering; staleness task), file (max-existing + 1), clear (per-source outcome listing always; tracked sources retained; one approval per run)
+13	  - Embed the normative BACKLOG.md grammar: H1, phases Idea then Needs Spec always both present, one-line entries, detail line <source>, <YYYY-MM-DD> with arrow-spec suffix only on Needs Spec entries
+14	  - Duplicate criterion is repo-realized (Decision 13); never run rune write commands on BACKLOG.md; never delete tracked files
+15	  - Stream: 1
+16	  - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [2.1](requirements.md#2.1), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [3.1](requirements.md#3.1), [3.2](requirements.md#3.2), [3.3](requirements.md#3.3), [3.4](requirements.md#3.4), [3.6](requirements.md#3.6), [3.7](requirements.md#3.7), [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.3](requirements.md#4.3), [4.4](requirements.md#4.4), [4.5](requirements.md#4.5)
+17	
+18	- [ ] 2. decision_mode in generated conventions <!-- id:dd74a8l -->
+19	  - Stream: 1
+20	  - Requirements: [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.4](requirements.md#5.4)
+21	  - [ ] 2.1. Update test_generate goldens to expect decision_mode rules in all three outputs (red) <!-- id:dd74a8m -->
+22	    - Stream: 1
+23	  - [ ] 2.2. Add decision_mode rules to shared/conventions.md and the decision-log format reference; run make generate (green) <!-- id:dd74a8n -->
+24	    - conventions.md Documentation Standards: read .agentic.json decision_mode before revising a decision; overwrite = edit in place same ID new date; supersede/absent = current behavior
+25	    - decision-log-format.md gains a Revising a decision section covering both modes and the manifest read
+26	    - Blocked-by: dd74a8m (Update test_generate goldens to expect decision_mode rules in all three outputs red)
+27	    - Stream: 1
+28	
+29	- [ ] 3. Per-skill decision_mode edits in supersede-mandating skills <!-- id:dd74a8o -->
+30	  - spec-janitor/SKILL.md:97 and spec-janitor/references/spec-conventions.md: audit must not flag overwrite-mode logs as drift; also reword its nextup mention
+31	  - make-it-so/SKILL.md:91 and next-task/SKILL.md:33: mid-implementation edit clauses defer to the repo declared mode
+32	  - One sentence each; behavior-scoped list per Decision 14
+33	  - Blocked-by: dd74a8l (decision_mode in generated conventions)
+34	  - Stream: 1
+35	  - Requirements: [5.1](requirements.md#5.1), [5.3](requirements.md#5.3)
+36	
+37	## Toolchain
+38	
+39	- [ ] 4. BACKLOG.md column and schema check in process_status.py <!-- id:dd74a8p -->
+40	  - Stream: 2
+41	  - Requirements: [3.1](requirements.md#3.1), [3.5](requirements.md#3.5), [6.3](requirements.md#6.3)
+42	  - [ ] 4.1. Write BACKLOG fixture tests in test_process_status.py; remove nextup-column assertions (red) <!-- id:dd74a8q -->
+43	    - ok fixtures: absent (renders -), valid, empty-but-valid (both phases zero entries), gapped numbering, U+2192 arrow detail, trailing-whitespace heading
+44	    - drift fixtures: rune-unparseable, wrong/extra/case-variant phase, checked entry, nested checked subtask (only Stats catches it), missing H1
+45	    - Stream: 2
+46	  - [ ] 4.2. Implement _backlog_status hybrid check, column swap, backlog-drift flag, docstring and argparse rewrite (green) <!-- id:dd74a8r -->
+47	    - Hybrid: _rune_parses gate, raw right-trimmed case-sensitive scan of H2 set/order == [Idea, Needs Spec], rune list --format json Stats.Pending == Stats.Total, raw H1 presence scan
+48	    - Remove NEXTUP/EXAMPLE keys :118-119 assigns :131-132 header :188 _row :205-206 (presence-only, no drift wiring exists); add backlog-drift to drift_flags with reason detail line; rewrite module docstring :4-16 and argparse description :252
+49	    - Detail-line grammar deliberately unchecked (design: out of AC 3.5 scope)
+50	    - Blocked-by: dd74a8q (Write BACKLOG fixture tests in test_process_status.py; remove nextup-column assertions red)
+51	    - Stream: 2
+52	
+53	- [ ] 5. Owned-symlink prune in sync-claude.sh <!-- id:dd74a8s -->
+54	  - Stream: 2
+55	  - Requirements: [6.4](requirements.md#6.4)
+56	  - [ ] 5.1. Write prune cases in test_sync_compat.py (red) <!-- id:dd74a8t -->
+57	    - Stream: 2
+58	  - [ ] 5.2. Implement the prune loop in sync-claude.sh (green) <!-- id:dd74a8u -->
+59	    - For each entry in ~/.agents/skills (nullglob): [ -L ] and literal target prefix $REPO_CLAUDE_DIR/skills/ and [ ! -e ] then rm; foreign links never touched; script only creates absolute links so literal prefix match suffices
+60	    - Blocked-by: dd74a8t (Write prune cases in test_sync_compat.py red)
+61	    - Stream: 2
+62	
+63	- [ ] 6. Remove align step 6 and the canonical template <!-- id:dd74a8v -->
+64	  - Stream: 2
+65	  - Requirements: [6.2](requirements.md#6.2)
+66	  - [ ] 6.1. Rewrite test_align.py: drop step-6 classes and all 8 nextup fixtures; add stray-template-untouched and no-gitignore-write tests (red) <!-- id:dd74a8w -->
+67	    - Delete fixtures: nextup-{canonical,gitignore-append,gitignore-create,markerless,missing,plan-only,session-file,user-zone} plus their .gitignore files and seed-root/nextup.example.md
+68	    - New tests: align leaves a stray nextup.example.md in a target untouched (stop-managing means no touch, not delete); align never writes .gitignore
+69	    - Stream: 2
+70	  - [ ] 6.2. Delete align step-6 code and nextup.example.md in the same commit (green) <!-- id:dd74a8x -->
+71	    - Delete: NEXTUP_EXAMPLE :90, NEXTUP_LM_MARKER :94, _ensure_nextup_gitignore :346, _converge_nextup_template :371, call :420, seed-root existence error :548, docstring managed-files entry :48; renumber remaining steps
+72	    - _shadow_copy :443: NEXTUP_EXAMPLE and .gitignore both leave the tuple (gitignore management existed only for nextup)
+73	    - Canonical nextup.example.md deleted in this same commit or align crashes on a seed root missing an expected file
+74	    - Blocked-by: dd74a8w (Rewrite test_align.py: drop step-6 classes and all 8 nextup fixtures; add stray-template-untouched and no-gitignore-write tests red)
+75	    - Stream: 2
+76	
+77	## Sunset
+78	
+79	- [ ] 7. Sunset gate and removals <!-- id:dd74a8y -->
+80	  - Stream: 1
+81	  - Requirements: [6.1](requirements.md#6.1), [6.5](requirements.md#6.5), [6.6](requirements.md#6.6)
+82	  - [ ] 7.1. Write the tracked-files sunset grep test (red) <!-- id:dd74a8z -->
+83	    - File set from git ls-files; case-insensitive nextup|spout; exempt specs/, CHANGELOG.md, and the test file itself; fails against current tree until 7.2
+84	    - Stream: 1
+85	  - [ ] 7.2. Remove nextup and spout skill dirs, swap README registry, purge remaining tracked references (green) <!-- id:dd74a90 -->
+86	    - Delete claude/skills/nextup and claude/skills/spout; README registry lists backlog in their place
+87	    - Purge: .gitignore /nextup.md and /SPOUT.md entries plus comments; docs/agent-notes align-tooling, process-status, spec-janitor, transit-integration; docs/runbooks/process-onboarding.md now points at /backlog; scripts/README.md align steps and status columns; claude/uplift-candidates.md purge or delete
+88	    - Ordering (AC 6.6): blocked by task 1 so the skill exists in the synced toolchain before the sunset lands
+89	    - Blocked-by: dd74a8z (Write the tracked-files sunset grep test red), dd74a8k (Author claude/skills/backlog/SKILL.md), dd74a8r (Implement _backlog_status hybrid check, column swap, backlog-drift flag, docstring and argparse rewrite green), dd74a8x (Delete align step-6 code and nextup.example.md in the same commit green)
+90	    - Stream: 1
+91	
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:49:33+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>specs/backlog-skill/requirements.md</code></summary>
+
+```
+1	# Requirements: backlog-skill
+2	
+3	## Introduction
+4	
+5	A single `/backlog` skill replaces the sunset `nextup` and `spout` skills. It captures ideas, loose notes, and audit findings into a tracked, rune-parseable `specs/BACKLOG.md`, routes each item to where the work belongs (an existing spec's tasks, an existing spec's requirements, or the backlog itself), and clears the consumed sources. The feature also executes the sunset: removing both old skills and their toolchain footprint (align seeding, tests, fixtures, documentation), and introducing a per-repo decision overwrite mode.
+6	
+7	## Definitions
+8	
+9	- **Item outcome**: every captured item ends a run in exactly one state — **filed** (written to a backlog entry, spec task, or requirement amendment), **dropped** (recognized as already present in the backlog or realized in a spec), or **failed** (could not be processed). An item is **handled** when it is filed or dropped.
+10	- **Source**: a file content was captured from. A source is **delete-eligible** when it is not tracked by git, at least one item was read from it, and every item read from it is handled with none failed.
+11	- **User zone**: in a `nextup.md`, the user-intent content: everything except content at or below a recognized machine marker (`<!-- LM -->`, legacy `<!-- ML -->`, `<!-- nextup:machine -->`). A `<!-- USER -->` marker belongs to the zone it opens; WHERE no machine marker exists, the entire file is the zone.
+12	
+13	## Non-Goals
+14	
+15	- No Transit integration now — BACKLOG.md statuses are named for a clean later import, but no Transit MCP calls, `T-` ids, or column sync.
+16	- No tracking of in-progress or completed work — once promoted to a spec, an item leaves the backlog; specs/OVERVIEW.md and task files own it from there.
+17	- No orientation report — spout's "state of every spec" summary is retired without replacement; `specs/OVERVIEW.md` covers it.
+18	- No regenerated scratch artifacts — the skill writes no SPOUT.md-style gitignored output; its only artifacts are the tracked backlog and spec amendments.
+19	- No automatic commits — the skill edits files; committing remains a user action.
+20	- No sweeping or deleting of tracked project documentation — tracked files can be capture sources only when the user names them (except a root `nextup.md`, which is always a candidate), and are never deleted.
+21	- No changes to the starwave skills — backlog/spec consistency is owned by `/backlog`'s reconciliation pass, not by hooks in the spec workflow.
+22	- No cross-repo rollout in these requirements — enrollment of new participating repos, per-repo migration runs, per-repo `decision_mode` configuration, and residual-file cleanup are post-build administration, tracked in this spec's `rollout.md`.
+23	
+24	## Requirements
+25	
+26	### 1. Capture
+27	
+28	**User Story:** As a developer, I want to hand loose ideas and note files to one skill, so that forward intent stops living in untracked scratch.
+29	
+30	**Acceptance Criteria:**
+31	
+32	1. <a name="1.1"></a>WHEN invoked with free-form text, the skill SHALL capture that text as one or more items and route them per Requirement 2 in the same run  
+33	2. <a name="1.2"></a>WHEN invoked bare, the skill SHALL detect candidate sources in the repo — a root `nextup.md` regardless of tracked status (user zone only), plus untracked or gitignored markdown files at the repo root and under `specs/` that do not belong to a spec folder — and present them for capture  
+34	3. <a name="1.3"></a>The skill SHALL exclude known generated artifacts (`SPOUT.md`) from source detection  
+35	4. <a name="1.4"></a>WHEN invoked with a file path, the skill SHALL capture from that file regardless of its tracked status  
+36	5. <a name="1.5"></a>IF a captured item already exists in the backlog or is already realized in the repository (a spec, or shipped work recorded in code or the changelog), THEN the skill SHALL drop it and report what it matched  
+37	
+38	### 2. Routing
+39	
+40	**User Story:** As a developer, I want each captured item placed where the work actually belongs, so that the backlog holds only work with no home yet.
+41	
+42	**Acceptance Criteria:**
+43	
+44	1. <a name="2.1"></a>The skill SHALL propose exactly one destination per item — existing-spec task, existing-spec requirement amendment, or backlog entry — with a one-line reason  
+45	2. <a name="2.2"></a>WHEN an item is routed to an existing spec as a task, the skill SHALL append it as a rune-parseable task to the spec's most relevant task file, creating `tasks.md` WHERE the spec has no task file  
+46	3. <a name="2.3"></a>WHEN an item is routed to an existing spec as a requirement amendment, the skill SHALL confirm the amendment before writing, SHALL add or modify the requirement in that spec's requirements.md without renumbering existing acceptance-criterion anchors, and SHALL append a task (per the task-file selection rule of [2.2](#2.2)) naming the stale downstream documents (design, tasks) whose workflows need re-running  
+47	4. <a name="2.4"></a>WHEN an item warrants a spec that does not exist, the skill SHALL file it as a backlog entry with status `needs-spec` and a proposed spec name  
+48	5. <a name="2.5"></a>WHEN an item is an idea with no actionable next step, the skill SHALL file it as a backlog entry with status `idea`  
+49	6. <a name="2.6"></a>WHEN a run starts, the skill SHALL reconcile the backlog: entries whose proposed spec now exists or whose content is now realized in the repository (per [1.5](#1.5)) SHALL be removed and reported  
+50	
+51	### 3. The BACKLOG.md contract
+52	
+53	**User Story:** As a developer, I want the backlog to be a tracked file with a stable format, so that it survives machines, appears in diffs, and imports into Transit later.
+54	
+55	**Acceptance Criteria:**
+56	
+57	1. <a name="3.1"></a>The backlog SHALL live at `specs/BACKLOG.md` in the repo the skill runs in (the git root is the unit), created together with `specs/` on first capture; its absence SHALL NOT be reported as drift  
+58	2. <a name="3.2"></a>The backlog SHALL be parseable by `rune list`, with this schema: an H1 title, exactly two H2 phases `## Idea` and `## Needs Spec` as the status carriers, task items as unchecked entries, and capture date, source name, and (for `needs-spec`) proposed spec name as indented detail lines  
+59	3. <a name="3.3"></a>Every entry SHALL sit in exactly one phase; phase membership IS the status, mapping to Transit's Idea and Planning columns  
+60	4. <a name="3.4"></a>All entries SHALL remain unchecked: work that starts leaves the backlog, so a checked or in-progress entry is a defect, and rune write commands SHALL NOT be used on BACKLOG.md  
+61	5. <a name="3.5"></a>The per-repo process-status report SHALL rune-parse `specs/BACKLOG.md` where present and flag as drift: parse failures, phases other than the two of [3.2](#3.2), and any non-pending entry  
+62	6. <a name="3.6"></a>WHEN BACKLOG.md fails to parse at the start of a run, the skill SHALL report the violation and make no changes to BACKLOG.md, spec files, or source files until the file is repaired  
+63	7. <a name="3.7"></a>A source name recorded in a detail line is historical provenance (free-form input records the invocation, e.g. `conversation`); it SHALL NOT be required to resolve to an existing file  
+64	
+65	### 4. Clearing consumed sources
+66	
+67	**User Story:** As a developer, I want consumed source files removed once their content is filed, so that stale intent files cannot lie to future sessions.
+68	
+69	**Acceptance Criteria:**
+70	
+71	1. <a name="4.1"></a>WHEN a run captured from any sources, the skill SHALL show the outcome of every item per source; WHEN delete-eligible sources exist, it SHALL ask for approval once per run before deleting them — including sources whose items were all dropped as duplicates  
+72	2. <a name="4.2"></a>IF approval is declined, THEN the skill SHALL leave every source file untouched while keeping the filed entries, and a later run SHALL again offer the (now all-duplicate) source for deletion  
+73	3. <a name="4.3"></a>A source with any failed item SHALL NOT be deleted in that run  
+74	4. <a name="4.4"></a>The skill SHALL NOT delete tracked files, regardless of how they entered the run  
+75	5. <a name="4.5"></a>A fully-handled tracked source SHALL appear in the per-source outcome listing of [4.1](#4.1) marked as retained, with removal noted as a user action  
+76	
+77	### 5. Decision overwrite mode
+78	
+79	**User Story:** As a developer, I want a repo to be able to declare that decision log entries are overwritten in place instead of superseded, so that changes to design and downstream documents stay salient.
+80	
+81	**Acceptance Criteria:**
+82	
+83	1. <a name="5.1"></a>WHERE a repo's `.agentic.json` sets `decision_mode` to `overwrite`, workflows that revise a decision SHALL edit the existing entry in place, keeping its ID and updating its date, with no superseding entry appended  
+84	2. <a name="5.2"></a>WHERE `decision_mode` is unset or `supersede`, decision revisions SHALL keep today's behavior: the old entry is marked superseded and a new entry is appended  
+85	3. <a name="5.3"></a>Workflows whose instructions direct decision-log creation or revision (the starwave skills, smolspec, spec-janitor, make-it-so, next-task) SHALL determine the mode by reading the repo's `.agentic.json` at run time, defaulting to `supersede`  
+86	4. <a name="5.4"></a>The decision-log format reference and the shared convention text for all three toolchains (Claude, Codex, Copilot wrappers) SHALL document both modes and the run-time manifest read  
+87	
+88	### 6. Sunset of nextup and spout
+89	
+90	**User Story:** As a developer, I want the retired skills and their entire toolchain footprint gone, so that no tool recommends, seeds, tests, or documents the failed pattern.
+91	
+92	**Acceptance Criteria:**
+93	
+94	1. <a name="6.1"></a>The `nextup` and `spout` skill directories SHALL be removed and the README skill registry SHALL list `backlog` in their place  
+95	2. <a name="6.2"></a>The align toolchain SHALL stop seeding `nextup.example.md` and stop managing `nextup.md` gitignore entries, with the canonical `nextup.example.md` removed in the same change so align never runs against a seed root missing a file it requires  
+96	3. <a name="6.3"></a>The process-status report SHALL drop both nextup columns (presence and example convergence) and their drift logic, replacing them with BACKLOG.md presence and the parse check of [3.5](#3.5)  
+97	4. <a name="6.4"></a>The sync script SHALL remove symlinks that point into this repo's skills directory but whose target no longer exists, and SHALL NOT touch links it does not own  
+98	5. <a name="6.5"></a>After the sunset lands, `nextup` and `spout` SHALL have no remaining references in the toolchain — skills, scripts, tests, fixtures, agent notes, runbooks, and README — with historical records (`specs/`, `CHANGELOG.md`) exempt; the known footprint at spec time spans the five align test fixture repos and seed root, three test files, four agent notes, the process-onboarding runbook, `scripts/README.md`, and the spec-janitor skill  
+99	6. <a name="6.6"></a>The sunset changes SHALL land only after the `/backlog` skill is present in the synced toolchain, so no session is left without an intent-capture entry point  
+100	
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Read: <code>specs/backlog-skill/design.md</code></summary>
+
+```
+1	# Design: backlog-skill
+2	
+3	## Overview
+4	
+5	One new skill (`claude/skills/backlog/SKILL.md`) plus surgical changes to the toolchain, the removal of two skills, and a test/fixture rewrite. The skill is LLM-instruction markdown like every other skill in the tree — no new runtime; the executable changes are in `process_status.py`, `align.py`, `sync-claude.sh`, the generated convention text, and four skill files that hard-code the supersede convention.
+6	
+7	## Architecture
+8	
+9	### Touch map
+10	
+11	| Path | Action | Requirements |
+12	|---|---|---|
+13	| `claude/skills/backlog/SKILL.md` | new | 1, 2, 3.6, 4 |
+14	| `claude/skills/nextup/`, `claude/skills/spout/` | delete | 6.1 |
+15	| `README.md` | registry entry swap | 6.1 |
+16	| `nextup.example.md` | delete (same commit as align change) | 6.2 |
+17	| `scripts/align.py` | delete step 6 (see Components) | 6.2 |
+18	| `scripts/process_status.py` | drop nextup columns; add BACKLOG column + schema check; rewrite module docstring and argparse text | 3.5, 6.3 |
+19	| `scripts/sync-claude.sh` | add owned-link prune | 6.4 |
+20	| `shared/conventions.md` | decision_mode rules in Documentation Standards | 5.3, 5.4 |
+21	| `claude/rules/references/decision-log-format.md` | "Revising a decision" section: both modes + manifest read | 5.4 |
+22	| `claude/skills/spec-janitor/SKILL.md` + `references/spec-conventions.md` | decision_mode awareness (its supersede mandate at SKILL.md:97 conflicts with overwrite mode); also reword nextup mention | 5.3, 6.5 |
+23	| `claude/skills/make-it-so/SKILL.md`, `claude/skills/next-task/SKILL.md` | decision_mode awareness in their "Mid-Implementation Spec Edits" clauses (:91, :33) | 5.3 |
+24	| `.gitignore` (this repo) | remove `/nextup.md`, `/SPOUT.md` entries and their comments | 6.5 |
+25	| `tests/`, `tests/fixtures/align/` | rewrite (see Testing) | 6.5 |
+26	| `docs/agent-notes/`, `docs/runbooks/process-onboarding.md`, `scripts/README.md`, `claude/uplift-candidates.md` | purge/rewrite nextup+spout references | 6.5 |
+27	
+28	Generated files (`claude/CLAUDE.md`, `copilot/instructions/copilot-instructions.md`, `codex/AGENTS.md`) pick up the conventions change via `make generate`; `make lint-drift` enforces it. Codex additionally reads `~/.codex/AGENTS.md`, written only by `generate.py --user` — a re-run after the conventions change is a rollout step, otherwise Codex sessions keep the old text indefinitely.
+29	
+30	### Sunset reference audit (AC 6.5)
+31	
+32	The gate is a test that greps **git-tracked files only** (`git ls-files` sourced), case-insensitive `nextup|spout`, exempting `specs/`, `CHANGELOG.md`, and the test file itself. Tracked-only is both the correct scope (AC 6.5 concerns the committed toolchain) and what makes the gate stable: untracked working files, the `.worktrees/` sibling checkout, and caches are out by construction. The tracked-tree scope is a superset of AC 6.5's enumerated surfaces — stricter is acceptable.
+33	
+34	Work list (every tracked reference at design time):
+35	
+36	| Site | Action |
+37	|---|---|
+38	| `tests/fixtures/align/repos/nextup-*` — **8 repos** (canonical, gitignore-append, gitignore-create, markerless, missing, plan-only, session-file, user-zone) + their `.gitignore` files + `seed-root/nextup.example.md` | delete fixtures |
+39	| `tests/test_align.py` (~51 refs) | delete step-6 test classes; keep unrelated convergence tests |
+40	| `tests/test_process_status.py` | rewrite nextup-column assertions to BACKLOG assertions |
+41	| `tests/test_sync_compat.py` | update if it enumerates skills; add prune coverage |
+42	| `scripts/process_status.py` module docstring (:4–16) and argparse description (:252) | rewrite |
+43	| `docs/agent-notes/align-tooling.md`, `process-status.md` | rewrite sections describing step 6 / nextup columns |
+44	| `docs/agent-notes/spec-janitor.md`, `transit-integration.md` | drop or reword passing references |
+45	| `docs/runbooks/process-onboarding.md` | rewrite: onboarding no longer seeds nextup; points at `/backlog` |
+46	| `scripts/README.md` | rewrite align step list and status column description |
+47	| `claude/skills/spec-janitor/SKILL.md` | reword its nextup mention |
+48	| `claude/uplift-candidates.md` | purge or delete (closed historical report) |
+49	| `.gitignore` | remove the nextup/spout entries and comments (dead once the tooling is gone; the sunset commit owns this repo's cleanup — rollout owns other repos') |
+50	
+51	## Components and Interfaces
+52	
+53	### The /backlog skill
+54	
+55	`claude/skills/backlog/SKILL.md`, frontmatter description covering triggers ("add this to the backlog", "capture these notes", "file this idea", bare `/backlog`). Workflow, in order:
+56	
+57	1. **Preflight** — `git rev-parse --show-toplevel`; `rune list specs/BACKLOG.md` if the file exists. Parse failure → report and stop; no writes of any kind this run (AC 3.6). Missing rune binary → warn and refuse all BACKLOG.md writes this run (unparseability cannot be detected without the parser); routing into spec files may proceed, and no source is deleted (items destined for the backlog are unhandled, so no source becomes delete-eligible).
+58	2. **Reconcile** (AC 2.6) — for each entry: if its `→ spec:` target exists under `specs/`, or the entry's content is realized in the repo, remove and report. Spec folders are authoritative; `specs/OVERVIEW.md` is a hint only (regenerated on demand, may be stale or absent).
+59	3. **Gather** — free-form argument text; named file paths; bare invocation detects a root `nextup.md` (any tracked status, user zone only — machine markers `<!-- LM -->`, `<!-- ML -->`, `<!-- nextup:machine -->` end the zone; `<!-- USER -->` belongs to it; no marker → whole file) plus untracked/gitignored `*.md` at root and under `specs/` outside spec folders. A **spec folder** is any directory under `specs/` containing at least one of requirements.md, design.md, smolspec.md, prd.md, tasks*.md, or decision_log.md. Excluded from detection: `SPOUT.md` (generated), `specs/BACKLOG.md` and `specs/OVERVIEW.md` (the skill's own artifact and the generated index). Candidates are presented before capture.
+60	4. **Route** (Req 2) — per item, one destination with a one-line reason. Task-file selection: the spec's only task file; else the `tasks-*.md` whose name/stream matches the item, else `tasks.md`; create `tasks.md` if none. Requirement amendments are confirmed per item before writing, never renumber existing anchors, and append a staleness task ("re-run design/tasks for requirement X") to the selected task file.
+61	5. **File** — backlog entries appended to the matching phase, numbered max-existing + 1. File and `specs/` created on first capture.
+62	6. **Clear** (Req 4) — per-source outcome listing (filed/dropped/failed per item), always shown when anything was captured. Tracked sources: marked retained, removal is the user's. Delete-eligible sources: one approval for the batch, then delete. Decline → no source touched.
+63	
+64	Contract notes: the skill never runs rune write commands on BACKLOG.md (AC 3.4) — appends and removals are text edits; it never commits. Duplicate detection (AC 1.5/2.6) uses the repo-realization criterion of Decision 13: an item matches if its substance exists in the backlog, a spec document, or shipped work recorded in the repo (code, CHANGELOG) — consumed intent zones are typically realized via commits, not spec text. The match target is always reported.
+65	
+66	### BACKLOG.md schema check in process_status.py
+67	
+68	Replace the two presence-only nextup columns (`NEXTUP`, `EXAMPLE`: info keys :118–119, assigns :131–132, header :188, `_row` :205–206 — there is no nextup drift wiring to remove) with one `BACKLOG` column: `-` (absent, never drift, AC 3.1), `ok`, or `drift`; a `backlog-drift` flag joins `drift_flags()` with the reason in the repo's detail lines, mirroring `rune-drift`.
+69	
+70	The check is a hybrid — each layer covers a hole in the other:
+71	
+72	1. **Parse gate**: `_rune_parses` (existing) on `specs/BACKLOG.md`. rune missing → existing warning path, skip.
+73	2. **Phase set/order**: raw-text scan of `^##[ ]` headings, right-trimmed, case-sensitive — must equal exactly `["Idea", "Needs Spec"]`. Raw scan rather than rune's JSON because an empty backlog yields `PhaseMarkers: []` (phases with zero entries are invisible to rune), and an empty-but-valid file is the normal post-reconciliation state. `## idea` is drift.
+74	3. **Unchecked invariant**: `rune list --format json` → `Stats.Pending == Stats.Total`. This is authoritative where a raw checkbox regex is not: rune counts nested subtasks (`  - [x] …`), which a `^- \[` scan misses. (The parse gate has already run, so fenced-content evasion of the raw scans is not possible — rune rejects such files.)
+75	4. **H1 presence**: raw scan for a leading `# ` title (rune parses files without one; AC 3.2 requires it).
+76	
+77	Deliberately out of the check's scope: detail-line grammar (source/date/arrow). AC 3.5 enumerates parse failures, phase violations, and non-pending entries; detail-line drift is visible in review diffs and correctable by the skill's next run, and enforcing prose grammar by regex is brittleness without payoff.
+78	
+79	### align.py step-6 removal
+80	
+81	Delete: `NEXTUP_EXAMPLE` (:90), `NEXTUP_LM_MARKER` (:94), `_ensure_nextup_gitignore` (:346), `_converge_nextup_template` (:371), the call at :420, the seed-root existence error (:548), the "Managed files" docstring list entry (:48), and the step-6 docstring text; renumber the remaining steps. `_shadow_copy` (:443) iterates `MANAGED_JSON + (NEXTUP_EXAMPLE, ".gitignore")` — both `NEXTUP_EXAMPLE` and `".gitignore"` leave the tuple: gitignore management existed only for the nextup entry, so align no longer touches `.gitignore` at all. No replacement behavior: align does not seed or manage BACKLOG.md (AC 3.1).
+82	
+83	### sync-claude.sh prune
+84	
+85	After the per-skill link loop: for each entry in `~/.agents/skills/` (nullglob-guarded), if it is a symlink (`[ -L ]`) whose literal target string is prefixed by `$REPO_CLAUDE_DIR/skills/` and the target does not exist (`[ ! -e ]`), remove it. Literal prefix comparison suffices — the script only ever creates absolute links (`ln -s "$skill_dir"`). Links resolving elsewhere are never touched (AC 6.4). `~/.claude/skills` is a single whole-directory link and self-heals. Dangling `nextup`/`spout` links already exist on this machine, so the prune has immediate work.
+86	
+87	### decision_mode plumbing
+88	
+89	Two delivery channels, both required — generated conventions alone do not override skill-local instructions:
+90	
+91	- `shared/conventions.md` § Documentation Standards gains the rule: before revising a decision, read `.agentic.json` → `decision_mode`; `overwrite` → edit the entry in place (same ID, new date, no superseding entry); `supersede`/absent → today's behavior. Reaches all three toolchains via generation; this is also how Codex/Copilot learn the mode rules (the deep format reference under `claude/rules/` stays Claude-side — AC 5.4's "all three toolchains" is satisfied by the conventions block they each receive).
+92	- Per-skill edits to every skill whose text mandates supersession: `spec-janitor/SKILL.md:97` and `spec-janitor/references/spec-conventions.md` (its audit must not flag overwrite-mode logs as drift), `make-it-so/SKILL.md:91`, `next-task/SKILL.md:33`. Each gains one sentence deferring to the repo's declared mode.
+93	- `claude/rules/references/decision-log-format.md` gains a "Revising a decision" section describing both modes and the manifest read.
+94	
+95	AC 5.3's workflow list is behavior-scoped per Decision 14: the skills whose instructions direct decision-log creation or revision (starwave skills, smolspec, spec-janitor, make-it-so, next-task).
+96	
+97	## Data Models
+98	
+99	BACKLOG.md grammar (rune-strict; both phases always present in this order, even when empty):
+100	
+101	```markdown
+102	# Backlog
+103	
+104	## Idea
+105	
+106	- [ ] 1. <one-line item>
+107	  - <source>, <YYYY-MM-DD>
+108	
+109	## Needs Spec
+110	
+111	- [ ] 2. <one-line item>
+112	  - <source>, <YYYY-MM-DD> → spec: <kebab-name>
+113	```
+114	
+115	Normative detail-line grammar: exactly one physical line per entry, `- <source>, <date>` with an optional ` → spec: <kebab-name>` suffix that appears on every Needs Spec entry and no Idea entry. `<source>` is the captured file's repo-relative path or `conversation` (AC 3.7); `<date>` is ISO `YYYY-MM-DD`. Entry titles are single lines and may not contain ` → spec: ` (the suffix is parsed from the line end). Numbering is file-global: a new entry takes max-existing + 1, and reconciliation removals never renumber survivors, so gaps are normal. Verified against the installed rune: gapped numbering parses, and rune assigns its own sequential display IDs — the written number is the stable reference.
+116	
+117	`.agentic.json`: optional top-level `"decision_mode": "overwrite" | "supersede"`; absent means `supersede`. align preserves unknown keys, so no align change is needed for it.
+118	
+119	## Error Handling
+120	
+121	| Failure | Behavior |
+122	|---|---|
+123	| BACKLOG.md unparseable at preflight | Report, stop; zero writes (AC 3.6) |
+124	| rune binary missing | Skill: refuse BACKLOG.md writes and source deletion this run; spec-file routing may proceed. process-status: existing warning path |
+125	| Item cannot be routed/filed | Outcome `failed`; its source is never deleted that run (AC 4.3) |
+126	| Tracked-status ambiguity | `git ls-files --error-unmatch <path>` decides; tracked → retained (AC 4.4/4.5) |
+127	| Source deletion fails mid-batch | Report per file; already-filed entries stay (filing is complete before any deletion starts) |
+128	
+129	## Testing Strategy
+130	
+131	- **test_align.py**: delete the step-6 classes and all 8 nextup fixture repos plus the seed-root template; assert align runs clean against a fixture repo *with* a stray `nextup.example.md` present (align must ignore it — stop-managing means no touch, not delete) and that align no longer writes `.gitignore`.
+132	- **test_process_status.py**: fixture BACKLOG.md variants asserting column value and drift detail — absent (`-`, no drift), valid, **empty-but-valid** (both phases, zero entries → `ok`), gapped numbering (`ok`), U+2192 arrow detail line (`ok`), trailing-whitespace heading (`ok`), rune-unparseable, wrong/extra/case-variant phase, checked entry, **nested checked subtask** (drift via Stats), missing H1. Nextup-column assertions removed.
+133	- **test_sync_compat.py**: dangling owned link (removed), dangling foreign link (kept), live owned link (kept), empty skills dir (no-op).
+134	- **test_generate.py**: golden-file update — the decision_mode rules appear in all three generated outputs.
+135	- **Sunset grep test** (new): `git ls-files` sourced, case-insensitive `nextup|spout`, exempting `specs/`, `CHANGELOG.md`, and itself; permanent guard against reintroduction.
+136	- The skill itself is instruction markdown — exercised by the rollout migration (rollout.md carries acceptance scenarios for Requirements 1, 2, and 4), not unit tests; the schema check is what keeps skill drift detectable.
+137	- Tasks file: encode the AC 6.6 ordering (skill commit before sunset commit) as rune `blocked-by` dependencies so the sequence is mechanical.
+138	
+139	PBT is not warranted: the only parser is rune (external, already trusted), and the schema check's failure space is enumerable and covered by the fixtures above.
+140	
+141	## Requirements traceability
+142	
+143	| Requirement | Design element |
+144	|---|---|
+145	| 1.1–1.5 | Skill steps 3–5; spec-folder definition; SPOUT/BACKLOG/OVERVIEW exclusions |
+146	| 2.1–2.6 | Skill steps 2, 4; task-file selection rule; amendment confirmation |
+147	| 3.1–3.4, 3.7 | BACKLOG grammar; skill step 5; no-rune-writes contract |
+148	| 3.5 | Hybrid `_backlog_status` check in process_status.py |
+149	| 3.6 | Skill step 1 preflight |
+150	| 4.1–4.5 | Skill step 6 |
+151	| 5.1–5.4 | conventions.md + format reference + per-skill edits (spec-janitor, make-it-so, next-task) |
+152	| 6.1 | skill dir deletions + README |
+153	| 6.2 | align step-6 removal + template deletion, same commit |
+154	| 6.3 | process_status column swap + docstring/argparse rewrite |
+155	| 6.4 | sync-claude.sh prune |
+156	| 6.5 | reference audit table + tracked-files grep gate |
+157	| 6.6 | skill commit precedes sunset commit; encoded as task dependencies |
+158	
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Read: <code>specs/backlog-skill/decision_log.md</code></summary>
+
+```
+1	# Decision Log: backlog-skill
+2	
+3	## Decision 1: Feature name and scope
+4	
+5	**Date**: 2026-08-26
+6	**Status**: accepted
+7	
+8	### Context
+9	
+10	The nextup skill has been sunset (it did not do what was needed) and spout is slated for removal. Both failed the same way: ephemeral output — nextup zones were never cleared and went stale; SPOUT.md was gitignored and stale the moment HEAD moved. A cross-repo assessment (2026-08-26) found forward intent across all repos living in gitignored or untracked files with no tracked home.
+11	
+12	### Decision
+13	
+14	Build one replacement feature named `backlog-skill`: a `/backlog` skill plus the sunset of nextup and spout, specced together in `specs/backlog-skill/`.
+15	
+16	### Rationale
+17	
+18	The replacement and the removal are one change — the migration of nextup.md zones only makes sense with the new destination in place, and shipping the skill without the sunset would leave two competing entry points.
+19	
+20	### Alternatives Considered
+21	
+22	- **`backlog` as the name**: matches the invocation `/backlog` - Rejected because the folder name would not distinguish the skill from the BACKLOG.md artifact it manages.
+23	- **`nextup-spout-sunset`**: names the removal - Rejected because it hides the new capability, which is the larger half of the work.
+24	
+25	### Consequences
+26	
+27	**Positive:**
+28	- One spec covers the full round trip: new skill, toolchain retirement, migration.
+29	
+30	**Negative:**
+31	- Larger spec surface than a skill-only feature; the migration adds multi-repo coordination.
+32	
+33	---
+34	
+35	## Decision 2: Enroll the operator's remaining active repos; migrate all participants
+36	
+37	**Date**: 2026-08-26
+38	**Status**: accepted
+39	
+40	### Context
+41	
+42	A set of repos already participates in align; several of the operator's active repos do not, and assessment found the unenrolled ones hold some of the richest untracked backlogs. (This log is committed, so repos are referred to by role; the concrete list is session-local operator state.)
+43	
+44	### Decision
+45	
+46	Enroll the operator-designated unenrolled repos as align participants within this feature's rollout, and run the nextup.md migration across all participants.
+47	
+48	### Alternatives Considered
+49	
+50	- **Existing participants only**: defer enrollment - Rejected because the unenrolled repos are where the migration pays off most.
+51	- **This repo only, others ad hoc**: smallest scope - Rejected because ad hoc migration is exactly the untracked-intent pattern being retired.
+52	
+53	### Consequences
+54	
+55	**Positive:**
+56	- The repos with the largest untracked backlogs get a tracked home in the same pass.
+57	
+58	**Negative:**
+59	- Enrollment adds per-repo `.agentic.json` setup and align verification to the rollout.
+60	
+61	---
+62	
+63	## Decision 3: BACKLOG.md holds pre-spec work only
+64	
+65	**Date**: 2026-08-26
+66	**Status**: accepted
+67	
+68	### Context
+69	
+70	BACKLOG.md needs a lifecycle contract: either track work through its whole life (mirroring all five Transit columns) or hold only pre-spec intent.
+71	
+72	### Decision
+73	
+74	The backlog holds only pre-spec items with statuses `idea` and `needs-spec` (mapping to Transit's Idea and Planning columns). Promotion to a spec removes the entry; specs/OVERVIEW.md and task files own the work from there.
+75	
+76	### Rationale
+77	
+78	Duplicated state that goes stale is the failure mode that killed nextup and SPOUT.md. In-progress and done states are already tracked by the spec system; mirroring them would reintroduce drift.
+79	
+80	### Alternatives Considered
+81	
+82	- **Full Transit mirror**: entries persist through idea → done - Rejected because it duplicates OVERVIEW.md/task state and will drift.
+83	- **Promoted-pointer hybrid**: promotion rewrites entries to pointers - Rejected as accumulating clutter that needs periodic pruning, a maintenance chore with no consumer.
+84	
+85	### Consequences
+86	
+87	**Positive:**
+88	- Nothing in the backlog can contradict the spec system; the file only shrinks when work starts.
+89	- Transit import later maps cleanly: backlog statuses → Idea/Planning columns.
+90	
+91	**Negative:**
+92	- No single file shows the full pipeline; answering "what is in flight" still needs OVERVIEW.md.
+93	
+94	---
+95	
+96	## Decision 4: Confirm once per run, then delete sources
+97	
+98	**Date**: 2026-08-26
+99	**Status**: accepted
+100	
+101	### Context
+102	
+103	Consumed sources (nextup.md zones, loose proposals) are mostly gitignored or untracked, so deletion is unrecoverable. The clearing step must balance safety against leaving stale husks.
+104	
+105	### Decision
+106	
+107	The skill shows what it filed from each source and asks for approval once per run before deleting the source files. Declining leaves all sources untouched while keeping the filed entries.
+108	
+109	### Alternatives Considered
+110	
+111	- **Delete only after commit**: strongest guarantee - Rejected because it forces a commit into the skill's flow, and committing stays a user action.
+112	- **Empty, never delete**: truncate to a template - Rejected because empty husk files are exactly the clutter being retired.
+113	
+114	### Consequences
+115	
+116	**Positive:**
+117	- Untracked content is safe: by the time sources are deleted, it lives in the tracked backlog.
+118	
+119	**Negative:**
+120	- A declined confirmation leaves content duplicated between source and backlog until the next run.
+121	
+122	---
+123	
+124	## Decision 5: Routing can amend requirements, not just append tasks
+125	
+126	**Date**: 2026-08-26
+127	**Status**: accepted
+128	
+129	### Context
+130	
+131	A captured item that belongs to an existing spec could be filed as a task (fits existing requirements) or could change the spec's scope. Filing scope changes as tasks would silently bypass the requirements gate.
+132	
+133	### Decision
+134	
+135	Routing has three destinations: existing-spec task, existing-spec requirement amendment (which flags design/tasks as stale so those workflows re-run), or backlog entry (`needs-spec` / `idea`). Items are filed directly — the backlog only ever holds work with no spec home.
+136	
+137	### Rationale
+138	
+139	Requirement amendments make downstream change salient and re-engage the design/tasks workflows rather than letting scope creep in through the task list. The user accepted the resulting rebuild churn as a cost.
+140	
+141	### Alternatives Considered
+142	
+143	- **Always park in BACKLOG.md first**: human promotes later - Rejected as adding a manual step to every item; the backlog would accumulate routed-but-unmoved entries.
+144	- **Tasks-only routing**: never touch requirements - Rejected because scope changes filed as tasks bypass the requirements gate.
+145	
+146	### Consequences
+147	
+148	**Positive:**
+149	- Scope changes surface as requirement diffs, not buried tasks.
+150	
+151	**Negative:**
+152	- A requirement amendment obligates a design/tasks re-run — heavier than dropping in a task.
+153	
+154	---
+155	
+156	## Decision 6: Decision overwrite mode, per-repo opt-in
+157	
+158	**Date**: 2026-08-26
+159	**Status**: accepted
+160	
+161	### Context
+162	
+163	For some projects the supersede convention (mark old entry superseded, append new) buries the current state of a decision under its history. The user wants decisions overwritten in place for several of their application repos, so changes to design and downstream documents stay salient — accepting fragile renumbering in code comments and rebuild churn as a cost.
+164	
+165	### Decision
+166	
+167	A `decision_mode` key in `.agentic.json`: `overwrite` edits decision entries in place (same ID, updated date, no superseding entry); unset or `supersede` keeps today's behavior. The rollout sets `overwrite` in the repos the operator designates.
+168	
+169	### Alternatives Considered
+170	
+171	- **Overwrite as the global default, supersede opt-in**: covers "etc." without a list - Rejected by the user in favor of explicit opt-in.
+172	- **Global overwrite, supersede retired**: simplest - Rejected because repos where decision history matters (this repo among them) lose the audit trail.
+173	
+174	### Consequences
+175	
+176	**Positive:**
+177	- Decision logs in overwrite repos always read as current state; no archaeology through superseded entries.
+178	
+179	**Negative:**
+180	- Overwrite repos lose in-file decision history (git history still holds it).
+181	- References to decision IDs in code comments and documents can silently drift when entries are rewritten.
+182	
+183	---
+184	
+185	## Decision 7: BACKLOG.md encoding — phases as status, pending-only invariant
+186	
+187	**Date**: 2026-08-26
+188	**Status**: accepted
+189	
+190	### Context
+191	
+192	Rune's parser is strict (H1, H2 phases, checkbox task items, indented detail lines; free prose fails) and its status model is only pending/in-progress/completed. The requirements demanded rune-parseability and custom statuses (`idea`, `needs-spec`) without saying how the two coexist — flagged as a blocker by the design-critic and confirmed by peer review.
+193	
+194	### Decision
+195	
+196	Statuses are H2 phases: `## Idea` and `## Needs Spec`. Phase membership is the status. All entries stay unchecked forever — since promotion removes an entry (Decision 3), a checked or in-progress entry is a defect, not a state. Capture date, source, and proposed spec name are indented detail lines. Rune write commands are not used on BACKLOG.md, and the process-status report rune-parses the file to enforce the contract.
+197	
+198	### Rationale
+199	
+200	Phases are first-class in rune, entries move between statuses without touching detail lines, and "everything reads as Pending" converts from an apparent limitation into a checkable invariant. Detail-line statuses would be invisible to every parser and forfeit the point of rune-parseability.
+201	
+202	### Alternatives Considered
+203	
+204	- **Detail-line status (`Status: idea`)**: keeps one phase - Rejected because no parser can select on it, forcing a bespoke Transit importer later.
+205	- **Rune's native checkbox states as status**: no custom encoding - Rejected because pre-spec statuses do not map onto pending/in-progress/completed.
+206	
+207	### Consequences
+208	
+209	**Positive:**
+210	- The contract is mechanically checkable today (process-status parse) and importable later (phases → Transit columns).
+211	
+212	**Negative:**
+213	- Rune's write/renumber commands must be avoided on this one file; hand-edits that break parsing block the skill until repaired.
+214	
+215	---
+216	
+217	## Decision 8: decision_mode is read from .agentic.json at run time
+218	
+219	**Date**: 2026-08-26
+220	**Status**: accepted
+221	
+222	### Context
+223	
+224	The draft said the mode would be "generated into each repo's agent instructions" — but review verified no per-repo agent-instruction generation path exists for any repo (align writes only MCP configs into targets; copilot-instructions is gated on `cloud_assets`, which is false in the repos the mode targets). The convention agents actually follow is a globally symlinked format reference that cannot express per-repo modes.
+225	
+226	### Decision
+227	
+228	Decision-writing workflows read `decision_mode` from the repo's `.agentic.json` at run time, defaulting to `supersede`. The global decision-log format reference and the shared convention text in all three toolchain wrappers (Claude, Codex, Copilot) document both modes and the manifest read. The named workflows: starwave skills, smolspec, fix-bug, spec-janitor, /backlog.
+229	
+230	### Alternatives Considered
+231	
+232	- **Per-repo generated instruction text**: static per-repo files - Rejected because the generation path doesn't exist and would have to be built, and generated text goes stale against the manifest.
+233	- **Global convention only, no manifest**: simplest - Rejected because it cannot express per-repo modes at all.
+234	
+235	### Consequences
+236	
+237	**Positive:**
+238	- One source of truth per repo; no new generation machinery.
+239	
+240	**Negative:**
+241	- Every decision-writing workflow gains a manifest-read step, and a repo without `.agentic.json` silently stays in supersede mode.
+242	
+243	---
+244	
+245	## Decision 9: Backlog/spec consistency via /backlog reconciliation, not starwave hooks
+246	
+247	**Date**: 2026-08-26
+248	**Status**: accepted
+249	
+250	### Context
+251	
+252	"Promotion removes the entry" had no owner: specs are normally created by the starwave workflow, which this feature does not modify, so entries for promoted work would linger — the drift Decision 3 exists to prevent.
+253	
+254	### Decision
+255	
+256	`/backlog` owns consistency: every run starts with a reconciliation pass that removes and reports entries whose proposed spec now exists. The starwave skills are untouched.
+257	
+258	### Alternatives Considered
+259	
+260	- **Modify starwave-creating-spec to prune the backlog**: removal at the moment of promotion - Rejected because it couples the spec workflow to the backlog and widens this feature into skills it otherwise doesn't touch.
+261	- **Manual removal**: human obligation - Rejected as the unenforced-discipline pattern that failed before.
+262	
+263	### Consequences
+264	
+265	**Positive:**
+266	- One owner; the spec workflow stays ignorant of the backlog.
+267	
+268	**Negative:**
+269	- Stale entries persist between /backlog runs (bounded by run frequency, and visible in the tracked file).
+270	
+271	---
+272	
+273	## Decision 10: Requirement amendments leave a tracked staleness task
+274	
+275	**Date**: 2026-08-26
+276	**Status**: accepted
+277	
+278	### Context
+279	
+280	Routing an item as a requirement amendment makes design.md/tasks.md stale. Reporting that only in-session is the ephemeral-state failure mode this feature exists to kill.
+281	
+282	### Decision
+283	
+284	An amendment appends a task to the amended spec's own task file naming the stale documents and the workflows to re-run. Amendments never renumber existing acceptance-criterion anchors.
+285	
+286	### Alternatives Considered
+287	
+288	- **Status flag in specs/OVERVIEW.md**: central visibility - Rejected because OVERVIEW.md is regenerated by the specs-overview skill and hand-set flags would be overwritten.
+289	- **In-session report only**: no artifact - Rejected as ephemeral state, the pattern being retired.
+290	
+291	### Consequences
+292	
+293	**Positive:**
+294	- Staleness is tracked, rune-visible, and surfaced by existing process-status drift checks.
+295	
+296	**Negative:**
+297	- The staleness task must be kept honest — completing the re-run must check it off.
+298	
+299	---
+300	
+301	## Decision 11: Sunset ordering — skill first, migrate, then remove
+302	
+303	**Date**: 2026-08-26
+304	**Status**: accepted
+305	
+306	### Context
+307	
+308	align raises an error if its seed root lacks `nextup.example.md`, so deleting the canonical template before updating align breaks every align run. Review also found the sunset's real footprint is ~5x the skill directories: five test fixtures, three test files, four agent notes, a runbook, scripts/README, and a spec-janitor reference.
+309	
+310	### Decision
+311	
+312	Strict ordering: (1) the /backlog skill lands and syncs; (2) migration runs across participating repos; (3) the sunset removes the skills, align seeding + canonical template in the same change, tests/fixtures, and documentation. Since no seeded `nextup.example.md` copies exist in any target repo, align gets no removal behavior — residual cleanup belongs to the migration flow with human eyes on it.
+313	
+314	### Alternatives Considered
+315	
+316	- **align converges the absence of nextup.example.md**: automated cleanup - Rejected because zero seeded copies exist to clean, and post-deletion align has no canonical to judge "previously seeded" against without risking user content.
+317	- **No mandated ordering**: land as convenient - Rejected because one wrong merge order breaks align for every repo.
+318	
+319	### Consequences
+320	
+321	**Positive:**
+322	- No intermediate state where align is broken or intent files are orphaned without a destination.
+323	
+324	**Negative:**
+325	- The feature cannot ship as independent parallel streams; migration gates the sunset.
+326	
+327	---
+328	
+329	## Decision 12: Rollout administration is not a requirement
+330	
+331	**Date**: 2026-08-26
+332	**Status**: accepted
+333	
+334	### Context
+335	
+336	The draft requirements carried per-repo rollout actions — enrolling new participants, setting `decision_mode` in designated repos, migration checklists, residual-file cleanup in other repos. The user's review: adoption or removal of tools in other repos is post-build administration, not system design; keeping it in requirements pollutes context and intent. A follow-up ruling extended this: committed spec documents must not name repos outside this one or machine-local paths — they would publish what the developer works on and reference ephemeral resources.
+337	
+338	### Decision
+339	
+340	Requirements describe only system behavior — what `/backlog` does in whatever repo it runs in, and what the sunset changes in this repo's toolchain. All per-repo rollout actions move to `rollout.md` in this spec folder as a checklist. Decisions 2 (enrollment scope) and 11 (skill → migrate → sunset ordering) stand, but their per-repo substance is executed via rollout.md, and the requirements retain only the toolchain-internal ordering constraint (skill present before sunset lands).
+341	
+342	### Rationale
+343	
+344	Behaviors like nextup.md user-zone capture, duplicate dropping, and all-duplicate delete eligibility are system requirements because they hold wherever the skill runs; visiting thirteen repos is a one-time operation with no design content. Separating them keeps the requirements testable against the system rather than against the state of the user's filesystem.
+345	
+346	### Alternatives Considered
+347	
+348	- **Keep rollout in requirements as a numbered section**: everything in one document - Rejected by the user: it pollutes design context and intent with administration.
+349	- **Rollout as tasks in the task phase**: tracked with the implementation - Rejected because the task phase is coding-only by convention, and repo visits are not coding.
+350	
+351	### Consequences
+352	
+353	**Positive:**
+354	- Requirements stay about the system; the design phase inherits no per-repo noise.
+355	- Rollout has a checkable home with exit criteria instead of being implied by ACs.
+356	
+357	**Negative:**
+358	- rollout.md is a new document kind in the spec folder; completion tracking is manual checkboxes, not rune.
+359	
+360	---
+361	
+362	## Decision 13: Duplicate detection matches repo-realized work, not only specs
+363	
+364	**Date**: 2026-08-26
+365	**Status**: accepted
+366	
+367	### Context
+368	
+369	The design's contract notes widened the drop criterion from "realized in a spec" to shipped work generally — flagged by the design-critic as a requirements change smuggled through the design, feeding delete-eligibility of unrecoverable untracked sources. But the narrower criterion fails on the feature's own worked examples: consumed intent zones are typically realized via commits and changelog entries, not spec text, so migration would re-file already-shipped work.
+370	
+371	### Decision
+372	
+373	An item is a duplicate when its substance exists in the backlog, a spec document, or shipped work recorded in the repository (code, CHANGELOG). ACs 1.5 and 2.6 are amended accordingly; the match target is always reported, and the per-run deletion approval remains the backstop.
+374	
+375	### Alternatives Considered
+376	
+377	- **Spec-realization only**: as originally approved - Rejected because consumed zones would never register as duplicates and migration would re-file shipped work.
+378	- **Backlog-only matching**: cheapest check - Rejected because it re-files anything that skipped the backlog on its way to shipping, which is most historical work.
+379	
+380	### Consequences
+381	
+382	**Positive:**
+383	- Migration recognizes consumed zones; the backlog stays free of already-shipped work.
+384	
+385	**Negative:**
+386	- The judgment surface is larger (code and changelog, not just specs), so dedup quality depends more on session diligence; the deletion approval gate is the control.
+387	
+388	---
+389	
+390	## Decision 14: decision_mode delivery is two-channel; AC 5.3 scoped by behavior
+391	
+392	**Date**: 2026-08-26
+393	**Status**: accepted
+394	
+395	### Context
+396	
+397	The design claimed one paragraph in shared conventions would reach all decision-writing workflows with no per-skill edits. Review disproved this: three skills hard-code the supersede convention in their own instructions (spec-janitor's audit mandate, and the mid-implementation edit clauses in make-it-so and next-task), and skill-local instructions beat generic convention text at runtime. Review also found AC 5.3's named list was wrong: fix-bug contains no decision-log behavior, and /backlog itself writes none.
+398	
+399	### Decision
+400	
+401	Deliver the mode through both channels: the generated conventions text (all three toolchains), plus one-sentence edits to every skill whose instructions direct decision-log revision — spec-janitor (SKILL.md and its spec-conventions reference), make-it-so, next-task. AC 5.3 is amended to name workflows by behavior: skills whose instructions direct decision-log creation or revision.
+402	
+403	### Alternatives Considered
+404	
+405	- **Conventions text only**: single edit - Rejected because skill-local supersede mandates override it; spec-janitor would flag overwrite-mode logs as drift.
+406	- **Per-skill edits only, no conventions text**: precise - Rejected because ad-hoc decision writing outside any skill (common in sessions) would never learn the mode.
+407	
+408	### Consequences
+409	
+410	**Positive:**
+411	- No skill contradicts the mode; sessions without a skill still get the rule from conventions.
+412	
+413	**Negative:**
+414	- Four skill files gain a mode-awareness sentence that future skill authors must remember to include when a new skill touches decision logs.
+415	
+416	---
+417	
+```
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Explore repo skill structure and shared conventions</summary>
+
+**Command:**
+```bash
+ls claude/skills/ | head -50 && echo --- && ls claude/skills/nextup/ 2>/dev/null && echo --- && ls claude/skills/spout/ 2>/dev/null && echo --- && find . -name "shared" -maxdepth 2 && echo --- && ls shared/ 2>/dev/null
+```
+
+**Result:**
+```
+agreement
+blitz-merge
+bug-blitz
+capture-knowledge
+catchup
+claude-code-workshop
+code-audit
+code-simplifier
+commit
+customer-docs-check
+design-critic
+efficiency-optimizer
+explain-like
+fiscal-probe
+fix-bug
+go-test-fixer
+invoice
+make-it-so
+next-task
+nextup
+permission-analyzer
+pr-overview
+pr-pilot
+pr-review-fixer
+pr-review-html
+prd
+pre-push-review
+project-init
+release-prep
+rune
+spec-janitor
+specs-overview
+spout
+starwave-creating-spec
+starwave-design
+starwave-requirements
+starwave-smolspec
+starwave-tasks
+swiftui-forms
+systematic-debugger
+ui-ux-reviewer
+---
+SKILL.md
+---
+SKILL.md
+---
+./shared
+---
+claude-wrapper.md
+codex-wrapper.md
+conventions.md
+copilot-wrapper.md
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 ToolSearch</summary>
+
+**Input:**
+```json
+{
+  "max_results": 5,
+  "query": "select:TaskCreate,TaskUpdate"
+}
+```
+
+**Result:**
+```
+[{"tool_name":"TaskCreate","type":"tool_reference"},{"tool_name":"TaskUpdate","type":"tool_reference"}]
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskCreate: Write the /backlog skill per design.md Components section: preflight, reconcile, gather, route, file, clear workflow; BACKLOG.md grammar; duplicate criterion.</summary>
+
+**Input:**
+```json
+{
+  "description": "Write the /backlog skill per design.md Components section: preflight, reconcile, gather, route, file, clear workflow; BACKLOG.md grammar; duplicate criterion.",
+  "subject": "Author claude/skills/backlog/SKILL.md (task 1)"
+}
+```
+
+**Result:**
+```
+Task #1 created successfully: Author claude/skills/backlog/SKILL.md (task 1)
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskCreate: Update test_generate.py goldens to expect decision_mode rules (red), then add rules to shared/conventions.md and decision-log-format.md, run make generate (green).</summary>
+
+**Input:**
+```json
+{
+  "description": "Update test_generate.py goldens to expect decision_mode rules (red), then add rules to shared/conventions.md and decision-log-format.md, run make generate (green).",
+  "subject": "decision_mode goldens + conventions (task 2.1, 2.2)"
+}
+```
+
+**Result:**
+```
+Task #2 created successfully: decision_mode goldens + conventions (task 2.1, 2.2)
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskCreate: Add one-sentence decision_mode deferrals to spec-janitor SKILL.md + spec-conventions.md, make-it-so SKILL.md, next-task SKILL.md.</summary>
+
+**Input:**
+```json
+{
+  "description": "Add one-sentence decision_mode deferrals to spec-janitor SKILL.md + spec-conventions.md, make-it-so SKILL.md, next-task SKILL.md.",
+  "subject": "Per-skill decision_mode edits (task 3)"
+}
+```
+
+**Result:**
+```
+Task #3 created successfully: Per-skill decision_mode edits (task 3)
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskUpdate</summary>
+
+**Input:**
+```json
+{
+  "status": "in_progress",
+  "taskId": "1"
+}
+```
+
+**Result:**
+```
+Updated task #1 status
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:49:48+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>claude/skills/nextup/SKILL.md</code></summary>
+
+```
+1	---
+2	name: nextup
+3	description: The universal entry point for a session. Reads the nextup.md user zone, works out where you are, and routes each job to the right next step — execute the user's instructions directly, author a standalone PRD, honour an act-autonomously flag, resume a spec phase, start a fresh spec, send a small job straight to a focused skill, fan several independent small jobs out to parallel sub-agents, recommend implementation, or close out the session. Use when the user says "/nextup", "run nextup", "what's next", "pick up where we left off", "close out", "wrap up", or starts a session without saying which command to run.
+4	---
+5	
+6	# Nextup — a pure router
+7	
+8	`/nextup` is the front door to a session: the user thinks outside Claude, writes instructions into `nextup.md`, and enters — the user zone is arbitrary instructions, treated like any prompt. `/nextup` routes: read the intent, pick the lane and the skill, dispatch. It keeps **no status record of its own** — the files in `specs/`, rune task lists, and `docs/agent-notes/` are the only record of progress, and anything the router itself learns or produces is said in plain English in this conversation. Run it from any branch, at any time; the branch is one signal for finding your feature, never a gate. The user has to be able to trust the routing blind, so every dispatch names the lane, the skill, and the one signal that decided it.
+9	
+10	`/nextup` is the **boundary** between the gated and ungated worlds. On one side is heavyweight, spec-driven development — the `/starwave` chain, with its approval gates. On the other is everything ungated: direct execution of whatever the user wrote, lighter focused skills (fix a bug, make a small change, improve an existing file), and `/prd`, which authors a standalone PRD document for a small project or a first MVP. Weigh the intent and send it down the right lane, preferring the lightest that genuinely fits; the gated lane is a recommendation for feature-shaped work, never an enforcement. The audience is often **non-technical**: every message you show the user is plain English — where they are and what happens next, no jargon.
+11	
+12	## `nextup.md`
+13	
+14	`nextup.md` lives at the repo root (gitignored; `nextup.example.md` is the tracked template it is seeded from). It is a **user-intent file**:
+15	
+16	- The **user zone** — everything above the first recognised marker (`<!-- LM -->`; treat legacy `<!-- ML -->`, `<!-- nextup:machine -->`, or a `# What I want` heading as equivalent) — is the user's authoritative intent.
+17	- Everything below that first marker is **not state**: ignore it — never read it as intent or status. The marker itself is a reserved anchor for tooling (`scripts/align.py` converges the template from it); the only line below it is an inert note saying so.
+18	- You never modify an existing `nextup.md` — not the user zone, not anything else. The one write allowed: when the file is missing, seed it **verbatim** from `nextup.example.md` (whose user-zone placeholder documents the `act autonomously` flag), or — when the template is absent too — write this skeleton:
+19	
+20	  ```markdown
+21	  <!-- USER -->
+22	
+23	  <user inputs for next session — free-form instructions, run as written; add a line `act autonomously` to skip approval gates>
+24	
+25	  <!-- LM -->
+26	
+27	  reserved marker for tooling — no session status is kept here
+28	  ```
+29	
+30	**Worktrees.** `nextup.md` is gitignored, so it never travels into a linked git worktree. When running in a worktree without one, read the main worktree's `nextup.md` (first entry of `git worktree list`) user zone for intent — do this yourself; the user should never have to ask.
+31	
+32	## Each run: open or close?
+33	
+34	- **Close-out** — the user is wrapping up ("close out", "wrap up", "save where we are", "/nextup close out", "end the session", or user-zone text that asks to close). Run the bookkeeping sweep and stop — see [Close-out mode](#close-out-mode).
+35	- **Open** (default) — everything else: read the state, route the intent.
+36	
+37	## Open mode — route the intent
+38	
+39	### 1. Find or seed `nextup.md`
+40	
+41	A missing `nextup.md` never blocks — seed it and carry on. An empty user zone is not a dead end either — fall through to feature detection. Stop and ask, in plain English, *"What's the first version (your MVP) you'd like to build?"* only when there is genuinely nothing to go on: no user text, no spec folder matching the branch, and no **in-flight** spec. A spec folder is in-flight only if it holds at least one spec document with real content (`requirements.md`, `design.md`, `tasks.md`, `smolspec.md`, or a non-empty `userinput.md`); a folder of empty stubs gives you the feature *name*, not intent.
+42	
+43	### 2. Identify the feature
+44	
+45	In priority order:
+46	
+47	1. **Explicit reference in the user zone wins.** If the user names a spec folder (`specs/foo/...`, `specs/bugfixes/baz/...`), that is the feature — read every file in it before deciding.
+48	2. **Branch.** Run `git rev-parse --abbrev-ref HEAD`; if the name maps to an existing `specs/<name>` folder (stripping any `specs/` prefix), that is the feature.
+49	3. **Fresh idea.** If nothing matches, treat the user-zone text as a fresh idea — step 5 picks the lane. The first spec of a project is conventionally the **MVP** (`specs/mvp/`), the smallest first version. A stub-only `specs/mvp/` gives the name but no intent: if the user zone describes the MVP, dispatch `/starwave:creating-spec` and pass it through; if the user zone is also empty, ask for the MVP first.
+50	
+51	### 3. Read the true state
+52	
+53	The files in `specs/{feature}/` are the source of truth for how far the work has got. Read what is present. A `prd.md` in the folder means the work was framed as a standalone PRD rather than a spec — see step 5. If `decision_log.md` exists, read it and mention you did.
+54	
+55	### 4. Honour explicit skill directives
+56	
+57	If the user zone names a skill ("run `/starwave:smolspec`", "`/fix-bug` this"), dispatch to it — this overrides the lane inference in step 5. Arguments passed to `/nextup` count as user-zone text for this run. When a directive contradicts the files (asks for `/starwave:design` with no `requirements.md`), the files win on state: name the conflict plainly, dispatch the nearest achievable step to what was asked, and say what you skipped and why. Never hard-refuse — a run that ends with a refusal and zero work is a failure.
+58	
+59	### 5. Route each job to its lane
+60	
+61	Pick a **lane** by the weight of the intent, then route within it. Don't push a one-line fix through a full spec, and don't smuggle a real feature past requirements. When the user zone plainly asks for something to be done, do it or dispatch it — never withhold direct execution in favour of a process.
+62	
+63	**Direct lane — instructions that don't call for spec work.** Most user-zone text is just instructions: run this, update that, investigate the other. Execute or dispatch them exactly as you would any prompt — no spec folder, no starwave routing. This is the one lane where you may do the work inline yourself.
+64	
+65	**`/prd` — a standalone document, not a lane.** When the user zone asks for a PRD, route to `/prd`; it authors `specs/{name}/prd.md` and closes out there. A PRD suits a small project or a first MVP, where one document can describe a whole system. It has no execution step of its own: nothing derives a task file from it, so do not route an existing `prd.md` onward to `/make-it-so`. Work that must react to change or growing complexity belongs in the spec lane instead.
+66	
+67	**The autonomy flag.** A user-zone line reading `act autonomously` (canonical; treat obvious variants like `autonomous: true` the same) flips the preference to the ungated lane end-to-end, because approval gates block fanning out parallel development attempts. With the flag set: the starwave chain runs without pausing at its approval gates (the user zone stands in for the answers), and a complete spec dispatches straight to `/make-it-so` instead of stopping at a recommendation. No approval gates anywhere: the flag is the user's sign-off in writing. Route into the gated lane only when the user zone explicitly demands a spec.
+68	
+69	For work that isn't plain instructions or a PRD request, weigh intent by concrete signals, not vibes:
+70	
+71	- **Light signals:** names an existing file or a specific defect; verbs like fix, tweak, rename, adjust, clean up; bounded to a few files; adds no new capability.
+72	- **Spec signals:** a new capability or feature; several components touched; open design decisions or trade-offs; words like build, MVP, feature.
+73	- A job matching both, or neither cleanly, starts at `/starwave:smolspec` — never guess it into the spec lane.
+74	
+75	**Light lane — bounded intent goes straight to a focused skill.** No requirements/design ceremony:
+76	
+77	| Intent | Route to |
+78	|---|---|
+79	| A specific bug to fix | `/fix-bug` |
+80	| "Fix all the bugs" / a batch of open bugs | `/fix-bug` per bug — fan them out per §5b |
+81	| A minor change, or an iterative improvement to an existing file | `/starwave:smolspec` |
+82	
+83	Iterative, in-place improvements to something that already exists stay in the light lane. If you're unsure whether a change is "minor", start at `/starwave:smolspec` — it escalates to a full spec when the work turns out bigger than it looked.
+84	
+85	**Note on the blitz skills.** `/bug-blitz` and `/blitz-merge` draw their bug list from Transit, which is not in use on this branch. Do not route to them until Transit is re-enabled; until then a batch of bugs fans out as parallel `/fix-bug` jobs.
+86	
+87	**Spec lane — substantial features are recommended into the starwave chain.** Route by the earliest unmet need:
+88	
+89	| State of `specs/{feature}/` | Route to |
+90	|---|---|
+91	| No folder, or only a stub / fresh idea | `/starwave:creating-spec` |
+92	| `requirements.md` only | `/starwave:design` |
+93	| `requirements.md` + `design.md`, no `tasks.md` | `/starwave:tasks` |
+94	| `smolspec.md`, no `tasks.md` | `/starwave:tasks` |
+95	| spec complete (`requirements.md` + `design.md` + `tasks.md`, or `smolspec.md` + `tasks.md`) | **Recommend implementation** (below) |
+96	
+97	**When the spec is complete**, tell the user in plain English that it's ready and recommend `/make-it-so` to build all tasks, or `/next-task` to do them one at a time. Recommend; do not invoke — execution is the user's call. (With the autonomy flag set, that call is already in writing: dispatch `/make-it-so` instead of stopping.)
+98	
+99	### 5b. One job or many?
+100	
+101	Split the user zone into **jobs**: independently completable pieces that share no files and no ordering. Most runs carry one job — hand it off inline as step 5 routed it. When there are several, route each through step 5 on its own, then split by whether it can run unattended:
+102	
+103	- **Unattended-safe jobs** — direct-lane or light-lane work that runs start to finish without stopping to ask the user — fan out in parallel. Spawn one sub-agent per job **in a single message**, each told to invoke that job's routed skill with the job's user-zone text as input. Jobs that mutate files each get an isolated git worktree so parallel commits don't race. You stay on as overseer: wait for all to return, surface any failure plainly instead of masking it, and report every job's outcome in the session's closing message.
+104	- **Gated jobs** — anything in the spec lane, because requirements and design need user sign-off a sub-agent cannot collect — never go to a sub-agent. Tell the user, before dispatching anything, which gated jobs you are not dispatching — so they can bring them back next run — then route the most important one inline.
+105	
+106	A batch of same-shaped bug fixes fans out here as one `/fix-bug` sub-agent per bug, each in its own worktree — `/bug-blitz` would normally own that pipeline, but it is out of service while Transit is off. A job you dispatched belongs to its skill or sub-agent — you don't implement, review, or commit it yourself on top; only a direct-lane job you kept inline is yours to do. Before dispatching, tell the user in one or two plain sentences per job: which job it is, the lane and the skill (or direct execution) you chose, and the deciding signal (a path from the user zone, the branch name, an explicit `/...` directive, the autonomy flag). Then dispatch and **pass the user-zone text as the input** — inline for a single job, via the sub-agent prompts for a fan-out — so the user never retypes their idea. You MUST NOT continue past the dispatch: inline, the routed skill owns the rest of the turn; in a fan-out, your last act is reporting the sub-agents' outcomes. Either way the user returns to `/nextup` next session to pick up again.
+107	
+108	## Close-out mode
+109	
+110	A bookkeeping sweep, then stop — nothing is written to `nextup.md`:
+111	
+112	1. **Re-read the ground truth** — the spec files in `specs/{feature}/` and the git state (branch, recent commits, `git status`) — so the handoff reflects reality, not memory.
+113	2. **Sweep for loose ends.** Scan the session for flagged-but-untracked items ("worth a follow-up", "separate ticket", "worth a regression test"). Add each to the feature's active tasks file via the rune skill; if there is no active tasks file, list them in the closing message instead.
+114	3. If any spec document changed this session, run `/specs-overview` once to regenerate `specs/OVERVIEW.md` — never hand-edit it.
+115	4. If a naming or canonicality conflict was adjudicated this session, record it in the feature's `decision_log.md` so it isn't re-litigated.
+116	5. **Close in plain English**: what this session established, what was decided, what's blocked, and the concrete next step with the skill that runs it. That message plus `specs/OVERVIEW.md` is the at-a-glance status between sessions. Then stop — do not route or dispatch.
+117	
+118	### Interrupts
+119	
+120	When the user interrupts or asks to pause mid-run, give a brief in-chat handoff — where things stand and the concrete next step — and stop. Nothing is written anywhere; a pause is a spoken close-out with whatever ground truth you have.
+121	
+122	## Hard rules
+123	
+124	- You never write `nextup.md` (seeding a missing one is the sole exception) and never read anything below its first marker as intent or state. Routing itself writes no other files; a direct-lane job you execute inline writes whatever the instruction calls for, like any prompt.
+125	- You **never** create or write anything under `specs/` — those folders are owned by the starwave and PRD skills; you read them, the chain writes them. **Close-out bookkeeping is the one exception**: the sweep may add follow-up tasks via the rune skill, append adjudicated decisions to `decision_log.md`, and regenerate `specs/OVERVIEW.md` via `/specs-overview`.
+126	- In the **gated lane** you are a dispatcher, not an implementer: you never write a spec feature's code, run its tests, or fix it inline, and without the autonomy flag you never invoke execution skills (`/make-it-so`, `/next-task`) — when a spec is complete you **recommend** and stop. The ungated lanes are different: a direct-lane instruction may be executed right here, and the autonomy flag dispatches execution end-to-end. Sub-agents run one skill each; deeper fan-out belongs to the skill itself.
+127	- The user zone is authoritative. When it conflicts with the files, follow the user and surface the conflict.
+128	- Raise blockers fast and in plain English — "I can't tell which feature you mean — is it X or Y?" is the right output when inputs are genuinely ambiguous.
+129	- One run does one mode: open (read, route, execute or dispatch — one job inline or several via parallel sub-agents) or close out (sweep, report, stop). Never proceed past the dispatch.
+130	
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Read: <code>claude/skills/spout/SKILL.md</code></summary>
+
+```
+1	---
+2	name: spout
+3	description: Report the current state of a repository's specs, the discrete next steps to take, and where new work belongs — an existing spec, a new spec, or (rarely, with a named reason) neither. Writes a single regenerated SPOUT.md at the repo root and nothing else. Read-only over the repo: it names the exact command for every step but never runs the work. Chains /explain-like. Written for a person to read and act on — prose and tables, no serialised output. Use when the user asks "what's the state of the specs", "what's outstanding", "where should this work go", "summarise this codebase", "spout". Not a stage of the spec workflow — it runs at any time, on any branch, without starting or advancing a spec.
+4	---
+5	
+6	# Spout
+7	
+8	Produce **one document** — `SPOUT.md` at the repo root — that answers three questions: what state is every spec in, what are the discrete next steps, and **where does new work belong**. Every step names the exact invocation that performs it and the larger goal it serves, so a reader can act on any line without holding the rest of the repo in their head.
+9	
+10	The document is **written for a person**. No JSON, no serialised step list, no schema — a reader should be able to open it, read a row, and do the thing. Structured state for machines belongs in `docs/agent-notes/` if it is wanted at all; duplicating the steps into a parseable block would only create a second copy to drift.
+11	
+12	Spout is an **orientation tool**, not a stage of the spec workflow. Complex systems outrun anyone's working memory — expert and newcomer alike need the code areas, the drivers behind them, and the reasons a thing is half-finished summarised before they can act. Spout knows the starwave process and defaults to it when guiding new work, but it neither starts nor advances a spec: run it at any time, on any branch.
+13	
+14	Spout is a **reporter, not an actor**. It reads the repo, writes `SPOUT.md`, and stops. It does not author specs, fix findings, run tasks, or dispatch skills — the one exception is chaining `/explain-like` to resolve ambiguity (see [Ambiguity](#5-ambiguity--chain-explain-like)). Guidance is delivered as a written recommendation with its reason, never as a dispatch.
+15	
+16	## Where spout sits
+17	
+18	| Skill | Owns | Writes |
+19	|---|---|---|
+20	| `/specs-overview` | The catalogue of what specs exist | `specs/OVERVIEW.md` |
+21	| **`/spout`** | **Standing state + next steps, as a document** | **`SPOUT.md` only** |
+22	
+23	Spout consumes ONLY extant code and documentation, and makes no changes to any code. If `specs/OVERVIEW.md` is missing or stale, that is a *step spout reports* (`SP-INDEX`), not work spout does.
+24	
+25	## Placement — where work belongs
+26	
+27	Whenever spout finds work that no spec covers, it must say where that work lands. **The default is always the starwave spec process.** Work leaves that process only for a reason spout names explicitly in the report; an unnamed exception is not an exception, it is an omission.
+28	
+29	Apply the ladder in order and stop at the first rung that fits:
+30	
+31	1. **An existing spec already owns this surface** → `SP-EXTEND:<spec>`. Amending a spec that covers the same problem beats opening a second one — two specs on one surface is the drift `/spec-janitor` exists to clean up (`SJ-SUP-001`). Name the spec and the section the work extends.
+32	2. **No spec owns it** → `SP-SPEC:<kebab-name>` → `/starwave:creating-spec`. Do **not** decide between smolspec and a full spec here; `/starwave:creating-spec` opens with its own scope assessment and owns that call. Spout says *a spec is needed*, never *which size*.
+33	3. **A named exception applies** → `SP-DIRECT:<kebab-name>`, and the step MUST carry the exception name from this closed list:
+34	
+35	| Exception | Covers | Still not exempt when |
+36	|---|---|---|
+37	| `brevity` | A change so small the spec would outweigh it | It adds a capability, changes an interface, or needs a decision recorded — then it is a spec, and `/starwave:creating-spec` may size it down to a smolspec |
+38	| `doc-only` | Documentation, comments, changelog prose — no behaviour change | The document is itself a spec artifact (that is `SP-EXTEND`) |
+39	| `file-transfer` | Copying or syncing files between repos with no authoring | The copy is adapted, rewritten, or re-scoped on arrival |
+40	| `operational` | A one-off command, investigation, or query leaving no artifact | It produces code, config, or a document that outlives the session |
+41	
+42	Anything not matching a row defaults to rung 1 or 2. When two rungs are arguable, take the **earlier** one — over-specifying is recoverable, under-specifying is the failure this ladder exists to prevent. When the choice between rungs 1 and 2 is genuinely undecidable from the files, that is an [ambiguity](#5-ambiguity--chain-explain-like), not a coin toss.
+43	
+44	## Arguments
+45	
+46	`/spout` — whole repo. `/spout <spec-path|spec-name>` — scope the report to one spec, still writing the whole document (out-of-scope specs collapse to one row each in [Spec state](#spec-state) with no steps). `/spout "<focus>"` — free text narrows which steps get ranked first and is recorded verbatim in the header.
+47	
+48	## Workflow
+49	
+50	### 1. Preflight
+51	
+52	- `git rev-parse --show-toplevel` for the repo root; `SPOUT.md` always lands there (not under `specs/`), because spout must also report on repos that have no `specs/`.
+53	- Read the existing `SPOUT.md` if present — specifically the step IDs in its Next steps table — and hold them for the [Since last run](#6-delta) delta. Never merge its prose forward; it is regenerated wholesale.
+54	- `date +%F` for the generation date. `git log -1 --format=%h` for the commit the report describes.
+55	- Check `specs/` exists. If it does not, go to [No specs](#no-specs).
+56	
+57	### 2. Read the state
+58	
+59	Read in this order; later sources override earlier ones on conflict, and every claim in the report must trace to one of them.
+60	
+61	1. `specs/OVERVIEW.md` — for curated display names, domains and summaries only. **Never** trust its Status column; recompute.
+62	2. Each spec folder's documents — mode is recognised from primary documents alone, per the spec-janitor conventions: `requirements.md` + `design.md` → full; `smolspec.md` → smol; `prd.md` → PRD lane; `report.md` under `specs/bugfixes/<entry>/` → bugfix.
+63	3. Task files (`tasks.md`, `tasks-*.md`) — via the three greps in [Task state](#task-state--regex-first), never by iterating files one at a time.
+64	4. `docs/agent-notes/` — read only the notes matching specs that have open steps; use them for the *why* in evidence lines, never as a source of status.
+65	5. `git log --format=%ad --date=short -- specs/<dir>` per spec for last-touched, and `git log --oneline -20` for repo-level context.
+66	6. `python3 <spec-janitor-skill-dir>/spec_lint.py . --json` when the auditor is reachable, **without `--fix`**. Exit 1 means findings, not failure. Findings become `SP-HYGIENE` steps, never repairs.
+67	
+68	Parallelise the git lookups and file reads.
+69	
+70	### Task state — regex first
+71	
+72	Task status is the single biggest input to the report and the easiest to get slowly. **Never loop over task files.** Three repo-wide greps answer every task question in three calls regardless of repo size, and the line numbers they return let you jump straight to any task without reading a file end to end:
+73	
+74	```bash
+75	# 1. Every incomplete task in the repo, with file and line — the primary signal
+76	grep -rnE --include='tasks*.md' -e '^[[:space:]]*- \[[ ~/-]\] ' specs
+77	
+78	# 2 & 3. Per-file totals and completions, for status derivation
+79	grep -rcE --include='tasks*.md' -e '^[[:space:]]*- \[[ xX~/-]\] ' specs | grep -v ':0$'
+80	grep -rcE --include='tasks*.md' -e '^[[:space:]]*- \[[xX]\] '      specs | grep -v ':0$'
+81	```
+82	
+83	Grep 1 is the one that matters: **empty output means every task in the repo is complete** (exit 1), and no further task reading is needed at all. Its output is already the evidence line for each `SP-IMPL` step — `file:line:` plus the task title and its `<!-- id:xxxxxxx -->` marker, in one pass.
+84	
+85	Regex notes, each load-bearing:
+86	
+87	- The marker class `[ ~/-]` is exactly rune's incomplete set: `[ ]` pending, plus `[-]`, `[~]`, `[/]` in progress. `[xX]` is the only complete form. Enumerate the markers — never `[^x]`, which swallows malformed lines as tasks. The `-` sits last in the class so it stays a literal.
+88	- Leading `[[:space:]]*` catches indented subtasks; the trailing space after `\]` rejects markdown link syntax and bare `[ ]` in prose.
+89	- `--include='tasks*.md'` scopes to task files. Add `--exclude-dir=bugfixes` when bugfix entries would otherwise be counted as spec tasks.
+90	- `-e` guards the pattern, which begins with a bracket class; `-rl` swaps grep 1 for a filename-only pre-filter when you only need *which* specs have open work.
+91	
+92	Then, and **only for the files grep 1 named**:
+93	
+94	- `rune list <file> --format json` when `rune` is on PATH — for task IDs, blocked-by edges and streams.
+95	- Absent rune, a ~10-line Read at the reported line number for that task's detail lines (`Blocked-by:`, `Stream:`, `Requirements:`).
+96	
+97	Files with no open tasks need neither call — greps 2 and 3 fully determine their status. On a repo where most specs are finished, that is the difference between two enrichment calls and dozens.
+98	
+99	**Human gates.** A task matching `- [ ] N. STOP` (or whose detail lines say a human reviews, pushes, or decides) is a decision gate, not agent work. It still emits `SP-IMPL`, but its `run` is the human action — `git log --oneline origin/main..HEAD` before a push review, say — never `/next-task`, which would hand a human's decision to an agent. Say plainly in the report when a spec's only open tasks are gates.
+100	
+101	### 3. Derive steps
+102	
+103	A **step** is one discrete action with an exact invocation. The kinds are a closed set — do not invent others:
+104	
+105	| Kind | Fires when | Invocation |
+106	|---|---|---|
+107	| `SP-EXTEND` | Uncovered work that an existing spec's surface already owns (ladder rung 1) | Amend that spec — `/starwave:requirements` for a full spec, `/starwave:smolspec` for a smol one |
+108	| `SP-SPEC` | Uncovered work no spec owns, or a folder of empty stubs (ladder rung 2) | `/starwave:creating-spec` |
+109	| `SP-DIRECT` | Uncovered work under a named exception (ladder rung 3) | The direct command or skill that does it — and the exception name |
+110	| `SP-DESIGN` | `requirements.md` present, `design.md` absent | `/starwave:design` |
+111	| `SP-TASKS` | Primary documents complete, no task file (spec-janitor `SJ-MODE-002`) | `/starwave:tasks` |
+112	| `SP-IMPL` | A task file has open tasks (grep 1 above) | `/next-task <task-file>` (or `/make-it-so` for the whole spec) — but the human action for a gate |
+113	| `SP-BUG` | A `specs/bugfixes/` entry whose `report.md` has no Resolution section | `/fix-bug <entry>` |
+114	| `SP-HYGIENE` | `spec_lint.py` findings, or judgment drift visible while reading | `/spec-janitor` |
+115	| `SP-INDEX` | `specs/OVERVIEW.md` missing, or its rows disagree with recomputed status | `/specs-overview` |
+116	| `SP-CLOSE` | Every task complete but the spec is not marked done or superseded | Human: annotate the spec, then `/specs-overview` |
+117	| `SP-EXPLAIN` | An ambiguity fired — see [step 5](#5-ambiguity--chain-explain-like) | `/explain-like <path>` |
+118	
+119	**Step ID** is `<kind>:<scope>`, where scope is the spec's repo-relative path under `specs/` (e.g. `SP-DESIGN:estimation/pipeline`), or the literal `repo` for repo-wide steps (`SP-INDEX:repo`). IDs are deterministic: the same outstanding work yields the same ID on every run, which is what makes the delta and the diffs meaningful. Never put line numbers or dates in an ID.
+120	
+121	Each step carries: the ID, a one-line imperative action, the exact invocation, readiness, its blockers, the **goal it serves**, and **evidence** — the file the step was derived from and why. A step with no evidence is not emitted. `SP-EXTEND`, `SP-SPEC` and `SP-DIRECT` additionally carry **placement** — the spec path the work joins, or `new:<kebab-name>` — and `SP-DIRECT` names its **exception**.
+122	
+123	**The goal.** A discrete step is only worth doing if it moves something larger. Every step says what that is, in a few words, in the Serves column:
+124	
+125	- With a `/spout "<focus>"` argument, the focus **is** the goal — say how each step advances it, and demote steps that advance nothing to a closing note rather than dropping them silently.
+126	- Without one, the goal is read from the repo: the spec the work belongs to, the release or milestone the spec serves, or the standing convention the step upholds (e.g. "spec-before-commit, per `CLAUDE.md`").
+127	- If a step serves no goal you can name from the files, that is worth saying plainly — an action nobody can justify is usually one to drop, and spout should surface it rather than pad the table.
+128	
+129	**Uncovered work** — the input to the [placement ladder](#placement--where-work-belongs) — is found from these signals only, each of which becomes the step's evidence:
+130	
+131	- Uncommitted or recent changes (`git status --porcelain`, `git log --oneline -20`) touching paths no spec's scope mentions.
+132	- Ghost references: a spec document naming work no spec folder covers (`SJ-GHOST-001` shape).
+133	- Follow-ups recorded in `docs/agent-notes/` with no task or spec behind them.
+134	- A `/spout "<focus>"` argument describing work not yet specced.
+135	
+136	Spout never invents work from what a repo "should probably have" — no signal, no step.
+137	
+138	**Blockers.** A step is blocked when another step must complete first: the starwave chain orders `SP-SPEC → SP-DESIGN → SP-TASKS → SP-IMPL` within a spec, and rune `blocked-by` edges order work inside `SP-IMPL`. Blockers are step IDs, never prose. Cross-spec blockers are only recorded when a spec document states the dependency explicitly — never inferred from topic similarity.
+139	
+140	### 4. Rank
+141	
+142	Rank descending by, in order: **ready before blocked**; then steps that unblock other steps; then specs touched in the last 30 days; then kind order exactly as listed in the table above, top to bottom (`SP-EXTEND` first, `SP-EXPLAIN` last). Ties break on spec path, alphabetically, so the ordering is stable across runs.
+143	
+144	Placement steps rank ahead of the rest of the chain deliberately: work with nowhere to live is the state most likely to bypass the spec process, so the report surfaces it before implementation detail.
+145	
+146	The report opens with exactly one **Start here** line naming a single ready step ID and its invocation. If nothing is ready — every step blocked, or no steps at all — say that in one sentence instead of manufacturing an action.
+147	
+148	### 5. Ambiguity — chain `/explain-like`
+149	
+150	Emit `SP-EXPLAIN` and chain `/explain-like` when any of these objectively hold. Do not use judgement about whether something "feels" unclear:
+151	
+152	1. Two step kinds fire for the same spec with no ordering between them.
+153	2. A spec's documents contradict each other about direction, with no supersession annotation (`SJ-SUP-002` shape).
+154	3. Open tasks reference requirements anchors that do not resolve (`SJ-REF-001` shape) — what to implement is not determinable.
+155	4. A `/spout <focus>` argument maps to no spec, or to more than one.
+156	5. A design document's next step depends on a decision absent from `decision_log.md`.
+157	6. Uncovered work fits ladder rung 1 and rung 2 equally — two existing specs could plausibly absorb it, or it is unclear whether it extends a spec or opens one. Report both candidates; never split the difference.
+158	
+159	On trigger: run `/explain-like` against the specific document, and fold its **Intermediate level** summary plus its **Validation Findings** into the Ambiguities section of `SPOUT.md`. **Decline explain-like's offer to save `explanation.md`** — spout emits one document, and `/specs-overview` treats `explanation.md` as session-scoped anyway.
+160	
+161	Run the chain inline for at most the **three** highest-ranked ambiguities. List the remainder with their exact `/explain-like` invocations, and state in the report how many were listed rather than run — a truncated sweep must never read as a complete one.
+162	
+163	### 6. Delta
+164	
+165	Compare the previous run's step IDs (held from step 1) against this run's:
+166	
+167	- **Resolved** — in the old set, absent now.
+168	- **New** — absent from the old set.
+169	- **Carried** — in both. For carried steps, note how many runs they have survived if the old block recorded it.
+170	
+171	Omit the section entirely on a first run rather than printing three empty lists.
+172	
+173	### 7. Write
+174	
+175	Overwrite `SPOUT.md` wholesale. This is the only file spout writes, ever.
+176	
+177	## Output structure
+178	
+179	````markdown
+180	# SPOUT — <repo name>
+181	
+182	Generated <YYYY-MM-DD> at <short-sha> from <N> specs<, focused on "<focus>">.
+183	Regenerated wholesale by `/spout` — do not hand-edit.
+184	
+185	**Start here:** `SP-EXTEND:estimation/pipeline` — the retry-backoff work in the last three commits has no spec; amend `specs/estimation/pipeline/requirements.md` via `/starwave:requirements`.
+186	
+187	## Next steps
+188	
+189	| # | ID | Do this | Run | Serves | Ready |
+190	|---|----|---------|-----|--------|-------|
+191	| 1 | `SP-EXTEND:estimation/pipeline` | Fold retry-backoff into the pipeline spec's §Failure handling | `/starwave:requirements` | Spec-before-commit, per `CLAUDE.md` | yes |
+192	| 2 | `SP-IMPL:estimation/pipeline` | Implement the 4 open tasks of 9 | `/next-task specs/estimation/pipeline/tasks.md` | Finishing the estimation pipeline | yes |
+193	| 3 | `SP-DESIGN:capture/intake` | Author the design document | `/starwave:design` | Unblocking intake capture | blocked by `SP-SPEC:capture/intake` |
+194	
+195	## Placement
+196	
+197	Where uncovered work belongs. The default is the spec process; exceptions are named.
+198	
+199	| ID | Work | Lands in | Why |
+200	|----|------|----------|-----|
+201	| `SP-EXTEND:estimation/pipeline` | Retry backoff (commits 32e32f8, ee1b7ea) | `estimation/pipeline` §Failure handling | Existing spec owns the retry surface |
+202	| `SP-SPEC:audit-export` | CSV export of the audit log | new spec `audit-export` | New capability; no spec covers export |
+203	| `SP-DIRECT:sync-brewfile` | Copy Brewfile from the tooling repo | no spec — `file-transfer` | Verbatim copy, no authoring |
+204	
+205	## Spec state
+206	
+207	| Spec | Mode | Status | Tasks | Last touched | Open steps |
+208	|------|------|--------|-------|--------------|------------|
+209	| estimation/pipeline | full | In Progress | 5/9 | 2026-08-11 | `SP-IMPL` |
+210	
+211	## Ambiguities
+212	
+213	### `SP-EXPLAIN:capture/intake`
+214	
+215	**Why:** design.md §Storage and §Retention describe mutually exclusive schemes with no supersession marker.
+216	
+217	<intermediate-level explanation and validation findings from /explain-like>
+218	
+219	**To resolve:** run `/explain-like specs/capture/intake/design.md`, then record the outcome in `decision_log.md`.
+220	
+221	## Since last run
+222	
+223	- **Resolved:** `SP-TASKS:estimation/pipeline`
+224	- **New:** `SP-EXPLAIN:capture/intake`
+225	- **Carried:** `SP-INDEX:repo` (3 runs)
+226	
+227	## Evidence
+228	
+229	What each step rests on, so a reader can check the reasoning rather than take it on trust.
+230	
+231	- `SP-EXTEND:estimation/pipeline` — `src/pipeline/retry.py` changed in `32e32f8`; no spec's scope mentions retry backoff.
+232	- `SP-DIRECT:sync-brewfile` — `Brewfile` is a verbatim copy with no authoring, so the `file-transfer` exception applies.
+233	````
+234	
+235	Sections with no content are omitted, not printed empty. The document ends at the evidence — there is no serialised appendix.
+236	
+237	## No specs
+238	
+239	When `specs/` is absent or empty, keep the same document and the same step grammar, and infer succinctly:
+240	
+241	- Read `git log --oneline -30`, `git status --porcelain`, the README, and any `docs/agent-notes/` — nothing else.
+242	- Run the placement ladder over each coherent body of in-flight or obviously-next work. With no specs to extend, rung 1 never fires: every body of work is `SP-SPEC:<kebab-name>` → `/starwave:creating-spec`, unless a named exception makes it `SP-DIRECT`.
+243	- The Spec state table is replaced by a short **Repo state** table (branch, unpushed commits, dirty paths); the Placement table stays.
+244	- Prefer tables and lists over prose; cap inference at five steps and say so if more were possible.
+245	
+246	A repo with no specs is the case where the spec-process default matters most — a first spec is conventionally the MVP (`specs/mvp/`), the smallest first version. Recommend it; do not create it.
+247	
+248	Never create `specs/` or any spec folder to make the report tidier.
+249	
+250	## Constraints
+251	
+252	- MUST write `SPOUT.md` at the repo root and **nothing else** — no spec files, no source, no `specs/OVERVIEW.md`, no `explanation.md`. The single exception is an explicit user instruction in the invoking turn to write elsewhere or additionally.
+253	- MUST be read-only over everything else: `rune list` only (never `add`/`update`/`complete`), `spec_lint.py` without `--fix`, git query commands only.
+254	- MUST NOT dispatch or perform the work it reports. `/explain-like` is the only skill spout invokes.
+255	- MUST give every step an ID from the closed kind set, an exact invocation, the goal it serves, and at least one piece of evidence.
+256	- MUST be readable end to end by a person: prose, tables and lists only. MUST NOT emit JSON, YAML, or any serialised step list — structured state for machines belongs in `docs/agent-notes/`, not here.
+257	- MUST default uncovered work to the starwave spec process, and MUST name the exception from the closed list whenever it does not. An `SP-DIRECT` step without an exception name is invalid output.
+258	- MUST NOT size a new spec — `/starwave:creating-spec` owns the smolspec-versus-full assessment. Spout says a spec is needed, never which kind.
+259	- MUST prefer extending an existing spec over opening a second one on the same surface.
+260	- MUST recompute status from task files and git; MUST NOT copy a Status value from `specs/OVERVIEW.md`.
+261	- MUST derive task state from the three repo-wide greps, honouring rune's `[-]`, `[~]`, `[/]` markers as incomplete. MUST NOT iterate task files one at a time, and MUST NOT call `rune list` on a file grep 1 did not name.
+262	- MUST give a human gate the human action as its `run`, never `/next-task`.
+263	- MUST state any cap it hit **in prose** — ambiguities listed rather than explained, inferred steps truncated — rather than letting a partial sweep read as complete.
+264	- MUST produce identical step IDs across two runs with no intervening repo change; the document may differ only in its generation date and commit.
+265	
+```
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+cat shared/conventions.md
+```
+
+**Result:**
+```
+# Communication Style
+
+- DO NOT overcomplicate things. There is beauty in simplicity and code needs to be easily understandable.
+- DO NOT act sycophantic. Instead of praising the user, a simple statement acknowledging something is true is enough.
+- DO NOT use hyperbolic terms like comprehensive. Be clear and concise in your wording.
+- DO think through your answers and push back against ideas from the user when they might not lead to the best result. Explain why you disagree with the user.
+
+# Development Workflow
+
+- Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit
+- After writing code, you MUST ensure you use appropriate linters and validators.
+- When you discover a learning specific to a language that needs to be kept, add it to the related language-rule file (or create a new one if needed).
+- Manage tasks with the `rune` CLI; task files (`tasks.md` or `tasks-*.md`) MUST live under the feature's `specs/` folder and stay parseable by `rune list`.
+- Committed feature work requires its spec documents to exist in `specs/` first: a design document or PRD, plus the rune task file.
+- When creating GitHub issues, ALWAYS create them in the current repository unless explicitly told otherwise.
+
+# Agent Notes
+
+Maintain implementation notes in `docs/agent-notes/` to preserve knowledge across sessions.
+
+**Before starting a task**: Check `docs/agent-notes/` for relevant notes and read them. Only read what's relevant — don't load everything.
+
+**After completing a task**: Create or update notes about the code you worked on. Focus on:
+- How things work (architecture, data flow, key abstractions)
+- Non-obvious behavior, gotchas, and things that don't work as expected
+- Why certain approaches were chosen or rejected
+- Setup/configuration details that aren't obvious from the code
+
+Keep notes factual and concise. Organise by topic or module (e.g., `auth.md`, `api-layer.md`) — not by date or task. Update existing notes rather than creating duplicates.
+
+# Project Conventions
+
+- When the user talks about a feature or spec, this will be a feature that has requirements, design, and tasks documents as well as a decision log in a subfolder of the specs directory. The feature's name will be that of the subfolder. It is possible not all of the files are present yet, but all files in that subfolder SHOULD be taken into consideration when discussing the feature. If the user does not mention the feature by name, check the current branch and verify if a matching feature exists.
+- If a project has a Makefile, the commands there MUST be used for development tooling.
+
+# CLI Commands
+
+If `run_silent` is available (check with `which run_silent`), use it to reduce token usage by buffering stdout/stderr and only showing them on non-zero exit.
+
+- Wrap bash/CLI commands with `run_silent` unless you need to see all the stdout
+- Good commands to prefix: package installs, builds, tests, linting
+- Examples:
+  - `run_silent pnpm install`
+  - `run_silent cargo check`
+  - `run_silent make lint`
+
+# Documentation Standards
+
+Decision log entries use the Enhanced Nygard ADR structure with required fields (ID, Date, Status, Context, Decision, Rationale) and recommended fields (Alternatives Considered, Consequences). Document at least two alternatives with rejection reasons, and list both positive and negative consequences. Entries live in the feature's `decision_log.md`, separated by horizontal rules.
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+cat claude/rules/references/decision-log-format.md
+```
+
+**Result:**
+```
+# Decision Log Format
+
+## Format: Enhanced Nygard ADR
+
+Decision logs use the Enhanced Nygard ADR format - based on Michael Nygard's Architecture Decision Record format with additional fields for comprehensive decision tracking.
+
+## Decision Entry Template
+
+```markdown
+## Decision {ID}: {Title}
+
+**Date**: YYYY-MM-DD
+**Status**: {proposed | accepted | rejected | deprecated | superseded by Decision X}
+
+### Context
+
+{1-3 paragraphs describing the situation, problem, or requirement that motivates
+this decision. Explain what issue needs to be addressed and why it matters.}
+
+### Decision
+
+{Clear, concise statement of what was decided. Use declarative language.
+Example: "Use standard markdown link format for requirement references."}
+
+### Rationale
+
+{Explanation of why this decision was made. Cover the reasoning, justification,
+and key factors that led to this choice. This should make it clear why this
+decision makes sense given the context.}
+
+### Alternatives Considered
+
+- **{Alternative 1 name/description}**: {Brief description} - {Why it was rejected}
+- **{Alternative 2 name/description}**: {Brief description} - {Why it was rejected}
+- {Add more alternatives as needed}
+
+### Consequences
+
+**Positive:**
+- {Benefit or improvement 1}
+- {Benefit or improvement 2}
+
+**Negative:**
+- {Drawback, trade-off, or challenge 1}
+- {Drawback, trade-off, or challenge 2}
+
+### Impact
+
+{Optional section describing what parts of the system, codebase, or project
+are affected by this decision. Useful for understanding scope of change.}
+
+---
+```
+
+## Required Fields
+
+- **Decision ID and Title**: `## Decision {ID}: {Title}` - Sequential number and short title (5-10 words)
+- **Date**: `**Date**: YYYY-MM-DD` - ISO 8601 date format
+- **Status**: `**Status**: {value}` - One of: proposed, accepted, rejected, deprecated, superseded by Decision X
+- **Context**: H3 section - 1-3 paragraphs explaining the situation
+- **Decision**: H3 section - Clear statement of what was decided (1-3 sentences, declarative)
+- **Rationale**: H3 section - Explanation of why this decision was made
+
+## Highly Recommended Fields
+
+- **Alternatives Considered**: H3 section with bulleted list `- **{Name}**: {Description} - {Rejection reason}`
+- **Consequences**: H3 section with `**Positive:**` and `**Negative:**` subsections, each with bulleted lists
+
+## Optional Fields
+
+- **Impact**: H3 section describing affected areas (use for decisions with significant scope)
+
+## Writing Guidelines
+
+1. **Be concise but complete** - Include necessary detail without verbosity
+2. **Write for the future** - Assume readers won't have current context
+3. **Document the "why" not just the "what"** - Focus on reasoning
+4. **Consider alternatives** - Show you evaluated multiple options (at least 2-3)
+5. **Be honest about trade-offs** - List both pros and cons
+
+## Quick Example
+
+```markdown
+## Decision 5: Use Go's Standard JSON Package
+
+**Date**: 2025-11-14
+**Status**: accepted
+
+### Context
+
+The application needs to serialize and deserialize JSON data for the API. We need to choose a JSON library.
+
+### Decision
+
+Use Go's standard `encoding/json` package for JSON operations.
+
+### Rationale
+
+The standard library provides all necessary functionality for our use case. It's well-tested, maintained by the Go team, and adds no external dependencies.
+
+### Alternatives Considered
+
+- **jsoniter**: Faster performance - Rejected because performance is not critical for our use case
+- **easyjson**: Code generation approach - Rejected because it adds build complexity without sufficient benefit
+
+### Consequences
+
+**Positive:**
+- No external dependencies
+- Well-documented and familiar to all Go developers
+- Sufficient performance for our needs
+
+**Negative:**
+- Slower than some alternatives (not significant for our use case)
+- Less flexible than some third-party options
+
+---
+```
+
+## File Structure
+
+- **File name**: `decision_log.md`
+- **Location**: In the feature's spec directory (e.g., `specs/feature-name/decision_log.md`)
+- **File header**: `# Decision Log: {Feature Name}`
+- **Separator**: Use `---` between decisions
+
+## Quick Checklist
+
+When adding a decision, ensure:
+- [ ] Unique sequential ID
+- [ ] Clear, descriptive title
+- [ ] Date in YYYY-MM-DD format
+- [ ] Valid status value
+- [ ] Context explains the situation
+- [ ] Decision statement is clear and specific
+- [ ] Rationale explains why
+- [ ] At least 2 alternatives documented with rejection reasons
+- [ ] Both positive and negative consequences listed
+- [ ] Horizontal rule (`---`) separates from next decision
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+find . -iname "generate.py" -o -iname "test_generate.py" | grep -v node_modules
+```
+
+**Result:**
+```
+./tests/test_generate.py
+./scripts/generate.py
+./.worktrees/template-repo/tests/test_generate.py
+./.worktrees/template-repo/scripts/generate.py
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:49:55+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>scripts/generate.py</code></summary>
+
+```
+1	#!/usr/bin/env python3
+2	"""Generate per-tool configuration from this repository's sources.
+3	
+4	Sources: shared/*.md fragments and mcp/servers.json.
+5	Python 3 stdlib only (Decision 12). Reusable logic lives in agentic_lib.py
+6	so align.py can import it.
+7	
+8	Usage:
+9	  generate.py                 regenerate checked-in conventions outputs
+10	  generate.py --user          user-level targets (Claude MCP, VS Code
+11	                              mcp.json/settings, Codex config.toml +
+12	                              AGENTS.md)
+13	  generate.py --repo PATH     per-repo .mcp.json + .vscode/mcp.json +
+14	                              .codex/config.toml
+15	  generate.py --cloud         print paste-ready cloud-agent MCP JSON
+16	  generate.py --servers a,b   subset of canonical servers (default: all
+17	                              applicable to the surface)
+18	"""
+19	
+20	from __future__ import annotations
+21	
+22	import argparse
+23	import sys
+24	from pathlib import Path
+25	
+26	sys.path.insert(0, str(Path(__file__).resolve().parent))
+27	
+28	import agentic_lib  # noqa: E402
+29	
+30	REPO_ROOT = Path(__file__).resolve().parent.parent
+31	
+32	
+33	def main(argv=None) -> int:
+34	    parser = argparse.ArgumentParser(description=__doc__)
+35	    parser.add_argument("--user", action="store_true",
+36	                        help="generate user-level configs")
+37	    parser.add_argument("--repo", metavar="PATH",
+38	                        help="generate per-repo MCP configs into PATH")
+39	    parser.add_argument("--cloud", action="store_true",
+40	                        help="print paste-ready cloud-agent MCP JSON")
+41	    parser.add_argument("--servers", metavar="A,B",
+42	                        help="comma-separated subset of canonical servers")
+43	    args = parser.parse_args(argv)
+44	
+45	    report: list = []
+46	    subset = args.servers.split(",") if args.servers else None
+47	
+48	    try:
+49	        if args.repo:
+50	            defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
+51	            agentic_lib.generate_repo_configs(Path(args.repo), defs, subset,
+52	                                              report)
+53	        elif args.cloud:
+54	            defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
+55	            print(agentic_lib.emit_cloud_json(defs, subset))
+56	        elif args.user:
+57	            defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
+58	            agentic_lib.generate_user_configs(defs, subset, report,
+59	                                              repo_root=REPO_ROOT)
+60	        else:
+61	            agentic_lib.generate_conventions(REPO_ROOT, report)
+62	    except agentic_lib.GenerationError as exc:
+63	        print(f"error: {exc}", file=sys.stderr)
+64	        return 1
+65	
+66	    for entry in report:
+67	        print(entry)
+68	    changed = any(getattr(entry, "kind", "changed") == "changed"
+69	                  for entry in report)
+70	    if not changed and not args.cloud:
+71	        print("no changes")
+72	    return 0
+73	
+74	
+75	if __name__ == "__main__":
+76	    sys.exit(main())
+77	
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Read: <code>tests/test_generate.py</code></summary>
+
+```
+1	"""Tests for scripts/generate.py and scripts/agentic_lib.py.
+2	
+3	Golden-fixture tests only; no test ever touches real user files —
+4	every target path is injected into a temp directory.
+5	"""
+6	
+7	import sys
+8	import tempfile
+9	import unittest
+10	from pathlib import Path
+11	from unittest import mock
+12	
+13	TESTS_DIR = Path(__file__).resolve().parent
+14	REPO_ROOT = TESTS_DIR.parent
+15	FIXTURES = TESTS_DIR / "fixtures"
+16	
+17	sys.path.insert(0, str(REPO_ROOT / "scripts"))
+18	
+19	import agentic_lib  # noqa: E402
+20	
+21	
+22	class MarkerContractTests(unittest.TestCase):
+23	    """Regression test for bugfix golden-test-markers.
+24	
+25	    The managed-block marker strings are a compatibility contract
+26	    (Decision 15, specs/toolset-agnostic-starwave): they identify
+27	    tool-owned blocks in already-generated and already-seeded files.
+28	    Changing them orphans every existing managed file, because
+29	    write_managed/align treat a file without the current markers as
+30	    hand-written and skip it forever. Commit 0d0f3f4 changed them by
+31	    accident; this test pins them so any future change fails loudly
+32	    with this explanation instead of via opaque golden diffs.
+33	    """
+34	
+35	    def test_managed_block_markers_are_stable(self):
+36	        self.assertEqual(agentic_lib.BEGIN_MARKER, "<!-- agentic:begin -->")
+37	        self.assertEqual(agentic_lib.END_MARKER, "<!-- agentic:end -->")
+38	
+39	
+40	class ConventionsAssemblyTests(unittest.TestCase):
+41	    """Task 1: conventions assembly from shared fragments."""
+42	
+43	    def test_claude_md_matches_golden(self):
+44	        block = agentic_lib.build_claude_block(FIXTURES / "shared")
+45	        text = agentic_lib.managed_file_text(block)
+46	        golden = (FIXTURES / "golden" / "CLAUDE.md").read_text()
+47	        self.assertEqual(text, golden)
+48	
+49	    def test_copilot_instructions_match_golden(self):
+50	        block = agentic_lib.build_copilot_block(FIXTURES / "shared")
+51	        text = agentic_lib.managed_file_text(block)
+52	        golden = (FIXTURES / "golden" / "copilot-instructions.md").read_text()
+53	        self.assertEqual(text, golden)
+54	
+55	    def test_codex_agents_md_matches_golden(self):
+56	        block = agentic_lib.build_codex_block(FIXTURES / "shared")
+57	        text = agentic_lib.managed_file_text(block)
+58	        golden = (FIXTURES / "golden" / "AGENTS.md").read_text()
+59	        self.assertEqual(text, golden)
+60	
+61	    def test_copilot_output_contains_no_claude_wrapper_content(self):
+62	        block = agentic_lib.build_copilot_block(FIXTURES / "shared")
+63	        wrapper = (FIXTURES / "shared" / "claude-wrapper.md").read_text()
+64	        for line in wrapper.strip().splitlines():
+65	            if line.strip():
+66	                self.assertNotIn(line, block)
+67	
+68	    def test_real_copilot_output_has_no_claude_isms(self):
+69	        """The repo's actual shared/ fragments must keep the Copilot output
+70	        free of Claude-only mechanisms and Claude-tree paths (Req 3.3)."""
+71	        block = agentic_lib.build_copilot_block(REPO_ROOT / "shared")
+72	        for forbidden in (
+73	            "AskUserQuestion",
+74	            "rules/references",
+75	            ".claude/scripts",
+76	            ".claude/skills",
+77	            "explain-like",
+78	            "mcp__",
+79	        ):
+80	            self.assertNotIn(forbidden, block, f"Copilot output leaks {forbidden!r}")
+81	
+82	    def test_real_outputs_share_conventions_verbatim(self):
+83	        conventions = (REPO_ROOT / "shared" / "conventions.md").read_text().strip()
+84	        claude_block = agentic_lib.build_claude_block(REPO_ROOT / "shared")
+85	        copilot_block = agentic_lib.build_copilot_block(REPO_ROOT / "shared")
+86	        codex_block = agentic_lib.build_codex_block(REPO_ROOT / "shared")
+87	        self.assertIn(conventions, claude_block)
+88	        self.assertIn(conventions, copilot_block)
+89	        self.assertIn(conventions, codex_block)
+90	
+91	
+92	class ManagedBlockWriterTests(unittest.TestCase):
+93	    """Task 1: managed-block semantics (Decision 15)."""
+94	
+95	    def setUp(self):
+96	        self.tmp = tempfile.TemporaryDirectory()
+97	        self.addCleanup(self.tmp.cleanup)
+98	        self.dir = Path(self.tmp.name)
+99	
+100	    def test_missing_file_is_created_with_markers(self):
+101	        target = self.dir / "out.md"
+102	        report = []
+103	        changed = agentic_lib.write_managed(target, "hello", report)
+104	        self.assertTrue(changed)
+105	        text = target.read_text()
+106	        self.assertTrue(text.startswith(agentic_lib.BEGIN_MARKER))
+107	        self.assertIn("hello", text)
+108	        self.assertIn(agentic_lib.END_MARKER, text)
+109	
+110	    def test_content_outside_markers_survives_regeneration(self):
+111	        """Claude memory appends after the block must survive (Decision 15)."""
+112	        target = self.dir / "CLAUDE.md"
+113	        agentic_lib.write_managed(target, "generated v1", [])
+114	        memory = "\n# Memories\n\n- remember the thing\n"
+115	        target.write_text(target.read_text() + memory)
+116	        agentic_lib.write_managed(target, "generated v2", [])
+117	        text = target.read_text()
+118	        self.assertIn("generated v2", text)
+119	        self.assertNotIn("generated v1", text)
+120	        self.assertIn("- remember the thing", text)
+121	
+122	    def test_head_content_before_markers_survives(self):
+123	        target = self.dir / "out.md"
+124	        agentic_lib.write_managed(target, "body", [])
+125	        target.write_text("hand-written header\n" + target.read_text())
+126	        agentic_lib.write_managed(target, "body2", [])
+127	        text = target.read_text()
+128	        self.assertTrue(text.startswith("hand-written header\n"))
+129	        self.assertIn("body2", text)
+130	
+131	    def test_markerless_existing_file_is_skipped_and_reported(self):
+132	        target = self.dir / "out.md"
+133	        target.write_text("hand-written, no markers\n")
+134	        report = []
+135	        changed = agentic_lib.write_managed(target, "generated", report)
+136	        self.assertFalse(changed)
+137	        self.assertEqual(target.read_text(), "hand-written, no markers\n")
+138	        self.assertTrue(any("out.md" in str(r) and "marker" in str(r).lower()
+139	                            for r in report))
+140	
+141	    def test_rewrite_with_same_content_reports_no_change(self):
+142	        target = self.dir / "out.md"
+143	        agentic_lib.write_managed(target, "same", [])
+144	        changed = agentic_lib.write_managed(target, "same", [])
+145	        self.assertFalse(changed)
+146	
+147	
+148	def _load_fixture_servers():
+149	    return agentic_lib.load_servers(FIXTURES / "servers.json")
+150	
+151	
+152	def _golden_json(name):
+153	    import json
+154	    return json.loads((FIXTURES / "golden" / name).read_text())
+155	
+156	
+157	class McpEmissionTests(unittest.TestCase):
+158	    """Task 4: per-target MCP config shapes from a fixture servers.json."""
+159	
+160	    def setUp(self):
+161	        self.defs = _load_fixture_servers()
+162	
+163	    def test_repo_mcp_matches_golden(self):
+164	        got = agentic_lib.emit_repo_mcp(self.defs, None)
+165	        self.assertEqual(got, _golden_json("repo-mcp.json"))
+166	
+167	    def test_vscode_mcp_matches_golden(self):
+168	        got = agentic_lib.emit_vscode_mcp(self.defs, None)
+169	        self.assertEqual(got, _golden_json("vscode-mcp.json"))
+170	
+171	    def test_cloud_config_matches_golden(self):
+172	        got = agentic_lib.emit_cloud_config(self.defs, None)
+173	        self.assertEqual(got, _golden_json("cloud-mcp.json"))
+174	
+175	    def test_codex_mcp_toml_matches_golden(self):
+176	        got = agentic_lib.emit_codex_mcp_toml_block(self.defs, None)
+177	        golden = (FIXTURES / "golden" / "codex-mcp.toml").read_text().rstrip()
+178	        self.assertEqual(got, golden)
+179	
+180	    def test_cloud_json_is_paste_ready_string(self):
+181	        import json
+182	        text = agentic_lib.emit_cloud_json(self.defs, None)
+183	        self.assertEqual(json.loads(text), _golden_json("cloud-mcp.json"))
+184	
+185	    def test_subset_selection(self):
+186	        """Req 4.4: per-repo generation supports a subset of the set."""
+187	        got = agentic_lib.emit_repo_mcp(self.defs, ["alpha"])
+188	        self.assertEqual(sorted(got["mcpServers"]), ["alpha"])
+189	
+190	    def test_unknown_server_in_subset_errors_with_canonical_names(self):
+191	        with self.assertRaises(agentic_lib.GenerationError) as ctx:
+192	            agentic_lib.emit_repo_mcp(self.defs, ["nope"])
+193	        self.assertIn("nope", str(ctx.exception))
+194	        self.assertIn("alpha", str(ctx.exception))
+195	
+196	    def test_surface_filtering(self):
+197	        """zulu is vscode-only; claude and cloud shapes must exclude it."""
+198	        self.assertNotIn("zulu", agentic_lib.emit_repo_mcp(self.defs, None)["mcpServers"])
+199	        self.assertNotIn("zulu", agentic_lib.emit_cloud_config(self.defs, None)["mcpServers"])
+200	        self.assertIn("zulu", agentic_lib.emit_vscode_mcp(self.defs, None)["servers"])
+201	
+202	    def test_no_secret_values_in_any_output(self):
+203	        """Req 4.3: outputs reference secrets, never contain values."""
+204	        import json
+205	        for emitted in (
+206	            agentic_lib.emit_repo_mcp(self.defs, None),
+207	            agentic_lib.emit_vscode_mcp(self.defs, None),
+208	            agentic_lib.emit_cloud_config(self.defs, None),
+209	            agentic_lib.emit_codex_mcp(self.defs, None),
+210	        ):
+211	            text = json.dumps(emitted)
+212	            self.assertNotIn("some-secret-value", text)
+213	
+214	    def test_unmappable_secret_aborts_naming_server_and_target(self):
+215	        broken = agentic_lib.load_servers(FIXTURES / "servers-broken.json")
+216	        for emitter, target in (
+217	            (agentic_lib.emit_repo_mcp, "claude"),
+218	            (agentic_lib.emit_vscode_mcp, "vscode"),
+219	            (agentic_lib.emit_cloud_config, "cloud"),
+220	            (agentic_lib.emit_codex_mcp, "codex"),
+221	        ):
+222	            with self.assertRaises(agentic_lib.GenerationError) as ctx:
+223	                emitter(broken, None)
+224	            msg = str(ctx.exception)
+225	            self.assertIn("broken", msg, f"target {target}: server not named")
+226	            self.assertIn(target, msg, f"target {target}: target not named")
+227	
+228	
+229	class McpMergeTests(unittest.TestCase):
+230	    """Task 4: managed-merge behavior against existing target files."""
+231	
+232	    def setUp(self):
+233	        self.defs = _load_fixture_servers()
+234	        self.tmp = tempfile.TemporaryDirectory()
+235	        self.addCleanup(self.tmp.cleanup)
+236	        self.dir = Path(self.tmp.name)
+237	
+238	    def test_repo_generation_preserves_non_canonical_and_converges(self):
+239	        import json
+240	        repo = self.dir / "repo"
+241	        repo.mkdir()
+242	        existing = {
+243	            "mcpServers": {
+244	                "custom": {"type": "stdio", "command": "my-own-thing"},
+245	                "alpha": {"type": "stdio", "command": "/Users/ronan/stale/alpha"},
+246	            }
+247	        }
+248	        (repo / ".mcp.json").write_text(json.dumps(existing))
+249	        report = []
+250	        agentic_lib.generate_repo_configs(repo, self.defs, None, report)
+251	        result = json.loads((repo / ".mcp.json").read_text())
+252	        self.assertEqual(result["mcpServers"]["custom"],
+253	                         existing["mcpServers"]["custom"])
+254	        self.assertEqual(result["mcpServers"]["alpha"],
+255	                         _golden_json("repo-mcp.json")["mcpServers"]["alpha"])
+256	        self.assertTrue(any("custom" in str(r) for r in report),
+257	                        "preserved non-canonical entry must be reported")
+258	        vs = json.loads((repo / ".vscode" / "mcp.json").read_text())
+259	        self.assertEqual(vs, _golden_json("vscode-mcp.json"))
+260	        codex = (repo / ".codex" / "config.toml").read_text()
+261	        self.assertIn("[mcp_servers.alpha]", codex)
+262	        self.assertIn("[mcp_servers.bravo.env_http_headers]", codex)
+263	
+264	    def test_repo_generation_is_idempotent(self):
+265	        repo = self.dir / "repo"
+266	        repo.mkdir()
+267	        agentic_lib.generate_repo_configs(repo, self.defs, None, [])
+268	        report = []
+269	        agentic_lib.generate_repo_configs(repo, self.defs, None, report)
+270	        self.assertEqual([r for r in report if r.kind != "preserved"], [])
+271	
+272	    def test_invalid_target_json_backed_up_and_regenerated(self):
+273	        import json
+274	        repo = self.dir / "repo"
+275	        (repo / ".vscode").mkdir(parents=True)
+276	        bad = "{ not json !!!"
+277	        (repo / ".vscode" / "mcp.json").write_text(bad)
+278	        report = []
+279	        agentic_lib.generate_repo_configs(repo, self.defs, None, report)
+280	        result = json.loads((repo / ".vscode" / "mcp.json").read_text())
+281	        self.assertEqual(result, _golden_json("vscode-mcp.json"))
+282	        baks = list((repo / ".vscode").glob("mcp.json.bak-*"))
+283	        self.assertEqual(len(baks), 1)
+284	        self.assertEqual(baks[0].read_text(), bad)
+285	        self.assertTrue(
+286	            any(r.kind == "warning" and "non-canonical" in r.detail
+287	                and "backup" in r.detail for r in report),
+288	            "report must warn that non-canonical entries may be in the backup")
+289	
+290	    def test_non_dict_root_backed_up_and_regenerated(self):
+291	        """A parseable non-object root (top-level array) is invalid for a
+292	        managed file: backup + regenerate, never AttributeError."""
+293	        import json
+294	        repo = self.dir / "repo"
+295	        repo.mkdir()
+296	        bad = '["not", "a", "dict"]\n'
+297	        (repo / ".mcp.json").write_text(bad)
+298	        report = []
+299	        agentic_lib.generate_repo_configs(repo, self.defs, None, report)
+300	        result = json.loads((repo / ".mcp.json").read_text())
+301	        self.assertEqual(result, _golden_json("repo-mcp.json"))
+302	        baks = list(repo.glob(".mcp.json.bak-*"))
+303	        self.assertEqual(len(baks), 1)
+304	        self.assertEqual(baks[0].read_text(), bad)
+305	        self.assertTrue(any(r.kind == "warning" for r in report))
+306	
+307	    def test_claude_user_config_merge_preserves_unrelated_keys(self):
+308	        import json
+309	        cfg = self.dir / "claude.json"
+310	        existing = {
+311	            "theme": "dark",
+312	            "projects": {"/some/path": {"history": [1, 2, 3]}},
+313	            "mcpServers": {
+314	                "custom": {"type": "stdio", "command": "keep-me"},
+315	                "alpha": {"type": "stdio", "command": "/Users/ronan/go/bin/alpha"},
+316	            },
+317	        }
+318	        cfg.write_text(json.dumps(existing))
+319	        report = []
+320	        agentic_lib.update_claude_user_config(cfg, self.defs, None, report,
+321	                                              use_cli=False)
+322	        result = json.loads(cfg.read_text())
+323	        self.assertEqual(result["theme"], "dark")
+324	        self.assertEqual(result["projects"], existing["projects"])
+325	        self.assertEqual(result["mcpServers"]["custom"],
+326	                         existing["mcpServers"]["custom"])
+327	        golden = _golden_json("repo-mcp.json")["mcpServers"]
+328	        for name, spec in golden.items():
+329	            self.assertEqual(result["mcpServers"][name], spec)
+330	        self.assertTrue(any("custom" in str(r) for r in report))
+331	
+332	    def test_codex_config_preserves_unrelated_and_noncanonical_tables(self):
+333	        cfg = self.dir / "config.toml"
+334	        cfg.write_text(
+335	            'model = "gpt-5.5"\n\n'
+336	            '[projects."/tmp/repo"]\n'
+337	            'trust_level = "trusted"\n\n'
+338	            '[mcp_servers.custom]\n'
+339	            'command = "keep-me"\n\n'
+340	            '[mcp_servers.alpha]\n'
+341	            'command = "/Users/ronan/stale/alpha"\n'
+342	        )
+343	        report = []
+344	        agentic_lib.update_codex_config(cfg, self.defs, None, report)
+345	        text = cfg.read_text()
+346	        self.assertIn('model = "gpt-5.5"', text)
+347	        self.assertIn('[projects."/tmp/repo"]', text)
+348	        self.assertIn("[mcp_servers.custom]", text)
+349	        self.assertIn('command = "keep-me"', text)
+350	        self.assertIn("# agentic:begin codex-mcp", text)
+351	        self.assertIn("[mcp_servers.alpha]", text)
+352	        self.assertIn('command = "alpha-cmd"', text)
+353	        self.assertNotIn('/Users/ronan/stale/alpha', text)
+354	        self.assertTrue(any(r.kind == "preserved" and "custom" in r.detail
+355	                            for r in report))
+356	        before = cfg.read_text()
+357	        report = []
+358	        agentic_lib.update_codex_config(cfg, self.defs, None, report)
+359	        self.assertEqual(cfg.read_text(), before)
+360	        self.assertEqual([r for r in report if r.kind != "preserved"], [])
+361	
+362	    def test_codex_config_keeps_existing_canonical_tables_outside_subset(self):
+363	        cfg = self.dir / "config.toml"
+364	        cfg.write_text(
+365	            '[mcp_servers.alpha]\n'
+366	            'command = "stale-alpha"\n\n'
+367	            '[mcp_servers.bravo]\n'
+368	            'url = "https://stale.example/mcp"\n'
+369	        )
+370	        report = []
+371	        agentic_lib.update_codex_config(cfg, self.defs, ["alpha"], report)
+372	        text = cfg.read_text()
+373	        self.assertIn("[mcp_servers.alpha]", text)
+374	        self.assertIn('command = "alpha-cmd"', text)
+375	        self.assertIn("[mcp_servers.bravo]", text)
+376	        self.assertIn('url = "https://bravo.example/mcp"', text)
+377	        self.assertNotIn("stale-alpha", text)
+378	        self.assertNotIn("https://stale.example/mcp", text)
+379	
+380	    def test_claude_cli_commands_use_user_scope(self):
+381	        cmds = agentic_lib.build_claude_cli_commands(self.defs, None)
+382	        self.assertTrue(cmds)
+383	        for cmd in cmds:
+384	            self.assertEqual(cmd[:3], ["claude", "mcp", "add-json"])
+385	            self.assertIn("--scope", cmd)
+386	            self.assertEqual(cmd[cmd.index("--scope") + 1], "user")
+387	
+388	
+389	_CLAUDE_STUB = '''#!/usr/bin/env python3
+390	"""Test stub for the claude CLI: records argv, mutates a fake config."""
+391	import json, os, sys
+392	
+393	with open(os.environ["CLAUDE_STUB_LOG"], "a") as f:
+394	    f.write(json.dumps(sys.argv[1:]) + "\\n")
+395	
+396	cfg = os.environ["CLAUDE_STUB_CONFIG"]
+397	
+398	def load():
+399	    try:
+400	        with open(cfg) as f:
+401	            return json.load(f)
+402	    except (OSError, ValueError):
+403	        return {}
+404	
+405	def save(data):
+406	    with open(cfg, "w") as f:
+407	        json.dump(data, f, indent=2)
+408	
+409	args = sys.argv[1:]
+410	if args[:2] == ["mcp", "add-json"]:
+411	    if os.environ.get("CLAUDE_STUB_FAIL_ADD"):
+412	        sys.stderr.write("boom: add-json refused\\n")
+413	        sys.exit(1)
+414	    data = load()
+415	    data.setdefault("mcpServers", {})[args[2]] = json.loads(args[3])
+416	    save(data)
+417	elif args[:2] == ["mcp", "remove"]:
+418	    data = load()
+419	    servers = data.get("mcpServers", {})
+420	    if args[2] not in servers:
+421	        sys.stderr.write("No MCP server found with name: %s\\n" % args[2])
+422	        sys.exit(1)
+423	    del servers[args[2]]
+424	    save(data)
+425	sys.exit(0)
+426	'''
+427	
+428	
+429	class ClaudeCliPathTests(unittest.TestCase):
+430	    """use_cli=True path of update_claude_user_config against a stubbed
+431	    `claude` executable: fresh add, identical rerun, changed definition."""
+432	
+433	    def setUp(self):
+434	        import os
+435	        self.tmp = tempfile.TemporaryDirectory()
+436	        self.addCleanup(self.tmp.cleanup)
+437	        self.dir = Path(self.tmp.name)
+438	        bindir = self.dir / "bin"
+439	        bindir.mkdir()
+440	        stub = bindir / "claude"
+441	        stub.write_text(_CLAUDE_STUB)
+442	        stub.chmod(0o755)
+443	        self.config = self.dir / "claude.json"
+444	        self.log = self.dir / "invocations.log"
+445	        self.defs = _load_fixture_servers()
+446	        self.env = {
+447	            "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}",
+448	            "CLAUDE_STUB_LOG": str(self.log),
+449	            "CLAUDE_STUB_CONFIG": str(self.config),
+450	        }
+451	        patcher = mock.patch.dict(os.environ, self.env)
+452	        patcher.start()
+453	        self.addCleanup(patcher.stop)
+454	
+455	    def invocations(self):
+456	        import json as j
+457	        if not self.log.exists():
+458	            return []
+459	        return [j.loads(line) for line in self.log.read_text().splitlines()]
+460	
+461	    def clear_log(self):
+462	        self.log.write_text("")
+463	
+464	    def run_update(self):
+465	        report = []
+466	        agentic_lib.update_claude_user_config(self.config, self.defs, None,
+467	                                              report, use_cli=True)
+468	        return report
+469	
+470	    def test_fresh_add_applies_every_server(self):
+471	        import json as j
+472	        report = self.run_update()
+473	        self.assertTrue(all(r.kind == "changed" for r in report))
+474	        calls = self.invocations()
+475	        self.assertEqual([c[1] for c in calls], ["add-json"] * 3)
+476	        self.assertEqual(j.loads(self.config.read_text()),
+477	                         _golden_json("repo-mcp.json"))
+478	
+479	    def test_identical_rerun_reports_no_change(self):
+480	        self.run_update()
+481	        self.clear_log()
+482	        report = self.run_update()
+483	        self.assertEqual([r.kind for r in report], ["unchanged"] * 3)
+484	        self.assertEqual(self.invocations(), [],
+485	                         "an already-converged rerun must not run the CLI")
+486	
+487	    def test_claude_args_normalization_reports_no_change(self):
+488	        import json as j
+489	        self.run_update()
+490	        # The real claude CLI persists an explicit "args": [] where the
+491	        # canonical entry omits args; simulate that in the stored config.
+492	        # A rerun must still report already-configured, not remove/re-add.
+493	        data = j.loads(self.config.read_text())
+494	        data["mcpServers"]["alpha"]["args"] = []
+495	        self.config.write_text(j.dumps(data))
+496	        self.clear_log()
+497	        report = self.run_update()
+498	        self.assertEqual([r.kind for r in report], ["unchanged"] * 3)
+499	        self.assertEqual(self.invocations(), [],
+500	                         "claude's args normalization must not trigger "
+501	                         "a remove/re-add cycle")
+502	
+503	    def test_changed_definition_is_removed_then_re_added(self):
+504	        import json as j
+505	        self.run_update()
+506	        data = j.loads(self.config.read_text())
+507	        data["mcpServers"]["alpha"]["command"] = "/Users/ronan/stale/alpha"
+508	        self.config.write_text(j.dumps(data))
+509	        self.clear_log()
+510	        report = self.run_update()
+511	        kinds = {r.kind for r in report}
+512	        self.assertIn("changed", kinds)
+513	        calls = [(c[1], c[2]) for c in self.invocations()]
+514	        self.assertEqual(calls, [("remove", "alpha"), ("add-json", "alpha")])
+515	        self.assertEqual(j.loads(self.config.read_text()),
+516	                         _golden_json("repo-mcp.json"))
+517	
+518	    def test_cli_failure_becomes_report_entry_not_traceback(self):
+519	        import os
+520	        with mock.patch.dict(os.environ, {"CLAUDE_STUB_FAIL_ADD": "1"}):
+521	            report = self.run_update()
+522	        self.assertEqual([r.kind for r in report], ["warning"] * 3)
+523	        self.assertTrue(all("failed" in r.detail for r in report))
+524	
+525	
+526	class VscodeSettingsMergeTests(unittest.TestCase):
+527	    """Task 7: VS Code user settings.json merge (generate.py --user)."""
+528	
+529	    def setUp(self):
+530	        self.tmp = tempfile.TemporaryDirectory()
+531	        self.addCleanup(self.tmp.cleanup)
+532	        self.dir = Path(self.tmp.name)
+533	        self.settings = self.dir / "settings.json"
+534	        self.repo_root = self.dir / "agentic-coding"
+535	
+536	    def test_merge_preserves_unrelated_keys_and_seeds_managed_ones(self):
+537	        import json
+538	        existing = {
+539	            "editor.fontSize": 13,
+540	            "workbench.colorTheme": "Default Dark+",
+541	            "chat.instructionsFilesLocations": {"/somewhere/else": True},
+542	        }
+543	        self.settings.write_text(json.dumps(existing))
+544	        report = []
+545	        agentic_lib.merge_vscode_settings(self.settings, self.repo_root, report)
+546	        result = json.loads(self.settings.read_text())
+547	        # unrelated keys untouched
+548	        self.assertEqual(result["editor.fontSize"], 13)
+549	        self.assertEqual(result["workbench.colorTheme"], "Default Dark+")
+550	        # existing instructions locations preserved, ours added
+551	        locations = result["chat.instructionsFilesLocations"]
+552	        self.assertTrue(locations["/somewhere/else"])
+553	        ours = str(self.repo_root / "copilot" / "instructions")
+554	        self.assertTrue(locations[ours])
+555	        # localml provider seeded
+556	        models = result["github.copilot.chat.customOAIModels"]
+557	        entry = models[agentic_lib.LOCALML_PLACEHOLDER_MODEL_ID]
+558	        self.assertEqual(entry["url"], "http://127.0.0.1:8080/v1")
+559	
+560	    def test_use_claude_md_file_is_never_enabled(self):
+561	        import json
+562	        self.settings.write_text("{}")
+563	        agentic_lib.merge_vscode_settings(self.settings, self.repo_root, [])
+564	        result = json.loads(self.settings.read_text())
+565	        self.assertNotEqual(result.get("chat.useClaudeMdFile"), True)
+566	
+567	    def test_missing_settings_file_is_created(self):
+568	        import json
+569	        report = []
+570	        agentic_lib.merge_vscode_settings(self.settings, self.repo_root, report)
+571	        result = json.loads(self.settings.read_text())
+572	        self.assertIn("chat.instructionsFilesLocations", result)
+573	        self.assertIn("github.copilot.chat.customOAIModels", result)
+574	
+575	    def test_jsonc_settings_backed_up_and_never_clobbered(self):
+576	        jsonc = ('{\n'
+577	                 '  // my carefully tuned settings\n'
+578	                 '  "editor.fontSize": 13,\n'
+579	                 '}\n')
+580	        self.settings.write_text(jsonc)
+581	        report = []
+582	        changed = agentic_lib.merge_vscode_settings(self.settings,
+583	                                                    self.repo_root, report)
+584	        self.assertFalse(changed)
+585	        self.assertEqual(self.settings.read_text(), jsonc,
+586	                         "unparseable settings.json must never be clobbered")
+587	        baks = list(self.dir.glob("settings.json.bak-*"))
+588	        self.assertEqual(len(baks), 1)
+589	        self.assertEqual(baks[0].read_text(), jsonc)
+590	        self.assertTrue(any("settings.json" in str(r) for r in report))
+591	
+592	    def test_repeated_jsonc_backup_does_not_accumulate(self):
+593	        """A second merge over the same unparseable content must not write
+594	        another .bak — the identical backup already exists."""
+595	        jsonc = ('{\n'
+596	                 '  // still JSONC\n'
+597	                 '  "editor.fontSize": 13,\n'
+598	                 '}\n')
+599	        self.settings.write_text(jsonc)
+600	        agentic_lib.merge_vscode_settings(self.settings, self.repo_root, [])
+601	        report = []
+602	        changed = agentic_lib.merge_vscode_settings(self.settings,
+603	                                                    self.repo_root, report)
+604	        self.assertFalse(changed)
+605	        baks = list(self.dir.glob("settings.json.bak-*"))
+606	        self.assertEqual(len(baks), 1,
+607	                         "identical content must not accumulate backups")
+608	        self.assertTrue(any(r.kind == "warning" for r in report),
+609	                        "the warning must still be reported on every run")
+610	
+611	    def test_non_dict_settings_root_backed_up_and_left_unchanged(self):
+612	        bad = '["settings", "as", "an", "array"]\n'
+613	        self.settings.write_text(bad)
+614	        report = []
+615	        changed = agentic_lib.merge_vscode_settings(self.settings,
+616	                                                    self.repo_root, report)
+617	        self.assertFalse(changed)
+618	        self.assertEqual(self.settings.read_text(), bad,
+619	                         "a non-object root must never be clobbered")
+620	        baks = list(self.dir.glob("settings.json.bak-*"))
+621	        self.assertEqual(len(baks), 1)
+622	        self.assertTrue(any(r.kind == "warning" for r in report))
+623	
+624	    def test_merge_is_idempotent(self):
+625	        agentic_lib.merge_vscode_settings(self.settings, self.repo_root, [])
+626	        before = self.settings.read_text()
+627	        report = []
+628	        changed = agentic_lib.merge_vscode_settings(self.settings,
+629	                                                    self.repo_root, report)
+630	        self.assertFalse(changed)
+631	        self.assertEqual(self.settings.read_text(), before)
+632	        self.assertEqual(report, [])
+633	
+634	    def test_existing_model_entry_is_converged(self):
+635	        import json
+636	        self.settings.write_text(json.dumps({
+637	            "github.copilot.chat.customOAIModels": {
+638	                "my-other-model": {"url": "http://example/v1"},
+639	                agentic_lib.LOCALML_PLACEHOLDER_MODEL_ID: {"url": "http://stale:9999/v1"},
+640	            }
+641	        }))
+642	        agentic_lib.merge_vscode_settings(self.settings, self.repo_root, [])
+643	        result = json.loads(self.settings.read_text())
+644	        models = result["github.copilot.chat.customOAIModels"]
+645	        self.assertEqual(models["my-other-model"], {"url": "http://example/v1"})
+646	        self.assertEqual(
+647	            models[agentic_lib.LOCALML_PLACEHOLDER_MODEL_ID]["url"],
+648	            "http://127.0.0.1:8080/v1")
+649	
+650	
+651	class UserConfigWiringTests(unittest.TestCase):
+652	    """Task 8: generate_user_configs writes all injected user targets."""
+653	
+654	    def test_user_generation_with_injected_paths(self):
+655	        import json
+656	        with tempfile.TemporaryDirectory() as tmp:
+657	            d = Path(tmp)
+658	            claude_cfg = d / "claude.json"
+659	            vs_mcp = d / "User" / "mcp.json"
+660	            vs_settings = d / "User" / "settings.json"
+661	            codex_cfg = d / ".codex" / "config.toml"
+662	            codex_agents = d / ".codex" / "AGENTS.md"
+663	            shared = d / "repo" / "shared"
+664	            shared.mkdir(parents=True)
+665	            for name in ("conventions.md", "codex-wrapper.md"):
+666	                (shared / name).write_text(
+667	                    (FIXTURES / "shared" / name).read_text()
+668	                )
+669	            defs = _load_fixture_servers()
+670	            report = []
+671	            agentic_lib.generate_user_configs(
+672	                defs, None, report, repo_root=d / "repo",
+673	                claude_config_path=claude_cfg,
+674	                vscode_mcp_path=vs_mcp,
+675	                vscode_settings_path=vs_settings,
+676	                codex_config_path=codex_cfg,
+677	                codex_agents_path=codex_agents,
+678	                use_cli=False)
+679	            self.assertEqual(json.loads(claude_cfg.read_text()),
+680	                             _golden_json("repo-mcp.json"))
+681	            self.assertEqual(json.loads(vs_mcp.read_text()),
+682	                             _golden_json("vscode-mcp.json"))
+683	            settings = json.loads(vs_settings.read_text())
+684	            self.assertIn("github.copilot.chat.customOAIModels", settings)
+685	            self.assertNotEqual(settings.get("chat.useClaudeMdFile"), True)
+686	            self.assertIn("[mcp_servers.alpha]", codex_cfg.read_text())
+687	            self.assertIn("# Codex Instructions", codex_agents.read_text())
+688	
+689	
+690	class CanonicalServersFileTests(unittest.TestCase):
+691	    """Task 5: sanity checks on the real mcp/servers.json."""
+692	
+693	    def test_canonical_set_and_portability(self):
+694	        defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
+695	        self.assertEqual(
+696	            sorted(defs),
+697	            ["awesome-copilot", "azure", "devtools", "github",
+698	             "svelte", "terraform", "transit"])
+699	        for name, spec in defs.items():
+700	            transport = spec["transport"]
+701	            self.assertIn(transport["type"], ("stdio", "http"))
+702	            self.assertIn("surfaces", spec)
+703	            self.assertIn("default_for", spec)
+704	            self.assertIn("secrets", spec)
+705	            cmd = transport.get("command", "")
+706	            self.assertFalse(cmd.startswith("/"),
+707	                             f"{name}: command must be PATH-resolved, not absolute")
+708	            self.assertNotIn("/Users/", str(spec))
+709	
+710	    def test_github_vscode_input_description_mentions_bearer_prefix(self):
+711	        defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
+712	        inputs = agentic_lib.emit_vscode_mcp(defs, ["github"])["inputs"]
+713	        self.assertEqual(len(inputs), 1)
+714	        self.assertIn("Bearer", inputs[0]["description"],
+715	                      "the prompt input must tell the user to include the "
+716	                      "'Bearer ' prefix")
+717	
+718	
+719	class SeedSourceMarkerTests(unittest.TestCase):
+720	    """Sanity checks on the real align seed sources: the body carries
+721	    managed-block markers so align can converge it, while the frontmatter
+722	    stays outside the block."""
+723	
+724	    SEED_SOURCES = (
+725	        REPO_ROOT / "copilot" / "agents" / "prd.agent.md",
+726	        REPO_ROOT / "claude" / "skills" / "prd" / "SKILL.md",
+727	    )
+728	
+729	    def test_seed_sources_carry_markers_with_frontmatter_outside(self):
+730	        for src in self.SEED_SOURCES:
+731	            with self.subTest(file=src.relative_to(REPO_ROOT).as_posix()):
+732	                text = src.read_text()
+733	                self.assertIn(agentic_lib.BEGIN_MARKER, text)
+734	                self.assertIn(agentic_lib.END_MARKER, text)
+735	                head, _, rest = text.partition(agentic_lib.BEGIN_MARKER)
+736	                self.assertTrue(head.startswith("---\n"),
+737	                                "frontmatter must open the file")
+738	                self.assertIn("name: prd", head,
+739	                              "frontmatter must sit OUTSIDE the managed block")
+740	                self.assertTrue(head.rstrip().endswith("---"),
+741	                                "the begin marker must directly follow the "
+742	                                "closing frontmatter delimiter")
+743	                self.assertIn(agentic_lib.END_MARKER, rest,
+744	                              "the end marker must close the body block")
+745	                block, _, _ = rest.partition(agentic_lib.END_MARKER)
+746	                self.assertEqual(
+747	                    block, "\n" + block.strip("\n") + "\n",
+748	                    "the block must sit flush against the markers (the "
+749	                    "write_managed normal form) or align's second run "
+750	                    "rewrites it")
+751	
+752	
+753	if __name__ == "__main__":
+754	    unittest.main()
+755	
+```
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+ls tests/fixtures/shared/ && echo --- && cat tests/fixtures/shared/conventions.md && echo "=== golden CLAUDE.md ===" && cat tests/fixtures/golden/CLAUDE.md && echo "=== golden copilot ===" && cat tests/fixtures/golden/copilot-instructions.md && echo "=== golden AGENTS.md ===" && cat tests/fixtures/golden/AGENTS.md
+```
+
+**Result:**
+```
+claude-wrapper.md
+codex-wrapper.md
+conventions.md
+copilot-wrapper.md
+---
+# Communication Style
+
+- Be concise.
+- Push back when an idea is weak.
+
+# Development Workflow
+
+- Read files before editing them.
+=== golden CLAUDE.md ===
+<!-- agentic:begin -->
+# Communication Style
+
+- Be concise.
+- Push back when an idea is weak.
+
+# Development Workflow
+
+- Read files before editing them.
+
+# Skills Usage
+
+Check `.claude/skills/` for the full list before suggesting manual approaches.
+
+# Asking the User Questions
+
+- When an AskUserQuestion answer includes free-text notes, the notes are the real instruction.
+- Follow the format in `rules/references/decision-log-format.md`.
+<!-- agentic:end -->
+=== golden copilot ===
+<!-- agentic:begin -->
+# GitHub Copilot Instructions
+
+Use the PRD lane for autonomous work: one PRD document per repository under `specs/`.
+
+# Communication Style
+
+- Be concise.
+- Push back when an idea is weak.
+
+# Development Workflow
+
+- Read files before editing them.
+<!-- agentic:end -->
+=== golden AGENTS.md ===
+<!-- agentic:begin -->
+# Codex Instructions
+
+Use Agent Skills from `~/.agents/skills` when they match the task.
+
+# Communication Style
+
+- Be concise.
+- Push back when an idea is weak.
+
+# Development Workflow
+
+- Read files before editing them.
+<!-- agentic:end -->
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+cat Makefile 2>/dev/null | head -80
+```
+
+**Result:**
+```
+# Development tooling for agentic-coding.
+#
+# bootstrap one-script new-machine setup (scripts/bootstrap.sh)
+# generate  rebuild the checked-in generated files (claude/CLAUDE.md,
+#           copilot/instructions/copilot-instructions.md, codex/AGENTS.md)
+#           and MCP configs
+# sync      create the ~/.claude and VS Code profile symlinks
+# align     align this repository's own agent configs
+# status    read-only process-status report over participating repos
+#           (this repo plus the checked-in default list; pass explicit
+#           paths via REPOS="path1 path2")
+# test      run the Python unittest suite
+# lint      shellcheck all shell scripts + fail if generated files drift
+#           from their sources in shared/ and mcp/
+
+.PHONY: bootstrap generate sync align status test lint lint-shell lint-drift
+
+bootstrap:
+	scripts/bootstrap.sh
+
+generate:
+	python3 scripts/generate.py
+
+sync:
+	scripts/sync-claude.sh
+
+align:
+	python3 scripts/align.py
+
+status:
+	python3 scripts/process_status.py $(REPOS)
+
+test:
+	python3 -m unittest discover -s tests
+
+lint: lint-shell lint-drift
+
+lint-shell:
+	@command -v shellcheck >/dev/null 2>&1 || { \
+		echo "shellcheck is not installed (brew install shellcheck)"; exit 1; }
+	shellcheck scripts/*.sh
+
+# Generated-drift check: regenerate in a way that leaves the working tree
+# untouched — snapshot the checked-in generated files, run the generator,
+# diff, then restore the snapshots — and fail when the checked-in files are
+# out of date. Any conventions warnings generate.py emits (e.g. tail content
+# in claude/CLAUDE.md that belongs in shared/) surface in this run's output.
+lint-drift:
+	@tmp="$$(mktemp -d)"; \
+	cp claude/CLAUDE.md "$$tmp/CLAUDE.md"; \
+	cp copilot/instructions/copilot-instructions.md "$$tmp/copilot-instructions.md"; \
+	cp codex/AGENTS.md "$$tmp/AGENTS.md"; \
+	python3 scripts/generate.py; \
+	status=0; \
+	diff -u "$$tmp/CLAUDE.md" claude/CLAUDE.md || status=1; \
+	diff -u "$$tmp/copilot-instructions.md" copilot/instructions/copilot-instructions.md || status=1; \
+	diff -u "$$tmp/AGENTS.md" codex/AGENTS.md || status=1; \
+	cp "$$tmp/CLAUDE.md" claude/CLAUDE.md; \
+	cp "$$tmp/copilot-instructions.md" copilot/instructions/copilot-instructions.md; \
+	cp "$$tmp/AGENTS.md" codex/AGENTS.md; \
+	rm -rf "$$tmp"; \
+	if [ "$$status" -ne 0 ]; then \
+		echo "Generated files drift from their sources; run 'make generate' and commit."; \
+		exit 1; \
+	fi; \
+	echo "Generated files match their sources."
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+sed -n '1,60p' claude/skills/spec-janitor/SKILL.md | head -120
+```
+
+**Result:**
+```
+---
+name: spec-janitor
+description: Audit and repair a diluted specs/ directory. Runs the mechanical auditor (spec_lint.py) for structural breakage, layers a judgment audit on top (duplicate/superseding specs, contradictions, scope mismatch, ghost changes, mis-filed items), applies auto-fixes, and triages gated repairs in approved batches. Use when the user asks to clean up specs, audit the specs directory, check spec hygiene, or find spec drift — e.g. "clean up the specs", "audit specs/", "run the spec janitor", "is anything wrong with our specs?".
+---
+
+# Spec Janitor
+
+Audit a repository's `specs/` directory for dilution — broken cross-references, unparseable task files, duplicate or silently superseded specs, contradictions, mis-filed items — and repair it under tiered authority: auto-fix what has exactly one correct fix, gate everything else on explicit approval, and only ever report what needs authored content.
+
+The normative rules live in [references/spec-conventions.md](references/spec-conventions.md) (stable `SJ-*` identifiers). Every finding cites exactly one rule ID; read the reference before the judgment audit so citations are exact.
+
+## Entry Contract
+
+This is an **interactive-entry skill**: no router (nextup, orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
+
+## The Auditor
+
+`spec_lint.py` sits alongside this SKILL.md (in seeded repos: `.github/skills/spec-janitor/spec_lint.py`). It is stdlib-only Python 3. Its exact CLI:
+
+```
+spec_lint.py <repo-path> [--json] [--fix] [--fix-dirty]
+spec_lint.py <repo-path> exclude (--spec <spec-path> | --finding <finding-id>)
+spec_lint.py <repo-path> mark-raised --finding <finding-id>
+```
+
+- **Exit codes**: 0 = no findings (including a repo with no `specs/`, which prints a notice); 1 = findings exist; **2** = usage or internal error. **Exit 1 means findings, not failure** — treat it as success-with-findings and never abort on it.
+- Without `--fix` / `exclude` / `mark-raised` the tool never writes anything.
+- `--fix` refuses when `specs/` has uncommitted changes (or the directory is not a git repo); `--fix-dirty` overrides.
+- `exclude` and `mark-raised` are the **only** writers of the exclusion store `specs/.janitor.json`. NEVER hand-edit that file — the subcommands schema-validate on write; hand-merged JSON is the store's most likely corruption source.
+
+## Workflow
+
+### 1. Preflight
+
+- Confirm `specs/` exists in the target repo. If it does not, run the auditor anyway (it reports this and exits 0) and stop after relaying the notice — create nothing.
+- Capture `git status --porcelain -- specs/` to know whether the tree is clean before step 3.
+
+### 2. Mechanical audit
+
+Run `python3 <skill-dir>/spec_lint.py . --json` and present the findings as a human-readable report grouped by spec, each finding tagged with its rule ID and disposition (`auto-fix` | `gated` | `detect-only` — a closed three-value enum). `demoted` is a boolean flag on auto-fix findings, not a disposition: findings with `demoted: true` are precondition-failed auto-fixes — they join the gated batches in step 5, never guessed at.
+
+### 3. Auto-fix
+
+- **Clean `specs/` tree**: run `python3 <skill-dir>/spec_lint.py . --fix` and list **every** applied fix in the report.
+- **Dirty tree**: do NOT fix silently. Warn that uncommitted changes under `specs/` block auto-fixes, and offer the override via AskUserQuestion: proceed with `--fix-dirty`, or continue report-only. Default to report-only.
+
+Auto-fix runs before triage deliberately: recording exclusions in step 5 dirties `specs/`, so reversing the order would block the fixes. This ordering is a constraint, not a preference.
+
+### 4. Judgment audit
+
+Read and reason over spec content — this is the half the auditor cannot do.
+
+**Recency scan first** (this prioritises active drift over historical drift):
+
+- Read `last_run` from `specs/.janitor.json`; fall back to **45 days** (the default constant) when the store or field is absent.
+- Per spec: `git log --format=%ad --date=short -- specs/<dir>` — specs touched since the cutoff are marked `active: true` and audited first.
+- For active drift, name the development pattern that produced it from the commit sequence (e.g. `autonomous-run-layering` for repeated make-it-so passes stacking unreconciled edits, `parallel-spec-authoring` for sibling specs created concurrently without cross-references) in the finding's `pattern` field.
+- Shallow or missing git history: note it in the report, skip the scan, and treat all specs as active — never a hard stop.
+
+**Check the judgment rules** against the conventions reference:
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+sed -n '85,110p' claude/skills/spec-janitor/SKILL.md; echo "=== spec-conventions.md grep supersede ==="; grep -n -i "supersede\|nextup" claude/skills/spec-janitor/references/spec-conventions.md
+```
+
+**Result:**
+```
+On decline, offer to record a durable exclusion at the granularity the user chooses:
+
+- Whole spec: `python3 <skill-dir>/spec_lint.py . exclude --spec <spec-path>`
+- Single finding: `python3 <skill-dir>/spec_lint.py . exclude --finding <finding-id>`
+
+A declined finding without an exclusion will be re-proposed next run — say so when offering. `SJ-DRIFT-001` findings the user wants left alone are recorded with `mark-raised --finding <finding-id>` so they are raised at most once.
+
+### 6. Apply
+
+Apply **approved batches only**. Rules:
+
+- **Moves** (`SJ-FILE-001`): the move and the rewrite of all inbound references within `specs/` happen in the same batch; inbound references outside `specs/` (docs/, README) are reported as follow-ups, never edited.
+- **Supersession** (`SJ-SUP-*`, `SJ-FLOW-001`): annotate, never delete. Decision-log entries follow the decision-log format (`superseded by Decision X` status markers); documents mark discarded sections superseded in place; and supersession between specs is recorded in **both directions** — the superseded spec names its successor and the superseding spec names what it replaces.
+- If a file changed between audit and apply, re-run the mechanical audit before proceeding.
+
+### 7. Index
+
+- `specs/OVERVIEW.md` missing and specs exist: run `/specs-overview` to create it.
+- Repairs changed any spec's status or supersession: run `/specs-overview` to regenerate so index rows match the repaired state.
+- `/specs-overview` unavailable in the environment: note it in the report and continue.
+
+### 8. Summary
+
+Report, with every item citing its rule ID:
+
+- Auto-fixes applied (each one listed).
+=== spec-conventions.md grep supersede ===
+175:markers (`superseded by Decision X`), documents mark discarded sections
+176:superseded in place, and superseding and superseded specs reference each other
+184:resolution: the superseded spec names its successor and the superseding spec
+194:the earlier section MUST be marked superseded in the same document. Two
+196:The repair marks the discarded sections superseded — content is never deleted.
+232:abandoned/superseded. The gated repair offers both options. The finding's
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+sed -n '75,100p' claude/skills/make-it-so/SKILL.md
+```
+
+**Result:**
+```
+- The phase number
+- The stream number if the phase has exactly one ready stream (otherwise note that streams are not defined for this phase)
+- The path to the tasks file
+- The list of `front_matter_references` to read before implementing
+- These instructions:
+  - Use `rune next --phase --stream N --format json` if a single stream is in play, otherwise `rune next --phase --format json`, to retrieve all tasks for the phase
+  - Read all referenced files before implementing
+  - Implement all tasks (including subtasks) in the order specified, using tools/skills as needed
+  - Mark each task complete with `rune complete <tasks-file-path> <task-id>` as it finishes
+  - Run all formatting and test commands for the project before committing
+  - Stage changes (including any reformatting and the modified `tasks.md`) and commit on the current working branch using the **Subagent Commit Conventions** below
+  - Report back: list of completed task IDs and final status (`done` | `failed`)
+
+The main agent waits for the subagent to return and surfaces any failure to the user before continuing.
+
+**Mid-Implementation Spec Edits:**
+Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`). This applies to the main agent and to every subagent it spawns.
+
+**Review (main agent):**
+- Once the phase is fully integrated (parallel mode) or the single subagent has returned `done` (single-subagent mode), run the design-critic skill over the phase's implementation **diff** (e.g. `git diff` from the phase's starting commit to HEAD) — not a plain read-through of the final state, which reliably finds nothing. Issues detected should be fixed (delegate the fix as a follow-up subagent if it involves code, or update the decision log directly)
+- When relaying the phase's results to the user, include one plain-English line per fix or change on how to verify it (what to do in the running app and what should happen) — dense subagent reports alone leave the user unsure what was actually solved
+
+**Phase Changelog & Specs Overview (main agent):**
+- After review, write a single phase-level changelog entry summarising the work done in this phase (subagent commits never touch the changelog — see Subagent Commit Conventions). Read `CHANGELOG.md` (create if missing), prepend the entry if not already present, and commit it as `[doc]: changelog for phase <P>` (or with a ticket prefix if applicable)
+- Then check if all tasks in the spec are complete: `rune list specs/{feature_name}/tasks.md --format json` and verify no incomplete tasks remain
+- If `specs/OVERVIEW.md` exists, run `/specs-overview` once to regenerate it — it derives spec statuses and file lists from the tree. Never hand-edit `OVERVIEW.md`
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+sed -n '20,45p' claude/skills/next-task/SKILL.md
+```
+
+**Result:**
+```
+- When retrieving a phase, the model MUST check for multiple work streams using `rune streams --available --json`
+- If multiple streams have ready tasks, parallel execution is possible
+- If only one stream has ready tasks, sequential execution within that stream is used
+
+**Task Execution:**
+- The model MUST read all files referenced in the front_matter_references
+- The selected tasks MUST be added to the internal TODO list for tracking and implemented in the order specified
+- The model MUST implement all of the selected tasks, including all subtasks
+- Once a subtask or task is completed, use the rune skill to mark it complete (e.g., `rune complete specs/{feature}/tasks.md 1.1`)
+- The model MUST NOT proceed past the selected task. Once a task is done, it needs to be put up for review by the user
+- Use tools and skills as appropriate while implementing the task. For example, if you need to know the capabilities of a library, use context7, and if you want to verify your code is efficient, use the efficiency-optimizer skill
+
+**Mid-Implementation Spec Edits:**
+Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`).
+
+**Parallel Execution with Multiple Streams:**
+When a phase is pulled in and multiple streams have ready tasks:
+1. The model MUST use `rune streams --available --json` to identify streams with ready work
+2. If there are 2 or more streams with ready tasks:
+   - The model SHOULD spawn subagents (using the Task tool) to handle each stream in parallel
+   - Each subagent receives instructions to:
+     - Retrieve all phase tasks for their stream using `rune next --phase --stream N --format json`
+     - Read all referenced files from front_matter_references
+     - Implement the tasks in dependency order
+     - Mark tasks complete as they finish using `rune complete <tasks-file-path> <task-id>`
+     - Report back when all tasks in the stream are done or blocked
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+grep -n "Supersession" claude/skills/spec-janitor/SKILL.md; grep -n "^\*\*Mid-Implementation" claude/skills/make-it-so/SKILL.md claude/skills/next-task/SKILL.md; wc -l claude/skills/spec-janitor/SKILL.md claude/skills/make-it-so/SKILL.md claude/skills/next-task/SKILL.md
+```
+
+**Result:**
+```
+97:- **Supersession** (`SJ-SUP-*`, `SJ-FLOW-001`): annotate, never delete. Decision-log entries follow the decision-log format (`superseded by Decision X` status markers); documents mark discarded sections superseded in place; and supersession between specs is recorded in **both directions** — the superseded spec names its successor and the superseding spec names what it replaces.
+claude/skills/make-it-so/SKILL.md:90:**Mid-Implementation Spec Edits:**
+claude/skills/next-task/SKILL.md:32:**Mid-Implementation Spec Edits:**
+     121 claude/skills/spec-janitor/SKILL.md
+     121 claude/skills/make-it-so/SKILL.md
+      76 claude/skills/next-task/SKILL.md
+     318 total
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+grep -n -i "nextup" claude/skills/spec-janitor/SKILL.md claude/skills/spec-janitor/references/spec-conventions.md
+```
+
+**Result:**
+```
+claude/skills/spec-janitor/SKILL.md:14:This is an **interactive-entry skill**: no router (nextup, orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:50:26+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>claude/skills/spec-janitor/references/spec-conventions.md</code></summary>
+
+```
+160	The finding's subject is the task-file name.
+161	
+162	### SJ-TASK-003 — out-of-sequence task numbering
+163	
+164	**Audit**: mechanical — disposition: detect-only
+165	
+166	Top-level task numbers MUST run sequentially from 1 across the file. A task
+167	whose number breaks the sequence violates this rule. Renumbering rewrites
+168	identifiers that commits, logs, and reviews reference, so the rule is
+169	report-only. The finding's subject is the kebab-slug of the out-of-order
+170	task's title (not its number — insertions renumber siblings).
+171	
+172	## Supersession (SJ-SUP)
+173	
+174	Supersession is annotated, never deleted: decision-log entries use status
+175	markers (`superseded by Decision X`), documents mark discarded sections
+176	superseded in place, and superseding and superseded specs reference each other
+177	in both directions.
+178	
+179	### SJ-SUP-001 — duplicate or silently superseding specs
+180	
+181	**Audit**: judgment — disposition: gated
+182	
+183	Two specs addressing the same problem or surface MUST reference each other's
+184	resolution: the superseded spec names its successor and the superseding spec
+185	names what it replaces. Silent duplication or replacement violates this rule.
+186	The finding is emitted once per pair, under the lexicographically first spec
+187	path; its subject is the other spec's path.
+188	
+189	### SJ-SUP-002 — internal contradiction after a direction change
+190	
+191	**Audit**: judgment — disposition: gated
+192	
+193	When a later section of a document changes direction from an earlier section,
+194	the earlier section MUST be marked superseded in the same document. Two
+195	mutually exclusive designs coexisting without annotation violate this rule.
+196	The repair marks the discarded sections superseded — content is never deleted.
+197	The finding's subject is the kebab-slug of the contradicted section heading.
+198	
+199	## Scope alignment (SJ-SCOPE)
+200	
+201	### SJ-SCOPE-001 — task-file scope does not match the spec document
+202	
+203	**Audit**: judgment — disposition: gated
+204	
+205	A task file's scope MUST match its source document's scope: tasks spanning
+206	phases or work the spec document does not cover (or a spec document covering
+207	work the task file ignores) violate this rule. Repair options are gated:
+208	extend the spec document, or split/annotate the task file. The finding's
+209	subject is the task-file name.
+210	
+211	## Ghost changes (SJ-GHOST)
+212	
+213	### SJ-GHOST-001 — spec references work no spec folder covers
+214	
+215	**Audit**: judgment — disposition: detect-only
+216	
+217	A spec document referencing changes, migrations, or features that no spec
+218	folder covers is a ghost reference. The finding claims only that the reference
+219	is unspecced — it is never confirmed against code or git history — and the
+220	report proposes a follow-up spec. The finding's subject is the kebab-slug of
+221	the referenced unspecced work.
+222	
+223	## Workflow state (SJ-FLOW)
+224	
+225	### SJ-FLOW-001 — spec abandoned mid-workflow
+226	
+227	**Audit**: judgment — disposition: gated
+228	
+229	A spec that stalled between workflow stages (e.g. requirements approved but
+```
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Write</summary>
+
+**File:** `/Users/r/repos/agentic-coding/claude/skills/backlog/SKILL.md`
+
+**Result:**
+```
+File created successfully at: /Users/r/repos/agentic-coding/claude/skills/backlog/SKILL.md (file state is current in your context — no need to Read it back)
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash: Mark task 1 complete in rune</summary>
+
+**Command:**
+```bash
+rune complete specs/backlog-skill/tasks.md 1
+```
+
+**Result:**
+```
+Completed task 1: Author claude/skills/backlog/SKILL.md
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskUpdate</summary>
+
+**Input:**
+```json
+{
+  "status": "completed",
+  "taskId": "1"
+}
+```
+
+**Result:**
+```
+Updated task #1 status
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskUpdate</summary>
+
+**Input:**
+```json
+{
+  "status": "in_progress",
+  "taskId": "2"
+}
+```
+
+**Result:**
+```
+Updated task #2 status
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:51:26+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>tests/test_generate.py</code></summary>
+
+```patch
+         self.assertIn(conventions, copilot_block)
+         self.assertIn(conventions, codex_block)
+ 
++    def test_real_outputs_document_decision_mode(self):
++        """Req 5.4: the shared convention text documents decision_mode's
++        overwrite/supersede modes and the .agentic.json manifest read, and
++        reaches all three toolchains via generation."""
++        claude_block = agentic_lib.build_claude_block(REPO_ROOT / "shared")
++        copilot_block = agentic_lib.build_copilot_block(REPO_ROOT / "shared")
++        codex_block = agentic_lib.build_codex_block(REPO_ROOT / "shared")
++        for block in (claude_block, copilot_block, codex_block):
++            self.assertIn("decision_mode", block)
++            self.assertIn(".agentic.json", block)
++            self.assertIn("overwrite", block)
+ 
++
+ class ManagedBlockWriterTests(unittest.TestCase):
+     """Task 1: managed-block semantics (Decision 15)."""
+ 
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:51:27+10:00
+
+Now let's verify this test fails (red) before implementing.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+python3 -m unittest tests.test_generate.ConventionsAssemblyTests.test_real_outputs_document_decision_mode -v 2>&1 | tail -20
+```
+
+**Result:**
+```
+test_real_outputs_document_decision_mode (tests.test_generate.ConventionsAssemblyTests)
+Req 5.4: the shared convention text documents decision_mode's ... FAIL
+
+======================================================================
+FAIL: test_real_outputs_document_decision_mode (tests.test_generate.ConventionsAssemblyTests)
+Req 5.4: the shared convention text documents decision_mode's
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/r/repos/agentic-coding/tests/test_generate.py", line 99, in test_real_outputs_document_decision_mode
+    self.assertIn("decision_mode", block)
+AssertionError: 'decision_mode' not found in '# Communication Style\n\n- DO NOT overcomplicate things. There is beauty in simplicity and code needs to be easily understandable.\n- DO NOT act sycophantic. Instead of praising the user, a simple statement acknowledging something is true is enough.\n- DO NOT use hyperbolic terms like comprehensive. Be clear and concise in your wording.\n- DO think through your answers and push back against ideas from the user when they might not lead to the best result. Explain why you disagree with the user.\n\n# Development Workflow\n\n- Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit\n- After writing code, you MUST ensure you use appropriate linters and validators.\n- When you discover a learning specific to a language that needs to be kept, add it to the related language-rule file (or create a new one if needed).\n- Manage tasks with the `rune` CLI; task files (`tasks.md` or `tasks-*.md`) MUST live under the feature\'s `specs/` folder and stay parseable by `rune list`.\n- Committed feature work requires its spec documents to exist in `specs/` first: a design document or PRD, plus the rune task file.\n- When creating GitHub issues, ALWAYS create them in the current repository unless explicitly told otherwise.\n\n# Agent Notes\n\nMaintain implementation notes in `docs/agent-notes/` to preserve knowledge across sessions.\n\n**Before starting a task**: Check `docs/agent-notes/` for relevant notes and read them. Only read what\'s relevant — don\'t load everything.\n\n**After completing a task**: Create or update notes about the code you worked on. Focus on:\n- How things work (architecture, data flow, key abstractions)\n- Non-obvious behavior, gotchas, and things that don\'t work as expected\n- Why certain approaches were chosen or rejected\n- Setup/configuration details that aren\'t obvious from the code\n\nKeep notes factual and concise. Organise by topic or module (e.g., `auth.md`, `api-layer.md`) — not by date or task. Update existing notes rather than creating duplicates.\n\n# Project Conventions\n\n- When the user talks about a feature or spec, this will be a feature that has requirements, design, and tasks documents as well as a decision log in a subfolder of the specs directory. The feature\'s name will be that of the subfolder. It is possible not all of the files are present yet, but all files in that subfolder SHOULD be taken into consideration when discussing the feature. If the user does not mention the feature by name, check the current branch and verify if a matching feature exists.\n- If a project has a Makefile, the commands there MUST be used for development tooling.\n\n# CLI Commands\n\nIf `run_silent` is available (check with `which run_silent`), use it to reduce token usage by buffering stdout/stderr and only showing them on non-zero exit.\n\n- Wrap bash/CLI commands with `run_silent` unless you need to see all the stdout\n- Good commands to prefix: package installs, builds, tests, linting\n- Examples:\n  - `run_silent pnpm install`\n  - `run_silent cargo check`\n  - `run_silent make lint`\n\n# Documentation Standards\n\nDecision log entries use the Enhanced Nygard ADR structure with required fields (ID, Date, Status, Context, Decision, Rationale) and recommended fields (Alternatives Considered, Consequences). Document at least two alternatives with rejection reasons, and list both positive and negative consequences. Entries live in the feature\'s `decision_log.md`, separated by horizontal rules.\n\n# Skills Usage\n\nThis project uses custom skills extensively. Available skills include: spec creation, PR review fixing, pre-push review, and explain-like. Check `.claude/skills/` for the full list before suggesting manual approaches.\n\nWhen asked to analyze or document something, first check if there\'s an existing skill/workflow for that task (e.g., spec creation, review). Use the established workflow rather than doing ad-hoc analysis.\n\nWhen managing tasks, prefer the rune skill over calling the CLI directly.\n\n# Asking the User Questions\n\n- When an AskUserQuestion answer includes free-text notes, the notes are the real instruction — treat them as first-class steering, even when the selected option looks like a rejection.\n- Ask clarifying questions one at a time, concretely, describing observable behavior — not implementation jargon.\n- Approval gates for documents SHOULD offer an "explain it first" option (e.g. run /explain-like) alongside approve/reject.\n\n# Claude-Specific Project Conventions\n\n- If `.claude/scripts/README.md` exists in the project, you SHOULD use the tools mentioned in there for their intended purposes.\n\n# Decision Log Format Reference\n\nWhen creating or updating decision log entries, follow the format in `rules/references/decision-log-format.md`. Read the format file before creating entries.'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:51:30+10:00
+
+Red confirmed. Now mark 2.1 complete and move to 2.2: add the decision_mode rules to `shared/conventions.md` and the decision-log format reference.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Mark subtask 2.1 complete</summary>
+
+**Command:**
+```bash
+rune complete specs/backlog-skill/tasks.md 2.1
+```
+
+**Result:**
+```
+Completed task 2.1: Update test_generate goldens to expect decision_mode rules in all three outputs (red)
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:51:34+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>shared/conventions.md</code></summary>
+
+```
+1	# Communication Style
+2	
+3	- DO NOT overcomplicate things. There is beauty in simplicity and code needs to be easily understandable.
+4	- DO NOT act sycophantic. Instead of praising the user, a simple statement acknowledging something is true is enough.
+5	- DO NOT use hyperbolic terms like comprehensive. Be clear and concise in your wording.
+6	- DO think through your answers and push back against ideas from the user when they might not lead to the best result. Explain why you disagree with the user.
+7	
+8	# Development Workflow
+9	
+10	- Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit
+11	- After writing code, you MUST ensure you use appropriate linters and validators.
+12	- When you discover a learning specific to a language that needs to be kept, add it to the related language-rule file (or create a new one if needed).
+13	- Manage tasks with the `rune` CLI; task files (`tasks.md` or `tasks-*.md`) MUST live under the feature's `specs/` folder and stay parseable by `rune list`.
+14	- Committed feature work requires its spec documents to exist in `specs/` first: a design document or PRD, plus the rune task file.
+15	- When creating GitHub issues, ALWAYS create them in the current repository unless explicitly told otherwise.
+16	
+17	# Agent Notes
+18	
+19	Maintain implementation notes in `docs/agent-notes/` to preserve knowledge across sessions.
+20	
+21	**Before starting a task**: Check `docs/agent-notes/` for relevant notes and read them. Only read what's relevant — don't load everything.
+22	
+23	**After completing a task**: Create or update notes about the code you worked on. Focus on:
+24	- How things work (architecture, data flow, key abstractions)
+25	- Non-obvious behavior, gotchas, and things that don't work as expected
+26	- Why certain approaches were chosen or rejected
+27	- Setup/configuration details that aren't obvious from the code
+28	
+29	Keep notes factual and concise. Organise by topic or module (e.g., `auth.md`, `api-layer.md`) — not by date or task. Update existing notes rather than creating duplicates.
+30	
+31	# Project Conventions
+32	
+33	- When the user talks about a feature or spec, this will be a feature that has requirements, design, and tasks documents as well as a decision log in a subfolder of the specs directory. The feature's name will be that of the subfolder. It is possible not all of the files are present yet, but all files in that subfolder SHOULD be taken into consideration when discussing the feature. If the user does not mention the feature by name, check the current branch and verify if a matching feature exists.
+34	- If a project has a Makefile, the commands there MUST be used for development tooling.
+35	
+36	# CLI Commands
+37	
+38	If `run_silent` is available (check with `which run_silent`), use it to reduce token usage by buffering stdout/stderr and only showing them on non-zero exit.
+39	
+40	- Wrap bash/CLI commands with `run_silent` unless you need to see all the stdout
+41	- Good commands to prefix: package installs, builds, tests, linting
+42	- Examples:
+43	  - `run_silent pnpm install`
+44	  - `run_silent cargo check`
+45	  - `run_silent make lint`
+46	
+47	# Documentation Standards
+48	
+49	Decision log entries use the Enhanced Nygard ADR structure with required fields (ID, Date, Status, Context, Decision, Rationale) and recommended fields (Alternatives Considered, Consequences). Document at least two alternatives with rejection reasons, and list both positive and negative consequences. Entries live in the feature's `decision_log.md`, separated by horizontal rules.
+50	
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:51:40+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>shared/conventions.md</code></summary>
+
+```patch
+ # Documentation Standards
+ 
+ Decision log entries use the Enhanced Nygard ADR structure with required fields (ID, Date, Status, Context, Decision, Rationale) and recommended fields (Alternatives Considered, Consequences). Document at least two alternatives with rejection reasons, and list both positive and negative consequences. Entries live in the feature's `decision_log.md`, separated by horizontal rules.
++
++Before revising a decision, read the repo's `.agentic.json` for a top-level `decision_mode` key. `overwrite` means edit the existing entry in place — same ID, updated date, no superseding entry appended. `supersede`, or `decision_mode` absent entirely, keeps the default behavior: mark the old entry `superseded by Decision X` and append the new one.
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:51:42+10:00
+
+Now add the "Revising a decision" section to the decision-log format reference.
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:51:46+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>claude/rules/references/decision-log-format.md</code></summary>
+
+```patch
+ - **File header**: `# Decision Log: {Feature Name}`
+ - **Separator**: Use `---` between decisions
+ 
++## Revising a decision
++
++A repo may declare, via a top-level `decision_mode` key in its `.agentic.json`, how a workflow revises an existing decision. Read that key at run time before writing any revision:
++
++- **`overwrite`**: edit the existing entry in place — same ID, `**Date**` updated to today, `**Status**` and body rewritten to reflect the new decision. No superseding entry is appended, and the entry's history lives only in git, not in the file.
++- **`supersede`, or the key absent**: today's default. Mark the old entry's status `superseded by Decision X` and append a new entry with the next sequential ID, following the template above.
++
++A repo with no `.agentic.json`, or one that omits `decision_mode`, is `supersede` — the same behavior this document already described before overwrite mode existed.
++
+ ## Quick Checklist
+ 
+ When adding a decision, ensure:
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:51:47+10:00
+
+Now run `make generate` to propagate this into the three toolchain outputs, then verify the test goes green.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Regenerate toolchain outputs from shared conventions</summary>
+
+**Command:**
+```bash
+make generate && git status --short
+```
+
+**Result:**
+```
+python3 scripts/generate.py
+/Users/r/repos/agentic-coding/claude/CLAUDE.md: managed block rewritten
+/Users/r/repos/agentic-coding/copilot/instructions/copilot-instructions.md: managed block rewritten
+/Users/r/repos/agentic-coding/codex/AGENTS.md: managed block rewritten
+ M claude/CLAUDE.md
+ M claude/rules/references/decision-log-format.md
+ M codex/AGENTS.md
+ M copilot/instructions/copilot-instructions.md
+ M shared/conventions.md
+ M specs/backlog-skill/.orbit/summary.json
+ M specs/backlog-skill/tasks.md
+ M tests/test_generate.py
+?? claude/skills/backlog/
+?? specs/backlog-skill/.orbit/index.html
+?? specs/backlog-skill/.orbit/index.md
+?? specs/backlog-skill/.orbit/phase-1-run-2-session.json
+?? specs/backlog-skill/.orbit/phase-1-run-2-session.txt
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.html
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.jsonl
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.md
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:51:50+10:00
+
+Good, generation is expected — that's exactly `make generate` regenerating the managed blocks. Now run the full test_generate suite.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+python3 -m unittest tests.test_generate -v 2>&1 | tail -50
+```
+
+**Result:**
+```
+test_real_copilot_output_has_no_claude_isms (tests.test_generate.ConventionsAssemblyTests)
+The repo's actual shared/ fragments must keep the Copilot output ... ok
+test_real_outputs_document_decision_mode (tests.test_generate.ConventionsAssemblyTests)
+Req 5.4: the shared convention text documents decision_mode's ... ok
+test_real_outputs_share_conventions_verbatim (tests.test_generate.ConventionsAssemblyTests) ... ok
+test_content_outside_markers_survives_regeneration (tests.test_generate.ManagedBlockWriterTests)
+Claude memory appends after the block must survive (Decision 15). ... ok
+test_head_content_before_markers_survives (tests.test_generate.ManagedBlockWriterTests) ... ok
+test_markerless_existing_file_is_skipped_and_reported (tests.test_generate.ManagedBlockWriterTests) ... ok
+test_missing_file_is_created_with_markers (tests.test_generate.ManagedBlockWriterTests) ... ok
+test_rewrite_with_same_content_reports_no_change (tests.test_generate.ManagedBlockWriterTests) ... ok
+test_managed_block_markers_are_stable (tests.test_generate.MarkerContractTests) ... ok
+test_cloud_config_matches_golden (tests.test_generate.McpEmissionTests) ... ok
+test_cloud_json_is_paste_ready_string (tests.test_generate.McpEmissionTests) ... ok
+test_codex_mcp_toml_matches_golden (tests.test_generate.McpEmissionTests) ... ok
+test_no_secret_values_in_any_output (tests.test_generate.McpEmissionTests)
+Req 4.3: outputs reference secrets, never contain values. ... ok
+test_repo_mcp_matches_golden (tests.test_generate.McpEmissionTests) ... ok
+test_subset_selection (tests.test_generate.McpEmissionTests)
+Req 4.4: per-repo generation supports a subset of the set. ... ok
+test_surface_filtering (tests.test_generate.McpEmissionTests)
+zulu is vscode-only; claude and cloud shapes must exclude it. ... ok
+test_unknown_server_in_subset_errors_with_canonical_names (tests.test_generate.McpEmissionTests) ... ok
+test_unmappable_secret_aborts_naming_server_and_target (tests.test_generate.McpEmissionTests) ... ok
+test_vscode_mcp_matches_golden (tests.test_generate.McpEmissionTests) ... ok
+test_claude_cli_commands_use_user_scope (tests.test_generate.McpMergeTests) ... ok
+test_claude_user_config_merge_preserves_unrelated_keys (tests.test_generate.McpMergeTests) ... ok
+test_codex_config_keeps_existing_canonical_tables_outside_subset (tests.test_generate.McpMergeTests) ... ok
+test_codex_config_preserves_unrelated_and_noncanonical_tables (tests.test_generate.McpMergeTests) ... ok
+test_invalid_target_json_backed_up_and_regenerated (tests.test_generate.McpMergeTests) ... ok
+test_non_dict_root_backed_up_and_regenerated (tests.test_generate.McpMergeTests)
+A parseable non-object root (top-level array) is invalid for a ... ok
+test_repo_generation_is_idempotent (tests.test_generate.McpMergeTests) ... ok
+test_repo_generation_preserves_non_canonical_and_converges (tests.test_generate.McpMergeTests) ... ok
+test_seed_sources_carry_markers_with_frontmatter_outside (tests.test_generate.SeedSourceMarkerTests) ... ok
+test_user_generation_with_injected_paths (tests.test_generate.UserConfigWiringTests) ... ok
+test_existing_model_entry_is_converged (tests.test_generate.VscodeSettingsMergeTests) ... ok
+test_jsonc_settings_backed_up_and_never_clobbered (tests.test_generate.VscodeSettingsMergeTests) ... ok
+test_merge_is_idempotent (tests.test_generate.VscodeSettingsMergeTests) ... ok
+test_merge_preserves_unrelated_keys_and_seeds_managed_ones (tests.test_generate.VscodeSettingsMergeTests) ... ok
+test_missing_settings_file_is_created (tests.test_generate.VscodeSettingsMergeTests) ... ok
+test_non_dict_settings_root_backed_up_and_left_unchanged (tests.test_generate.VscodeSettingsMergeTests) ... ok
+test_repeated_jsonc_backup_does_not_accumulate (tests.test_generate.VscodeSettingsMergeTests)
+A second merge over the same unparseable content must not write ... ok
+test_use_claude_md_file_is_never_enabled (tests.test_generate.VscodeSettingsMergeTests) ... ok
+
+----------------------------------------------------------------------
+Ran 48 tests in 0.372s
+
+OK
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:51:52+10:00
+
+Green. Let's also run `make lint-drift` and the full test suite to make sure nothing else broke.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+make lint-drift 2>&1 | tail -20
+```
+
+**Result:**
+```
+no changes
+Generated files match their sources.
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash: Run full python test suite</summary>
+
+**Command:**
+```bash
+python3 -m unittest discover -s tests 2>&1 | tail -40
+```
+
+**Result:**
+```
+.................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 177 tests in 6.908s
+
+OK
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:52:03+10:00
+
+All green. Mark 2.2 and task 2 complete.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Mark subtask 2.2 complete</summary>
+
+**Command:**
+```bash
+rune complete specs/backlog-skill/tasks.md 2.2
+```
+
+**Result:**
+```
+Completed task 2.2: Add decision_mode rules to shared/conventions.md and the decision-log format reference; run make generate (green)
+Auto-completed parent tasks: 2
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskUpdate</summary>
+
+**Input:**
+```json
+{
+  "status": "completed",
+  "taskId": "2"
+}
+```
+
+**Result:**
+```
+Updated task #2 status
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskUpdate</summary>
+
+**Input:**
+```json
+{
+  "status": "in_progress",
+  "taskId": "3"
+}
+```
+
+**Result:**
+```
+Updated task #3 status
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:52:11+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>claude/skills/spec-janitor/SKILL.md</code></summary>
+
+```
+93	
+94	Apply **approved batches only**. Rules:
+95	
+96	- **Moves** (`SJ-FILE-001`): the move and the rewrite of all inbound references within `specs/` happen in the same batch; inbound references outside `specs/` (docs/, README) are reported as follow-ups, never edited.
+97	- **Supersession** (`SJ-SUP-*`, `SJ-FLOW-001`): annotate, never delete. Decision-log entries follow the decision-log format (`superseded by Decision X` status markers); documents mark discarded sections superseded in place; and supersession between specs is recorded in **both directions** — the superseded spec names its successor and the superseding spec names what it replaces.
+98	- If a file changed between audit and apply, re-run the mechanical audit before proceeding.
+99	
+100	### 7. Index
+101	
+102	- `specs/OVERVIEW.md` missing and specs exist: run `/specs-overview` to create it.
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:52:15+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>claude/skills/spec-janitor/SKILL.md</code></summary>
+
+```patch
+ Apply **approved batches only**. Rules:
+ 
+ - **Moves** (`SJ-FILE-001`): the move and the rewrite of all inbound references within `specs/` happen in the same batch; inbound references outside `specs/` (docs/, README) are reported as follow-ups, never edited.
+-- **Supersession** (`SJ-SUP-*`, `SJ-FLOW-001`): annotate, never delete. Decision-log entries follow the decision-log format (`superseded by Decision X` status markers); documents mark discarded sections superseded in place; and supersession between specs is recorded in **both directions** — the superseded spec names its successor and the superseding spec names what it replaces.
++- **Supersession** (`SJ-SUP-*`, `SJ-FLOW-001`): annotate, never delete. Decision-log entries follow the decision-log format (`superseded by Decision X` status markers unless the repo's `.agentic.json` sets `decision_mode` to `overwrite`, in which case the entry is edited in place instead); documents mark discarded sections superseded in place; and supersession between specs is recorded in **both directions** — the superseded spec names its successor and the superseding spec names what it replaces.
+ - If a file changed between audit and apply, re-run the mechanical audit before proceeding.
+ 
+ ### 7. Index
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:52:18+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>claude/skills/spec-janitor/SKILL.md</code></summary>
+
+```
+12	## Entry Contract
+13	
+14	This is an **interactive-entry skill**: no router (nextup, orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
+15	
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:52:21+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>claude/skills/spec-janitor/SKILL.md</code></summary>
+
+```patch
+ 
+ ## Entry Contract
+ 
+-This is an **interactive-entry skill**: no router (nextup, orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
++This is an **interactive-entry skill**: no router (orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
+ 
+ ## The Auditor
+ 
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:52:23+10:00
+
+Now the spec-conventions.md Supersession preamble:
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:52:25+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>claude/skills/spec-janitor/references/spec-conventions.md</code></summary>
+
+```patch
+ Supersession is annotated, never deleted: decision-log entries use status
+ markers (`superseded by Decision X`), documents mark discarded sections
+ superseded in place, and superseding and superseded specs reference each other
+-in both directions.
++in both directions. A repo whose `.agentic.json` sets `decision_mode` to
++`overwrite` edits decision-log entries in place instead — the audit MUST NOT
++flag an overwrite-mode repo's in-place-edited entries as missing supersession.
+ 
+ ### SJ-SUP-001 — duplicate or silently superseding specs
+ 
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:52:27+10:00
+
+Now make-it-so and next-task's Mid-Implementation Spec Edits clauses:
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:52:28+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>claude/skills/make-it-so/SKILL.md</code></summary>
+
+```
+88	The main agent waits for the subagent to return and surfaces any failure to the user before continuing.
+89	
+90	**Mid-Implementation Spec Edits:**
+91	Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`). This applies to the main agent and to every subagent it spawns.
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Read: <code>claude/skills/next-task/SKILL.md</code></summary>
+
+```
+30	- Use tools and skills as appropriate while implementing the task. For example, if you need to know the capabilities of a library, use context7, and if you want to verify your code is efficient, use the efficiency-optimizer skill
+31	
+32	**Mid-Implementation Spec Edits:**
+33	Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`).
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:52:33+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>claude/skills/make-it-so/SKILL.md</code></summary>
+
+```patch
+ The main agent waits for the subagent to return and surfaces any failure to the user before continuing.
+ 
+ **Mid-Implementation Spec Edits:**
+-Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`). This applies to the main agent and to every subagent it spawns.
++Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`). This applies to the main agent and to every subagent it spawns. Recording or revising a decision-log entry defers to the repo's declared `decision_mode` (read from `.agentic.json`; default `supersede`) rather than always superseding.
+ 
+ **Review (main agent):**
+ - Once the phase is fully integrated (parallel mode) or the single subagent has returned `done` (single-subagent mode), run the design-critic skill over the phase's implementation **diff** (e.g. `git diff` from the phase's starting commit to HEAD) — not a plain read-through of the final state, which reliably finds nothing. Issues detected should be fixed (delegate the fix as a follow-up subagent if it involves code, or update the decision log directly)
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Edit: <code>claude/skills/next-task/SKILL.md</code></summary>
+
+```patch
+ - Use tools and skills as appropriate while implementing the task. For example, if you need to know the capabilities of a library, use context7, and if you want to verify your code is efficient, use the efficiency-optimizer skill
+ 
+ **Mid-Implementation Spec Edits:**
+-Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`).
++Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`). Recording or revising a decision-log entry defers to the repo's declared `decision_mode` (read from `.agentic.json`; default `supersede`) rather than always superseding.
+ 
+ **Parallel Execution with Multiple Streams:**
+ When a phase is pulled in and multiple streams have ready tasks:
+```
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Re-run full test suite after skill edits</summary>
+
+**Command:**
+```bash
+python3 -m unittest discover -s tests 2>&1 | tail -20
+```
+
+**Result:**
+```
+.................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 177 tests in 7.116s
+
+OK
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:52:48+10:00
+
+All still green. Marking task 3 complete.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Mark task 3 complete</summary>
+
+**Command:**
+```bash
+rune complete specs/backlog-skill/tasks.md 3
+```
+
+**Result:**
+```
+Completed task 3: Per-skill decision_mode edits in supersede-mandating skills
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 TaskUpdate</summary>
+
+**Input:**
+```json
+{
+  "status": "completed",
+  "taskId": "3"
+}
+```
+
+**Result:**
+```
+Updated task #3 status
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash: Check for specs/OVERVIEW.md</summary>
+
+**Command:**
+```bash
+ls specs/OVERVIEW.md 2>/dev/null && echo exists || echo "no OVERVIEW.md"
+```
+
+**Result:**
+```
+specs/OVERVIEW.md
+exists
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:52:53+10:00
+
+<details>
+<summary>🔧 Skill: specs-overview</summary>
+
+Base directory for this skill: /Users/r/.claude/skills/specs-overview
+
+# Specs Overview Generator
+
+Generate or update a `specs/OVERVIEW.md` file that catalogues all feature specs in the project's `specs/` directory.
+
+This skill is **format-adaptive** and **preservation-first**. Repos differ: some keep flat `specs/<capability>/` folders, some nest `specs/<domain>/<capability>/`; some tag specs with a domain and mode, some don't. The skill reads what a repo already does — from an existing `OVERVIEW.md` and from the on-disk structure — and reproduces that shape rather than flattening it to a lowest common denominator. When an `OVERVIEW.md` already exists, hand-curated prose is **preserved, not regenerated** (see [Preservation](#preservation-the-core-rule)). Full mechanical generation happens only for a first-time build or for newly discovered specs.
+
+## Prerequisites
+
+- A `specs/` directory must exist in the project root.
+- At least one spec folder must exist with spec files (`requirements.md`, `smolspec.md`, `design.md`, `prd.md`, `plan.md`, etc.).
+
+## Process
+
+### 1. Discover specs
+
+A **spec** is a leaf directory under `specs/` that contains at least one spec document: `requirements.md`, `smolspec.md`, `prd.md`, `design.md`, or a `tasks*.md` file. Discover them robustly so both layouts work:
+
+- **Flat repos:** `specs/<capability>/` — the capability directory is the spec.
+- **Nested repos:** `specs/<domain>/<capability>/` — the capability (leaf) directory is the spec, and `<domain>` is the path segment(s) between `specs/` and the leaf.
+
+Exclude `specs/bugfixes/` entirely (bug specs are tracked separately). Ignore container directories that only hold other spec folders (they are not themselves specs) and dotfolders (`.orbit`, etc.).
+
+For each spec collect:
+
+- **Directory path** relative to `specs/` (e.g. `estimation/pipeline` or `serving-adjust`) — used for file links.
+- **Domain** — the path segment(s) before the leaf, if the repo nests; empty for flat repos. If an existing `OVERVIEW.md` records a domain for a spec (including a multi-domain tag like `data · ui`), keep that.
+- **Display name** — Title Case of the leaf directory name, UNLESS an existing `OVERVIEW.md` already gives the spec a curated display name (e.g. a renamed `estimation/pipeline` shown as **Research**); then keep the existing name and its anchor.
+- **Creation date** — earliest git commit that added files in the directory: `git log --diff-filter=A --format='%aI' -- 'specs/<dir>/'`; take the last (oldest) line, format `YYYY-MM-DD`.
+- **Status** — see [Status derivation](#status-derivation).
+- **Mode** — see [Mode derivation](#mode-derivation).
+- **Summary** — for an existing spec, the current curated summary (preserved). For a new spec, a first-draft one-to-two-sentence summary from the first substantive paragraph of the primary document (check in order: `requirements.md`, `smolspec.md`, `prd.md`, `design.md`, `plan.md`).
+- **Files** — all `.md` files in the directory, excluding `explanation.md` (session-scoped explain-like output — listing it creates dead links once the artefact is removed) and non-documentation items (`comparison-report/`, `.DS_Store`, artifact subdirectories).
+
+### Status derivation
+
+Determine status from the spec's task file(s) — `tasks.md` or, for PRD-lane specs, every `tasks-*.md` combined:
+
+- `Done` — every task checkbox is complete.
+- `In Progress` — some complete, some not.
+- `Planned` — tasks exist but none are complete.
+- `No Tasks` — no task file exists.
+
+Checkbox markers: `[x]`/`[X]` count as complete; `[ ]` is open; rune's in-progress/blocked markers `[-]`, `[~]`, `[/]` count as **not** complete (so a spec whose only remaining task is a `[-]` on-device verify is `In Progress`, not `Done`). Always recompute status live — never trust the old value.
+
+`Superseded` is a curated status, not a checkbox outcome: if the spec's `decision_log.md` or primary document marks it superseded / abandoned / retired, use `Superseded`. Preserve an existing `Superseded` status unless the spec has clearly been revived.
+
+### Mode derivation
+
+Include a Mode column when spec modes are meaningful in the repo (starwave / PRD lane repos — effectively all repos using this workflow). Derive from the files present:
+
+- `prd` — a `prd.md` exists (PRD lane).
+- `smol` — a `smolspec.md` exists.
+- `full` — `requirements.md` + `design.md` exist.
+- Fallback `full` if a `tasks.md` exists with numbered requirements-style docs.
+
+Preserve any curated suffix an existing `OVERVIEW.md` carries (e.g. `full ·iterative`, marking a target-driven concern inside an otherwise deterministic spec) — do not invent the `·iterative` suffix; only carry it forward if already present.
+
+## Preservation — the core rule
+
+**When `specs/OVERVIEW.md` already exists, treat its curated content as authoritative and edit around it:**
+
+- **Preserve** verbatim: the intro/legend block (header notes, `PROCESS.md` / `DECISIONS.md` links, the Domain/Mode legend), each existing spec's **Summary** prose, each existing spec's **detail-section prose**, curated **display names/anchors**, and curated **Domain**/**Mode**/`Superseded` tags.
+- **Recompute and update** for every existing spec: **Status** (from task files), **Creation date** (from git), and the **file list** (add/remove `.md` files that appeared or disappeared). If a summary contains a mechanical task-count phrase (e.g. "8/9 tasks done"), you MAY update just that phrase to match the recomputed status; otherwise leave the summary prose alone.
+- **Add** a table row and detail section for each newly discovered spec, generating a first-draft summary. Place it in the correct group and chronological position.
+- **Remove** the row and detail section for any spec whose directory no longer exists.
+
+This is an in-place reconciliation (Edit the file), not a from-scratch rewrite. Only when `OVERVIEW.md` does **not** exist do you generate the whole file mechanically.
+
+## Output structure
+
+### Columns (adaptive)
+
+The table always has **Name**, **Status**, **Summary**, and a **Created** column. Add:
+
+- a **Domain** column *iff* the repo nests specs under domain directories (or an existing `OVERVIEW.md` uses one);
+- a **Mode** column *iff* modes are meaningful (see [Mode derivation](#mode-derivation)).
+
+The medata-style full form is:
+
+```markdown
+# Specs Overview
+
+> How specs are written, tracked, and turned into code: [PROCESS.md](PROCESS.md).
+> Cross-cutting architectural decisions are distilled in the meta decision log: [DECISIONS.md](DECISIONS.md). Per-spec decision logs below remain authoritative for detail.
+
+> **Domain** — every spec lives at `specs/<domain>/<capability>/`; the domain is one of <the domains actually present>.
+> **Mode** — `full` / `smol` / `prd` / `iterative`; a `·iterative` suffix marks a target-driven concern inside an otherwise deterministic spec.
+
+| Name | Domain | Created | Status | Mode | Summary |
+|------|--------|---------|--------|------|---------|
+| [Spec Name](#anchor) | domain | YYYY-MM-DD | Status | mode | One- to two-sentence summary. |
+...
+
+---
+
+## Spec Name
+
+Summary prose (may be a short paragraph).
+
+- [filename.md](domain/capability/filename.md)
+...
+```
+
+Only emit the `PROCESS.md` / `DECISIONS.md` legend lines that correspond to files that actually exist under `specs/`. For a flat repo with no domains, drop the Domain column and the domain legend, and the table degrades to `| Name | Created | Status | Mode | Summary |`.
+
+### Ordering
+
+- If the repo uses domains: **group by domain**, and within each domain sort chronologically (oldest first). Preserve the domain group order an existing `OVERVIEW.md` already uses (e.g. estimation, capture, data, ui, then top-level multi-domain PRD specs). Top-level specs with no domain directory (typically PRD-lane) group together, conventionally last.
+- If the repo is flat: sort all rows chronologically, oldest first.
+
+### Detail sections
+
+- One H2 section per spec, in the same order as the table.
+- Summary/prose below the heading (preserved for existing specs).
+- A bulleted list of the spec's `.md` files, each linked relative to `specs/` (`domain/capability/filename.md` when nested).
+- Anchors are the display name lowercased with spaces replaced by hyphens; keep an existing spec's established anchor.
+
+## Write and verify
+
+- Existing file: apply the reconciliation as targeted edits.
+- No existing file: write the complete `specs/OVERVIEW.md`.
+- If the repo has a spelling/lint gate for docs (e.g. a `make spell` target or `tools/check_spelling.sh`), run it after writing and fix any flagged spellings — many repos mandate Irish/British spelling.
+
+## Constraints
+
+- MUST NOT include specs from `specs/bugfixes/`.
+- MUST use git history for creation dates, not filesystem timestamps.
+- MUST examine task files to determine status (honouring rune's `[-]`/`[~]` in-progress markers), not guess from other signals.
+- MUST preserve curated summaries, detail prose, display names, and the intro legend when `OVERVIEW.md` already exists — never flatten hand-maintained content to a mechanical regeneration.
+- MUST reproduce the repo's existing column set and ordering rather than imposing a fixed 4-column layout.
+- SHOULD parallelise git date lookups and file reads for efficiency.
+- MUST NOT create or modify any file other than `specs/OVERVIEW.md`.
+
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+grep -n -A2 -B2 "backlog-skill\|Backlog Skill\|Backlog" specs/OVERVIEW.md | head -60
+```
+
+**Result:**
+```
+10-| [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth. Supersedes the machine-zone portions of Nextup Starwave Refinement. |
+11-| [Spec Janitor](#spec-janitor) | 2026-07-26 | Done | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
+12:| [Backlog Skill](#backlog-skill) | 2026-08-26 | Planned | A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources; includes the full toolchain sunset and a per-repo decision overwrite mode |
+13-
+14----
+--
+73-- [tasks.md](spec-janitor/tasks.md)
+74-
+75:## Backlog Skill
+76-
+77-A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources. Includes the full toolchain sunset (align seeding, process-status columns, sync prune, tests and fixtures, documentation) and a per-repo `decision_mode` convention read from `.agentic.json`. Rollout administration is deliberately role-based in the committed documents.
+78-
+79:- [decision_log.md](backlog-skill/decision_log.md)
+80:- [design.md](backlog-skill/design.md)
+81:- [requirements.md](backlog-skill/requirements.md)
+82:- [rollout.md](backlog-skill/rollout.md)
+83:- [tasks.md](backlog-skill/tasks.md)
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:53:00+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>specs/OVERVIEW.md</code></summary>
+
+```patch
+ | [Fiscal Probe Skill](#fiscal-probe-skill) | 2026-07-23 | Done | Financial-document probe skill producing reports where every claim carries a source reference |
+ | [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth. Supersedes the machine-zone portions of Nextup Starwave Refinement. |
+ | [Spec Janitor](#spec-janitor) | 2026-07-26 | Done | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
+-| [Backlog Skill](#backlog-skill) | 2026-08-26 | Planned | A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources; includes the full toolchain sunset and a per-repo decision overwrite mode |
++| [Backlog Skill](#backlog-skill) | 2026-08-26 | In Progress | A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources; includes the full toolchain sunset and a per-repo decision overwrite mode |
+ 
+ ---
+ 
+```
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Confirm phase completion status</summary>
+
+**Command:**
+```bash
+rune list specs/backlog-skill/tasks.md --format json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('stats') or d.get('Stats'))" 2>&1; rune next --phase --format json specs/backlog-skill/tasks.md 2>&1 | head -20
+```
+
+**Result:**
+```
+{'Total': 17, 'Pending': 12, 'InProgress': 0, 'Completed': 5}
+{
+  "success": true,
+  "count": 3,
+  "phase_name": "Toolchain",
+  "tasks": [
+    {
+      "id": "4",
+      "title": "BACKLOG.md column and schema check in process_status.py",
+      "status": "Pending",
+      "stream": 2,
+      "blocked": false,
+      "children": [
+        {
+          "id": "4.1",
+          "title": "Write BACKLOG fixture tests in test_process_status.py; remove nextup-column assertions (red)",
+          "status": "Pending",
+          "stream": 2,
+          "blocked": false,
+          "details": [
+            "ok fixtures: absent (renders -), valid, empty-but-valid (both phases zero entries), gapped numbering, U+2192 arrow detail, trailing-whitespace heading",
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:53:07+10:00
+
+The "Skill and Conventions" phase (tasks 1–3) is complete; the next phase is "Toolchain" (tasks 4–6). Per `/next-task --phase`, I stop here for review rather than proceeding into the next phase.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Check working tree status before commit</summary>
+
+**Command:**
+```bash
+git status --short
+```
+
+**Result:**
+```
+ M claude/CLAUDE.md
+ M claude/rules/references/decision-log-format.md
+ M claude/skills/make-it-so/SKILL.md
+ M claude/skills/next-task/SKILL.md
+ M claude/skills/spec-janitor/SKILL.md
+ M claude/skills/spec-janitor/references/spec-conventions.md
+ M codex/AGENTS.md
+ M copilot/instructions/copilot-instructions.md
+ M shared/conventions.md
+ M specs/OVERVIEW.md
+ M specs/backlog-skill/.orbit/summary.json
+ M specs/backlog-skill/tasks.md
+ M tests/test_generate.py
+?? claude/skills/backlog/
+?? specs/backlog-skill/.orbit/index.html
+?? specs/backlog-skill/.orbit/index.md
+?? specs/backlog-skill/.orbit/phase-1-run-2-session.json
+?? specs/backlog-skill/.orbit/phase-1-run-2-session.txt
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.html
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.jsonl
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.md
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+grep -n "orbit" .gitignore 2>/dev/null; git log --oneline -1 -- specs/backlog-skill/.orbit/summary.json
+```
+
+**Result:**
+```
+d28a3a3 [feat]: add backlog-skill specification
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:53:16+10:00
+
+<details>
+<summary>🔧 Skill: commit</summary>
+
+Base directory for this skill: /Users/r/.claude/skills/commit
+
+# Commits
+
+1. Use the command line to get an overview of the staged git changes. If no changes are staged, stage all files.
+2. Determine if the changes include code files (not just documentation like .md files, comments, or config files). If code changes are present, run all formatting and test commands. If only documentation changes, skip tests and linting. If running the formatting resulted in unstaged changes to files, stage these as well. DO NOT revert code changes unless specifically asked to do so.
+3. Create a concise, well-documented summary of the changes in the format as defined at keepachangelog.com, excluding any changes to the changelog file itself. Use proper formatting and be specific about the changes. Ignore the marking of tasks as complete.
+4. Read the CHANGELOG.md file, if the file does not exist, create it.
+5. Verify if the summary is already present in the changelog, if not add it to the top of the file.
+6. Add the changelog to staged commits
+7. Verify the current git branch using the git command.
+8. Extract any ticket numbers from the branch, check for the below options based on what is likely.
+    a. Extract the ticket number from the branch. The ticket number will be in the format ABC-123 and will be the combination of 1-5 letters or numbers, a -, and 1-5 numbers. This will be at the start of the branch name, possibly preceeded by something like feature/ or hotfix/.
+    b. Check for a pure number, this would likely reflect a GitHub Issue.
+9. If a ticket number was found, use this as the commit message prefix, otherwise use [feat] / [bug] / [doc] as appropriate based on any prefixes in the branchname and/or the code changes
+10. Summarise the changes into a multi-line detailed commit message, prefixed with the commit message prefix and :. Do NOT include any co-authored-by information in the commit message.
+11. Commit the code
+
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Review unstaged changes overview</summary>
+
+**Command:**
+```bash
+git diff --stat
+```
+
+**Result:**
+```
+ claude/CLAUDE.md                                   |  2 ++
+ claude/rules/references/decision-log-format.md     |  9 +++++++
+ claude/skills/make-it-so/SKILL.md                  |  2 +-
+ claude/skills/next-task/SKILL.md                   |  2 +-
+ claude/skills/spec-janitor/SKILL.md                |  4 +--
+ .../spec-janitor/references/spec-conventions.md    |  4 ++-
+ codex/AGENTS.md                                    |  2 ++
+ copilot/instructions/copilot-instructions.md       |  2 ++
+ shared/conventions.md                              |  2 ++
+ specs/OVERVIEW.md                                  |  2 +-
+ specs/backlog-skill/.orbit/summary.json            | 29 +++++++++++++++++++---
+ specs/backlog-skill/tasks.md                       | 10 ++++----
+ tests/test_generate.py                             | 12 +++++++++
+ 13 files changed, 67 insertions(+), 15 deletions(-)
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+git log --stat -1 d28a3a3 -- specs/backlog-skill/.orbit/ | head -20; echo ---; git show d28a3a3 --stat | grep orbit
+```
+
+**Result:**
+```
+commit d28a3a3e0fc66870a6a761ceb87b55dd69bea805
+Author: Ronan O'Brien <18034798+troobit@users.noreply.github.com>
+Date:   Wed Aug 26 23:31:06 2026 +1000
+
+    [feat]: add backlog-skill specification
+    
+    Comprehensive specification for the /backlog skill that consolidates and replaces nextup and spout. Captures loose ideas and notes into a tracked, rune-parseable specs/BACKLOG.md, routes items to existing specs or the backlog, and enables the retirement of the nextup/spout toolchain.
+    
+    Includes:
+    - Requirements (AC 1–6): capture mechanics, routing rules, BACKLOG.md contract, source cleanup, decision_mode configuration, and sunset lifecycle
+    - Design: skill workflow phases, data model, hybrid schema check, decision_mode plumbing, and sunset reference audit
+    - Decision log (12 entries): scope, reconciliation, schema stability, superseding-vs-overwrite modes, and rollout ordering
+    - Rollout: per-repo enrollment, migration, cleanup, and exit criteria
+    - Tasks: 18 rune-managed implementation tasks with stream assignments and ordered dependencies
+    
+    Additional:
+    - .orbit.yaml for Codex toolchain distribution
+    - specs/OVERVIEW.md updated with backlog-skill entry
+    - .gitignore: added .worktrees/* for parallel execution isolation
+    
+---
+    - .orbit.yaml for Codex toolchain distribution
+ .orbit.yaml                             |  27 +++
+ specs/backlog-skill/.orbit/summary.json |  10 +
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash</summary>
+
+**Command:**
+```bash
+git diff specs/backlog-skill/.orbit/summary.json | head -40
+```
+
+**Result:**
+```
+diff --git a/specs/backlog-skill/.orbit/summary.json b/specs/backlog-skill/.orbit/summary.json
+index 573bc6f..048c66f 100644
+--- a/specs/backlog-skill/.orbit/summary.json
++++ b/specs/backlog-skill/.orbit/summary.json
+@@ -1,10 +1,31 @@
+ {
+   "started_at": "2026-08-26T23:28:43.40117+10:00",
++  "completed_at": "2026-08-26T23:33:45.206991+10:00",
+   "status": "running",
+-  "phases_completed": 0,
++  "phases_completed": 1,
+   "total_cost_usd": 0,
+-  "total_duration_ms": 0,
+-  "sessions": [],
+-  "run_number": 1,
++  "cost_totals": {},
++  "total_duration_ms": 16000,
++  "sessions": [
++    {
++      "phase": 1,
++      "session_id": "1dac717f-390f-46a3-9c2e-26471586109f",
++      "duration_ms": 16000,
++      "cost_usd": 0,
++      "num_turns": 0,
++      "started_at": "2026-08-26T23:33:29.141208+10:00",
++      "ended_at": "2026-08-26T23:33:45.171575+10:00",
++      "run_number": 2,
++      "agent_alias": "claude-code",
++      "agent_type": "claude-code"
++    }
++  ],
++  "error": "signal: killed",
++  "current_phase": {
++    "phase": 1,
++    "session_id": "1dac717f-390f-46a3-9c2e-26471586109f",
++    "started_at": "2026-08-26T23:33:29.145343+10:00"
++  },
++  "run_number": 3,
+   "branch_name": "specs/backlog-skill"
+ }
+```
+
+</details>
+
+<details>
+<summary>✅ 🔧 Bash: Stage task-related files, excluding unrelated .orbit run artifacts</summary>
+
+**Command:**
+```bash
+git add claude/CLAUDE.md claude/rules/references/decision-log-format.md claude/skills/make-it-so/SKILL.md claude/skills/next-task/SKILL.md claude/skills/spec-janitor/SKILL.md claude/skills/spec-janitor/references/spec-conventions.md codex/AGENTS.md copilot/instructions/copilot-instructions.md shared/conventions.md specs/OVERVIEW.md specs/backlog-skill/tasks.md tests/test_generate.py claude/skills/backlog/
+git status --short
+```
+
+**Result:**
+```
+M  claude/CLAUDE.md
+M  claude/rules/references/decision-log-format.md
+A  claude/skills/backlog/SKILL.md
+M  claude/skills/make-it-so/SKILL.md
+M  claude/skills/next-task/SKILL.md
+M  claude/skills/spec-janitor/SKILL.md
+M  claude/skills/spec-janitor/references/spec-conventions.md
+M  codex/AGENTS.md
+M  copilot/instructions/copilot-instructions.md
+M  shared/conventions.md
+M  specs/OVERVIEW.md
+ M specs/backlog-skill/.orbit/summary.json
+M  specs/backlog-skill/tasks.md
+M  tests/test_generate.py
+?? specs/backlog-skill/.orbit/index.html
+?? specs/backlog-skill/.orbit/index.md
+?? specs/backlog-skill/.orbit/phase-1-run-2-session.json
+?? specs/backlog-skill/.orbit/phase-1-run-2-session.txt
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.html
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.jsonl
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.md
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:53:48+10:00
+
+Good — staged everything relevant, left the unrelated `.orbit` run-tracking artifacts (from an earlier, unrelated failed orbit run) untouched. Tests are already green (ran the full suite above), so per the commit skill, code-affecting changes are covered. Now let's check branch/ticket and write the changelog entry.
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Check current branch and existing changelog</summary>
+
+**Command:**
+```bash
+git branch --show-current; echo ---; cat CHANGELOG.md 2>/dev/null | head -30
+```
+
+**Result:**
+```
+specs/backlog-skill
+---
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- **Backlog skill specification** (`specs/backlog-skill/`): Complete specification for the `/backlog` skill that consolidates and replaces the sunset `nextup` and `spout` skills. Captures ideas, loose notes, and audit findings into a tracked, rune-parseable `specs/BACKLOG.md`, routes items to existing spec tasks, requirement amendments, or the backlog, and enables automated sunset of retired skills with decision_mode configuration for overwrite-vs-supersede decision log behavior
+  - **requirements.md**: Five acceptance-criterion groups (AC 1–6) covering capture mechanics, routing rules, BACKLOG.md contract with rune-strict schema, source file cleanup, decision_mode configuration, and complete sunset of nextup/spout toolchain
+  - **design.md**: Skill workflow (preflight, reconcile, gather, route, file, clear phases), BACKLOG.md data model (rune-strict H1/H2 phases with detail-line grammar), decision_mode plumbing across conventions and per-skill edits (spec-janitor, make-it-so, next-task), hybrid schema check in process_status.py, and comprehensive reference audit for sunset requirement
+  - **decision_log.md**: 12-entry decision log covering skill scope, spec-named vs backlog-filed items, reconciliation triggers, single-vs-multi-file tasks, schema stability, decision ID preservation across rewrites, transit-integration timing, and superseding-vs-overwrite modes (Decision 14)
+  - **rollout.md**: Post-build per-repo administration (enrollment, decision_mode configuration, `/backlog` migration run, residual cleanup, process-status verification, Codex toolchain refresh)
+  - **tasks.md**: 18 rune-managed implementation tasks with stream assignments and blocked-by dependencies encoding the required commit ordering (skill commit → sunset commit)
+
+- **Orbit integration**: `.orbit.yaml` configuration file enabling backlog-skill distribution via the Codex toolchain
+
+- **Specs overview update**: `specs/OVERVIEW.md` with backlog-skill spec entry and status tracking
+
+### Changed
+- **.gitignore**: Added `.worktrees/*` for git worktree isolation pattern used by parallel execution skills
+
+## [2026-08-26]
+
+### Added
+- **Codex support** through the generation toolchain: `codex/AGENTS.md` (generated from `shared/codex-wrapper.md`) distributes to `~/.codex/AGENTS.md` via `scripts/generate.py --user`, with Codex-specific skill guidance and communication conventions matching Claude and Copilot instructions
+- **Agent Skills linking for Codex**: `scripts/sync-claude.sh` symlinks each top-level skill under `claude/skills/` individually into `~/.agents/skills` for Codex discovery, preserving existing user-installed skills and reporting conflicts
+- **Codex MCP configuration**: `scripts/generate.py` writes Codex MCP settings to `~/.codex/config.toml` managed blocks; `scripts/align.py` converges per-repo `.codex/config.toml` MCP tables while preserving unrelated Codex settings
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:53:53+10:00
+
+<details>
+<summary>✅ 🔧 Read: <code>CHANGELOG.md</code></summary>
+
+```
+1	# Changelog
+2	
+3	All notable changes to this project will be documented in this file.
+4	
+5	The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+6	and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+7	
+8	## [Unreleased]
+9	
+10	### Added
+11	- **Backlog skill specification** (`specs/backlog-skill/`): Complete specification for the `/backlog` skill that consolidates and replaces the sunset `nextup` and `spout` skills. Captures ideas, loose notes, and audit findings into a tracked, rune-parseable `specs/BACKLOG.md`, routes items to existing spec tasks, requirement amendments, or the backlog, and enables automated sunset of retired skills with decision_mode configuration for overwrite-vs-supersede decision log behavior
+12	  - **requirements.md**: Five acceptance-criterion groups (AC 1–6) covering capture mechanics, routing rules, BACKLOG.md contract with rune-strict schema, source file cleanup, decision_mode configuration, and complete sunset of nextup/spout toolchain
+13	  - **design.md**: Skill workflow (preflight, reconcile, gather, route, file, clear phases), BACKLOG.md data model (rune-strict H1/H2 phases with detail-line grammar), decision_mode plumbing across conventions and per-skill edits (spec-janitor, make-it-so, next-task), hybrid schema check in process_status.py, and comprehensive reference audit for sunset requirement
+14	  - **decision_log.md**: 12-entry decision log covering skill scope, spec-named vs backlog-filed items, reconciliation triggers, single-vs-multi-file tasks, schema stability, decision ID preservation across rewrites, transit-integration timing, and superseding-vs-overwrite modes (Decision 14)
+15	  - **rollout.md**: Post-build per-repo administration (enrollment, decision_mode configuration, `/backlog` migration run, residual cleanup, process-status verification, Codex toolchain refresh)
+16	  - **tasks.md**: 18 rune-managed implementation tasks with stream assignments and blocked-by dependencies encoding the required commit ordering (skill commit → sunset commit)
+17	
+18	- **Orbit integration**: `.orbit.yaml` configuration file enabling backlog-skill distribution via the Codex toolchain
+19	
+20	- **Specs overview update**: `specs/OVERVIEW.md` with backlog-skill spec entry and status tracking
+21	
+22	### Changed
+23	- **.gitignore**: Added `.worktrees/*` for git worktree isolation pattern used by parallel execution skills
+24	
+25	## [2026-08-26]
+26	
+27	### Added
+```
+
+</details>
+
+---
+
+## 🤖 Assistant · 2026-08-26T23:54:00+10:00
+
+<details>
+<summary>✅ 🔧 Edit: <code>CHANGELOG.md</code></summary>
+
+```patch
+ ## [Unreleased]
+ 
+ ### Added
++- **`/backlog` skill** (`claude/skills/backlog/SKILL.md`): implements the backlog-skill spec's Phase 1 — preflight/reconcile/gather/route/file/clear workflow, the rune-strict `specs/BACKLOG.md` grammar (H1 + `## Idea`/`## Needs Spec` phases, unchecked-forever entries, `<source>, <date>` detail lines), the task-file selection rule, gated requirement amendments with anchor-preserving edits, and the repo-realized duplicate criterion (Decision 13)
++- **`decision_mode` convention support**: `shared/conventions.md` and `claude/rules/references/decision-log-format.md` document the `.agentic.json` `decision_mode` key (`overwrite` edits a decision entry in place; `supersede`/absent keeps today's mark-and-append behavior), reaching all three generated toolchain outputs (`claude/CLAUDE.md`, `copilot/instructions/copilot-instructions.md`, `codex/AGENTS.md`)
++- **Per-skill `decision_mode` awareness**: `spec-janitor` (`SKILL.md` and `references/spec-conventions.md`), `make-it-so`, and `next-task` now defer their supersede-mandating instructions to the repo's declared `decision_mode` instead of always superseding
++
+ - **Backlog skill specification** (`specs/backlog-skill/`): Complete specification for the `/backlog` skill that consolidates and replaces the sunset `nextup` and `spout` skills. Captures ideas, loose notes, and audit findings into a tracked, rune-parseable `specs/BACKLOG.md`, routes items to existing spec tasks, requirement amendments, or the backlog, and enables automated sunset of retired skills with decision_mode configuration for overwrite-vs-supersede decision log behavior
+   - **requirements.md**: Five acceptance-criterion groups (AC 1–6) covering capture mechanics, routing rules, BACKLOG.md contract with rune-strict schema, source file cleanup, decision_mode configuration, and complete sunset of nextup/spout toolchain
+   - **design.md**: Skill workflow (preflight, reconcile, gather, route, file, clear phases), BACKLOG.md data model (rune-strict H1/H2 phases with detail-line grammar), decision_mode plumbing across conventions and per-skill edits (spec-janitor, make-it-so, next-task), hybrid schema check in process_status.py, and comprehensive reference audit for sunset requirement
+```
+
+</details>
+
+---
+
+<details>
+<summary>✅ 🔧 Bash: Commit staged phase 1 changes</summary>
+
+**Command:**
+```bash
+git add CHANGELOG.md
+git commit -m "$(cat <<'EOF'
+[feat]: implement /backlog skill and per-repo decision_mode convention
+
+Phase 1 of the backlog-skill spec: author claude/skills/backlog/SKILL.md
+(the six-step capture/route/file/clear workflow and the rune-strict
+BACKLOG.md grammar), plumb the decision_mode overwrite-vs-supersede
+convention through shared/conventions.md and the decision-log format
+reference so it reaches all three generated toolchain outputs, and
+make spec-janitor, make-it-so, and next-task defer their
+supersede-mandating instructions to a repo's declared decision_mode.
+
+Also rewords spec-janitor's stale nextup router mention ahead of its
+sunset, and refreshes specs/OVERVIEW.md's backlog-skill status.
+EOF
+)"
+git status --short
+```
+
+**Result:**
+```
+[specs/backlog-skill 0432aeb] [feat]: implement /backlog skill and per-repo decision_mode convention
+ 14 files changed, 163 insertions(+), 11 deletions(-)
+ create mode 100644 claude/skills/backlog/SKILL.md
+ M specs/backlog-skill/.orbit/summary.json
+?? specs/backlog-skill/.orbit/index.html
+?? specs/backlog-skill/.orbit/index.md
+?? specs/backlog-skill/.orbit/phase-1-run-2-session.json
+?? specs/backlog-skill/.orbit/phase-1-run-2-session.txt
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.html
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.jsonl
+?? specs/backlog-skill/.orbit/phase-1-run-2-transcript.md
+```
+
+</details>
+
+## 🤖 Assistant · 2026-08-26T23:54:09+10:00
+
+Committed. The remaining `.orbit/` changes are unrelated bookkeeping from an earlier, separate orbit run and were deliberately left out.
+
+**Summary:** Completed Phase 1 ("Skill and Conventions") of the backlog-skill spec — authored `claude/skills/backlog/SKILL.md`, added `decision_mode` documentation to `shared/conventions.md` and the decision-log format reference (with a red→green golden test and `make generate`), and updated spec-janitor/make-it-so/next-task to defer to a repo's declared `decision_mode`. Full test suite (177 tests) and `make lint-drift` pass. Committed as `0432aeb`.
+
+Next up per rune: the "Toolchain" phase (tasks 4–6, stream 2) — BACKLOG.md schema check in `process_status.py`, the sync-claude.sh symlink prune, and align step-6 removal.
+
+---
+

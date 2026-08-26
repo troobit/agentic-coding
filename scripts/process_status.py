@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """Read-only process-status report over participating repos.
 
-(PRD: nextup-starwave-refinement, "Process status"; rune-drift and PRD-lane
-visibility from PRD agreement-invoice-skills, "Process guardrails".)
+(rune-drift and PRD-lane visibility from PRD agreement-invoice-skills,
+"Process guardrails".)
 
-Prints one summary row per repo — nextup.md presence, nextup.example.md /
-.agentic.json presence, current branch, dirty/clean tree, last commit date
-— followed by indented detail lines listing each specs/ subfolder and
-which spec documents it contains. Folders carrying only a prd.md (PRD-lane
-work) appear like any other spec folder, so autonomous PRD work is visible
+Prints one summary row per repo — BACKLOG.md schema status, .agentic.json
+presence, current branch, dirty/clean tree, last commit date — followed
+by indented detail lines listing each specs/ subfolder and which spec
+documents it contains. Folders carrying only a prd.md (PRD-lane work)
+appear like any other spec folder, so autonomous PRD work is visible
 alongside starwave specs.
-
-nextup.md is a user-intent file only (the nextup skill is a pure router
-and keeps no session status in it — spec nextup-pure-router), so the
-report checks its presence and nothing inside it.
 
 Drift flags per row:
 
@@ -22,13 +18,19 @@ Drift flags per row:
 - rune-drift        a specs/** task file (tasks.md or tasks-*.md) fails
                     `rune list` parsing; the spec's detail line names the
                     failing file(s)
+- backlog-drift     specs/BACKLOG.md fails rune's parser, its H2 phases
+                    are not exactly Idea, Needs Spec, Outstanding, it has a
+                    non-pending entry (including a nested subtask), or it
+                    lacks a leading H1 title; the repo's detail line names
+                    the reason. BACKLOG.md's absence is not drift — the
+                    BACKLOG column reads `-`.
 - no-agentic-json   .agentic.json missing
 
 Strictly read-only against target repos: only `git --no-optional-locks -C
 <repo>` porcelain reads (branch/status/log) are used, so not even the git
-index is refreshed, and task files are checked with `rune list`, a pure
-parse. A missing repo path is reported on its row, never a crash; a
-missing rune binary degrades to a per-repo warning detail line.
+index is refreshed, and task files and BACKLOG.md are checked with `rune
+list`, a pure parse. A missing repo path is reported on its row, never a
+crash; a missing rune binary degrades to a per-repo warning detail line.
 
 CLI: process_status.py [repo ...]. With no arguments it reports this repo
 plus the checked-in default list below (resolved via ${HOME}, matching
@@ -40,6 +42,7 @@ Python 3 stdlib only (Decision 12). Tests: tests/test_process_status.py.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -62,6 +65,11 @@ DEFAULT_REPOS = (
 # Spec documents tracked per specs/ subfolder (Req 2).
 SPEC_DOCS = ("requirements.md", "design.md", "tasks.md", "smolspec.md",
              "prd.md")
+
+# specs/BACKLOG.md H2 phases, in required order. "Idea"/"Needs Spec" hold
+# captured entries; "Outstanding" is rebuilt from spec state on every
+# /backlog run. All three must be present even when empty.
+BACKLOG_PHASES = ["Idea", "Needs Spec", "Outstanding"]
 
 
 def default_repos() -> list[Path]:
@@ -106,6 +114,55 @@ def _rune_parses(rune: str, path: Path):
     return proc.returncode == 0
 
 
+def _backlog_status(rune: str, path: Path):
+    """BACKLOG.md schema status: `"-"` (absent), `"ok"`, or `"drift"`,
+    plus a reason string used in the detail line (None unless drifting).
+
+    Hybrid check (Decision 7, Req 3.5) — each layer covers a hole the
+    others miss:
+
+    1. Parse gate (`_rune_parses`). A vanished/unusable rune binary is
+       treated like the absent-file case — never checked, never drift.
+    2. Phase set/order: raw-text scan of `## ` headings, right-trimmed,
+       case-sensitive, must equal exactly ["Idea", "Needs Spec",
+       "Outstanding"]. Raw scan rather than rune's JSON because an
+       empty-but-valid backlog (the normal post-reconciliation state)
+       has no PhaseMarkers at all. All three are required even when
+       empty: "Outstanding" is rebuilt from spec state every run, so an
+       absent phase means a stale file, not an idle one.
+    3. Pending-only invariant via `rune list --format json` Stats:
+       Pending must equal Total. Authoritative over a raw checkbox scan
+       because rune counts nested subtask checkboxes a `^- \\[` scan
+       would miss. The parse gate already ran, so fenced-content evasion
+       of the raw scans is not possible.
+    4. H1 presence: raw scan for a leading `# ` title.
+    """
+    if not path.is_file():
+        return "-", None
+    parsed = _rune_parses(rune, path)
+    if parsed is None:
+        return "-", None
+    if not parsed:
+        return "drift", "unparseable by rune"
+
+    text = path.read_text()
+    lines = text.splitlines()
+    phases = [line[3:].rstrip() for line in lines if line.startswith("## ")]
+    if phases != BACKLOG_PHASES:
+        return "drift", f"phases {phases!r} != {BACKLOG_PHASES!r}"
+
+    proc = subprocess.run([rune, "list", "--format", "json", str(path)],
+                          capture_output=True, text=True)
+    stats = json.loads(proc.stdout).get("Stats", {})
+    if stats.get("Pending", 0) != stats.get("Total", 0):
+        return "drift", "entries are not all pending"
+
+    if not any(line.startswith("# ") for line in lines):
+        return "drift", "missing H1 title"
+
+    return "ok", None
+
+
 def collect(repo_path) -> dict:
     """Gather every report column for one repo. Never raises for a missing
     or non-git path — the row reports the problem instead (Req 1, Req 4)."""
@@ -115,8 +172,8 @@ def collect(repo_path) -> dict:
         "name": repo.resolve().name,  # stable even for "." or trailing "/"
         "exists": repo.is_dir(),
         "git": False,
-        "nextup": False,
-        "example": False,
+        "backlog": "-",         # "-" (absent), "ok", or "drift"
+        "backlog_reason": None,  # drift reason, for the detail line
         "agentic_json": False,
         "specs": {},           # subfolder name -> [present spec docs]
         "rune_drift": {},      # subfolder name -> [unparseable task files]
@@ -128,13 +185,17 @@ def collect(repo_path) -> dict:
     if not info["exists"]:
         return info
 
-    info["nextup"] = (repo / "nextup.md").is_file()
-    info["example"] = (repo / "nextup.example.md").is_file()
     info["agentic_json"] = (repo / ".agentic.json").is_file()
 
     specs_dir = repo / "specs"
     if specs_dir.is_dir():
         rune = shutil.which("rune")
+        backlog_path = specs_dir / "BACKLOG.md"
+        if backlog_path.is_file() and rune is None:
+            info["rune_missing"] = True
+        else:
+            info["backlog"], info["backlog_reason"] = _backlog_status(
+                rune, backlog_path)
         for sub in sorted(p for p in specs_dir.iterdir() if p.is_dir()):
             info["specs"][sub.name] = [
                 doc for doc in SPEC_DOCS if (sub / doc).is_file()]
@@ -176,6 +237,8 @@ def drift_flags(info: dict) -> list:
         flags.append("spec-gap")
     if info["rune_drift"]:
         flags.append("rune-drift")
+    if info["backlog"] == "drift":
+        flags.append("backlog-drift")
     if not info["agentic_json"]:
         flags.append("no-agentic-json")
     return flags
@@ -185,8 +248,7 @@ def drift_flags(info: dict) -> list:
 # Rendering
 # ---------------------------------------------------------------------------
 
-_HEADER = ("REPO", "BRANCH", "TREE", "COMMIT", "NEXTUP", "EXAMPLE",
-           "AGENTIC", "FLAGS")
+_HEADER = ("REPO", "BRANCH", "TREE", "COMMIT", "BACKLOG", "AGENTIC", "FLAGS")
 
 
 def _yes_no(value) -> str:
@@ -195,7 +257,7 @@ def _yes_no(value) -> str:
 
 def _row(info: dict) -> tuple:
     if not info["exists"]:
-        return (info["name"], "-", "-", "-", "-", "-", "-", "missing-path")
+        return (info["name"], "-", "-", "-", "-", "-", "missing-path")
     flags = drift_flags(info)
     return (
         info["name"],
@@ -203,8 +265,7 @@ def _row(info: dict) -> tuple:
         "-" if info["dirty"] is None else
         ("dirty" if info["dirty"] else "clean"),
         info["last_commit"] or "-",
-        _yes_no(info["nextup"]),
-        _yes_no(info["example"]),
+        info["backlog"],
         _yes_no(info["agentic_json"]),
         ",".join(flags) or "-",
     )
@@ -219,6 +280,9 @@ def _details(info: dict) -> list:
     if info["rune_missing"]:
         lines.append("warning: rune binary not found; "
                      "task-file parsing not checked")
+    if info["backlog"] == "drift":
+        lines.append(
+            f"specs/BACKLOG.md: {info['backlog_reason']} [backlog-drift]")
     for name, docs in info["specs"].items():
         line = f"specs/{name}: {' '.join(docs) or '(no spec docs)'}"
         failing = info["rune_drift"].get(name)
@@ -249,7 +313,8 @@ def render(infos) -> str:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Read-only process-status report over participating "
-                    "repos (nextup/specs/git state plus drift flags).")
+                    "repos (specs/git state, BACKLOG.md schema, and "
+                    "drift flags).")
     parser.add_argument(
         "repos", nargs="*",
         help="repo paths to report on (default: this repo plus "

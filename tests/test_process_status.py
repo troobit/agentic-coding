@@ -1,5 +1,5 @@
-"""Fixture tests for scripts/process_status.py (PRD: nextup-starwave-refinement;
-rune-drift and PRD-lane visibility from PRD agreement-invoice-skills).
+"""Fixture tests for scripts/process_status.py (rune-drift and PRD-lane
+visibility from PRD agreement-invoice-skills).
 
 Fixture repos are real git checkouts built in a temp dir (same pattern as
 tests/test_align.py) with pinned commit dates, so every report column can
@@ -37,17 +37,6 @@ RUNE_TASKS = "# Tasks\n\n- [ ] 1. First thing\n- [x] 2. Done thing\n"
 HAND_TASKS = "# TODO\n\n- [ ] write the thing\n- [x] ship it\n"
 
 
-def nextup_text():
-    """A nextup.md user-intent file: user zone plus the inert marker line."""
-    return ("<!-- USER -->\n"
-            "\n"
-            "free-form user instructions\n"
-            "\n"
-            "<!-- LM -->\n"
-            "\n"
-            "reserved marker for tooling — no session status is kept here\n")
-
-
 class StatusFixtureCase(unittest.TestCase):
     """Shared helper: materialise fixture repos as real git checkouts."""
 
@@ -60,22 +49,17 @@ class StatusFixtureCase(unittest.TestCase):
         subprocess.run(["git", "-C", str(repo), *GIT_ENV_ARGS, *args],
                        check=True, capture_output=True)
 
-    def make_repo(self, name, *, nextup=None, example=True, agentic=True,
+    def make_repo(self, name, *, agentic=True,
                   specs=None, files=None, git=True, commit=True, dirty=False):
         """Build a fixture repo.
 
-        nextup: file text or None (file absent). specs: dict of
-        subfolder name -> iterable of spec doc filenames to create.
-        files: dict of repo-relative path -> exact text, for files whose
-        content matters (e.g. rune task files). The default kwargs
+        specs: dict of subfolder name -> iterable of spec doc filenames to
+        create. files: dict of repo-relative path -> exact text, for files
+        whose content matters (e.g. rune task files). The default kwargs
         produce a repo with zero drift flags.
         """
         repo = self.tmp / name
         repo.mkdir(parents=True)
-        if nextup is not None:
-            (repo / "nextup.md").write_text(nextup)
-        if example:
-            (repo / "nextup.example.md").write_text("<!-- USER -->\n")
         if agentic:
             (repo / ".agentic.json").write_text('{"servers": []}\n')
         for folder, docs in (specs or {}).items():
@@ -113,7 +97,6 @@ class CollectColumnsTest(StatusFixtureCase):
     def test_all_columns_match_fixture(self):
         repo = self.make_repo(
             "known",
-            nextup=nextup_text(),
             specs={
                 "full": ("requirements.md", "design.md", "tasks.md"),
                 "smol": ("smolspec.md", "tasks.md"),
@@ -124,8 +107,6 @@ class CollectColumnsTest(StatusFixtureCase):
         self.assertTrue(info["exists"])
         self.assertTrue(info["git"])
         self.assertEqual(info["name"], "known")
-        self.assertTrue(info["nextup"])
-        self.assertTrue(info["example"])
         self.assertTrue(info["agentic_json"])
         self.assertEqual(info["specs"], {
             "empty": [],
@@ -139,11 +120,8 @@ class CollectColumnsTest(StatusFixtureCase):
         self.assertEqual(info["last_commit"], "2026-07-01")
 
     def test_dirty_tree_and_absent_optional_files(self):
-        repo = self.make_repo("bare", nextup=None, example=False,
-                              agentic=False, dirty=True)
+        repo = self.make_repo("bare", agentic=False, dirty=True)
         info = process_status.collect(repo)
-        self.assertFalse(info["nextup"])
-        self.assertFalse(info["example"])
         self.assertFalse(info["agentic_json"])
         self.assertEqual(info["specs"], {})
         self.assertTrue(info["dirty"])
@@ -167,30 +145,22 @@ class DriftFlagTest(StatusFixtureCase):
     """Req 3: each drift fixture produces that flag and only that flag."""
 
     def test_clean_fixture_has_no_flags(self):
-        self.assertEqual(self.flags(self.make_repo("clean",
-                                                   nextup=nextup_text())), [])
-
-    def test_missing_nextup_is_not_flagged(self):
-        # nextup.md is user intent, not tracked state — its absence is
-        # reported in the NEXTUP column but is not drift.
-        repo = self.make_repo("no-nextup", nextup=None)
-        self.assertEqual(self.flags(repo), [])
+        self.assertEqual(self.flags(self.make_repo("clean")), [])
 
     def test_spec_gap_requirements_without_design_or_tasks(self):
-        repo = self.make_repo("gap", nextup=nextup_text(),
+        repo = self.make_repo("gap",
                               specs={"orphan": ("requirements.md",)})
         self.assertEqual(self.flags(repo), ["spec-gap"])
 
     def test_requirements_with_design_or_tasks_is_not_a_gap(self):
         repo = self.make_repo(
-            "no-gap", nextup=nextup_text(),
+            "no-gap",
             specs={"designed": ("requirements.md", "design.md"),
                    "tasked": ("requirements.md", "tasks.md")})
         self.assertEqual(self.flags(repo), [])
 
     def test_missing_agentic_json(self):
-        repo = self.make_repo("no-manifest", nextup=nextup_text(),
-                              agentic=False)
+        repo = self.make_repo("no-manifest", agentic=False)
         self.assertEqual(self.flags(repo), ["no-agentic-json"])
 
 
@@ -198,7 +168,7 @@ class RuneDriftTest(StatusFixtureCase):
     """PRD agreement-invoice-skills Req 1: rune-drift flag and detail lines."""
 
     def test_hand_written_tasks_md_is_flagged(self):
-        repo = self.make_repo("hand", nextup=nextup_text(),
+        repo = self.make_repo("hand",
                               files={"specs/feat/tasks.md": HAND_TASKS})
         info = process_status.collect(repo)
         self.assertEqual(info["rune_drift"], {"feat": ["tasks.md"]})
@@ -206,7 +176,7 @@ class RuneDriftTest(StatusFixtureCase):
         self.assertEqual(self.flags(repo), ["rune-drift"])
 
     def test_rune_format_file_is_not_flagged(self):
-        repo = self.make_repo("live", nextup=nextup_text(),
+        repo = self.make_repo("live",
                               files={"specs/feat/tasks.md": RUNE_TASKS})
         info = process_status.collect(repo)
         self.assertEqual(info["rune_drift"], {})
@@ -214,21 +184,21 @@ class RuneDriftTest(StatusFixtureCase):
 
     def test_only_the_failing_split_file_is_named(self):
         repo = self.make_repo(
-            "split", nextup=nextup_text(),
+            "split",
             files={"specs/feat/tasks.md": RUNE_TASKS,
                    "specs/feat/tasks-extra.md": HAND_TASKS})
         info = process_status.collect(repo)
         self.assertEqual(info["rune_drift"], {"feat": ["tasks-extra.md"]})
 
     def test_detail_line_names_the_failing_file(self):
-        repo = self.make_repo("named", nextup=nextup_text(),
+        repo = self.make_repo("named",
                               files={"specs/feat/tasks.md": HAND_TASKS})
         output = process_status.render([process_status.collect(repo)])
         self.assertIn("specs/feat: tasks.md [rune-drift: tasks.md]", output)
         self.assertIn("rune-drift", output.splitlines()[1])
 
     def test_missing_rune_binary_warns_and_never_flags(self):
-        repo = self.make_repo("no-rune", nextup=nextup_text(),
+        repo = self.make_repo("no-rune",
                               files={"specs/feat/tasks.md": HAND_TASKS})
         with mock.patch("process_status.shutil.which", return_value=None):
             info = process_status.collect(repo)
@@ -240,12 +210,204 @@ class RuneDriftTest(StatusFixtureCase):
                       "task-file parsing not checked", output)
 
     def test_repo_without_task_files_never_probes_or_warns(self):
-        repo = self.make_repo("no-tasks", nextup=nextup_text(),
+        repo = self.make_repo("no-tasks",
                               specs={"prd-only": ("prd.md",)})
         with mock.patch("process_status.shutil.which", return_value=None):
             info = process_status.collect(repo)
         self.assertFalse(info["rune_missing"])
         self.assertEqual(self.flags(repo), [])
+
+
+class BacklogStatusTest(StatusFixtureCase):
+    """Req 3.5, AC 6.3: BACKLOG.md schema check and the BACKLOG column.
+
+    Hybrid check: rune parse gate, then a raw-text phase set/order scan
+    (an empty-but-valid backlog has no PhaseMarkers in rune's JSON), the
+    pending-only invariant via rune's Stats (catches nested checked
+    subtasks a top-level-only checkbox scan would miss), and a raw H1
+    presence scan.
+    """
+
+    VALID = ("# Backlog\n"
+             "\n"
+             "## Idea\n"
+             "\n"
+             "- [ ] 1. First idea\n"
+             "  - conversation, 2026-08-26\n"
+             "\n"
+             "## Needs Spec\n"
+             "\n"
+             "- [ ] 2. Second idea\n"
+             "  - conversation, 2026-08-26 → spec: foo-bar\n"
+             "\n"
+             "## Outstanding\n"
+             "\n"
+             "- [ ] 3. foo-bar: 4 tasks outstanding, 1 blocked\n"
+             "  - specs/foo-bar/tasks.md, 2026-08-26 → run: /next-task\n")
+
+    def backlog(self, text):
+        repo = self.make_repo("repo", files={"specs/BACKLOG.md": text})
+        return process_status.collect(repo)
+
+    # -- ok fixtures --
+
+    def test_absent_backlog_renders_dash_and_is_not_drift(self):
+        repo = self.make_repo("no-backlog", specs={"feat": ("requirements.md",
+                                                             "design.md")})
+        info = process_status.collect(repo)
+        self.assertEqual(info["backlog"], "-")
+        self.assertNotIn("backlog-drift", self.flags(repo))
+
+    def test_valid_backlog_is_ok(self):
+        info = self.backlog(self.VALID)
+        self.assertEqual(info["backlog"], "ok")
+        self.assertEqual(process_status.drift_flags(info), [])
+
+    def test_empty_but_valid_backlog_is_ok(self):
+        # All three phases present, zero entries — the normal state for a
+        # repo with nothing captured and nothing outstanding. rune's JSON
+        # has no PhaseMarkers at all for an empty file, so this must come
+        # from the raw-text phase scan, not rune's Stats.
+        info = self.backlog(
+            "# Backlog\n\n## Idea\n\n## Needs Spec\n\n## Outstanding\n")
+        self.assertEqual(info["backlog"], "ok")
+        self.assertEqual(process_status.drift_flags(info), [])
+
+    def test_gapped_numbering_is_ok(self):
+        info = self.backlog(
+            "# Backlog\n"
+            "\n"
+            "## Idea\n"
+            "\n"
+            "- [ ] 1. First idea\n"
+            "  - conversation, 2026-08-26\n"
+            "\n"
+            "- [ ] 3. Third idea\n"
+            "  - conversation, 2026-08-26\n"
+            "\n"
+            "## Needs Spec\n"
+            "\n"
+            "## Outstanding\n")
+        self.assertEqual(info["backlog"], "ok")
+
+    def test_arrow_detail_line_is_ok(self):
+        info = self.backlog(
+            "# Backlog\n"
+            "\n"
+            "## Idea\n"
+            "\n"
+            "## Needs Spec\n"
+            "\n"
+            "- [ ] 1. Something\n"
+            "  - conversation, 2026-08-26 → spec: foo-bar\n"
+            "\n"
+            "## Outstanding\n")
+        self.assertEqual(info["backlog"], "ok")
+
+    def test_trailing_whitespace_heading_is_ok(self):
+        info = self.backlog(
+            "# Backlog\n"
+            "\n"
+            "## Idea \n"
+            "\n"
+            "- [ ] 1. First idea\n"
+            "  - conversation, 2026-08-26\n"
+            "\n"
+            "## Needs Spec\n"
+            "\n"
+            "## Outstanding\n")
+        self.assertEqual(info["backlog"], "ok")
+
+    # -- drift fixtures --
+
+    def test_unparseable_backlog_is_drift(self):
+        info = self.backlog(
+            "# Backlog\n"
+            "\n"
+            "## Idea\n"
+            "\n"
+            "- missing checkbox format\n"
+            "\n"
+            "## Needs Spec\n"
+            "\n"
+            "## Outstanding\n")
+        self.assertEqual(info["backlog"], "drift")
+        self.assertEqual(process_status.drift_flags(info), ["backlog-drift"])
+
+    def test_wrong_phase_name_is_drift(self):
+        info = self.backlog(
+            "# Backlog\n\n## idea\n\n## Needs Spec\n\n## Outstanding\n")
+        self.assertEqual(info["backlog"], "drift")
+        self.assertEqual(process_status.drift_flags(info), ["backlog-drift"])
+
+    def test_extra_phase_is_drift(self):
+        info = self.backlog(
+            "# Backlog\n\n## Idea\n\n## Needs Spec\n\n## Outstanding\n"
+            "\n## Someday\n")
+        self.assertEqual(info["backlog"], "drift")
+
+    def test_missing_phase_is_drift(self):
+        info = self.backlog("# Backlog\n\n## Idea\n")
+        self.assertEqual(info["backlog"], "drift")
+
+    def test_missing_outstanding_phase_is_drift(self):
+        # The pre-Outstanding two-phase shape: a backlog written before the
+        # rebuild step existed, or one whose rebuild never ran. Absent means
+        # stale, not idle — an idle rebuild leaves the phase present-but-empty.
+        info = self.backlog("# Backlog\n\n## Idea\n\n## Needs Spec\n")
+        self.assertEqual(info["backlog"], "drift")
+        self.assertEqual(process_status.drift_flags(info), ["backlog-drift"])
+
+    def test_phase_order_is_drift(self):
+        info = self.backlog(
+            "# Backlog\n\n## Idea\n\n## Outstanding\n\n## Needs Spec\n")
+        self.assertEqual(info["backlog"], "drift")
+
+    def test_checked_entry_is_drift(self):
+        info = self.backlog(
+            "# Backlog\n"
+            "\n"
+            "## Idea\n"
+            "\n"
+            "- [x] 1. Checked entry\n"
+            "  - conversation, 2026-08-26\n"
+            "\n"
+            "## Needs Spec\n"
+            "\n"
+            "## Outstanding\n")
+        self.assertEqual(info["backlog"], "drift")
+        self.assertEqual(process_status.drift_flags(info), ["backlog-drift"])
+
+    def test_nested_checked_subtask_is_drift(self):
+        # Only the Stats-based check catches this: a naive top-level-only
+        # `^- \[` scan sees just the unchecked parent line.
+        info = self.backlog(
+            "# Backlog\n"
+            "\n"
+            "## Idea\n"
+            "\n"
+            "- [ ] 1. Parent idea\n"
+            "  - [x] 1.1. Nested sub\n"
+            "\n"
+            "## Needs Spec\n"
+            "\n"
+            "## Outstanding\n")
+        self.assertEqual(info["backlog"], "drift")
+        self.assertEqual(process_status.drift_flags(info), ["backlog-drift"])
+
+    def test_missing_h1_is_drift(self):
+        info = self.backlog("## Idea\n\n## Needs Spec\n\n## Outstanding\n")
+        self.assertEqual(info["backlog"], "drift")
+
+    def test_drift_reason_appears_in_detail_lines(self):
+        repo = self.make_repo(
+            "reasoned",
+            files={"specs/BACKLOG.md":
+                   "## Idea\n\n## Needs Spec\n\n## Outstanding\n"})
+        output = process_status.render([process_status.collect(repo)])
+        self.assertIn(
+            "specs/BACKLOG.md: missing H1 title [backlog-drift]", output)
+        self.assertIn("backlog-drift", output.splitlines()[1])
 
 
 class ReadOnlyTest(StatusFixtureCase):
@@ -261,9 +423,9 @@ class ReadOnlyTest(StatusFixtureCase):
 
     def test_run_leaves_target_trees_bit_identical(self):
         repos = [
-            self.make_repo("ro-clean", nextup=nextup_text(),
+            self.make_repo("ro-clean",
                            specs={"gap": ("requirements.md",)}),
-            self.make_repo("ro-dirty", nextup=None, agentic=False,
+            self.make_repo("ro-dirty", agentic=False,
                            dirty=True),
             self.make_repo("ro-plain", git=False),
         ]
@@ -293,7 +455,7 @@ class CliTest(StatusFixtureCase):
                          "loshop")])
 
     def test_explicit_paths_report_only_those(self):
-        one = self.make_repo("only-one", nextup=nextup_text())
+        one = self.make_repo("only-one")
         exit_code, output = self.run_main([str(one)])
         self.assertEqual(exit_code, 0)
         lines = output.strip().splitlines()
@@ -303,7 +465,7 @@ class CliTest(StatusFixtureCase):
 
     def test_summary_row_carries_every_column(self):
         repo = self.make_repo(
-            "rowcheck", nextup=nextup_text(),
+            "rowcheck",
             specs={"feat": ("requirements.md", "design.md", "tasks.md")})
         _, output = self.run_main([str(repo)])
         row = output.splitlines()[1]
@@ -314,7 +476,7 @@ class CliTest(StatusFixtureCase):
 
     def test_prd_only_spec_folder_appears_in_detail_lines(self):
         # PRD agreement-invoice-skills Req 5: PRD-lane folders are visible.
-        repo = self.make_repo("prd-lane", nextup=nextup_text(),
+        repo = self.make_repo("prd-lane",
                               specs={"autonomous": ("prd.md",)})
         _, output = self.run_main([str(repo)])
         self.assertIn("specs/autonomous: prd.md", output)

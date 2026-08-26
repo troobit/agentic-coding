@@ -1,0 +1,22 @@
+Orbit Session Log - Phase 1
+========================================
+
+Session ID: 1dac717f-390f-46a3-9c2e-26471586109f
+Started:    2026-08-26T23:49:00+10:00
+Ended:      2026-08-26T23:54:12+10:00
+Duration:   5m8.085s
+Cost:       $3.3491
+Turns:      74
+Error:      false
+
+Output:
+----------------------------------------
+Committed. The remaining `.orbit/` changes are unrelated bookkeeping from an earlier, separate orbit run and were deliberately left out.
+
+**Summary:** Completed Phase 1 ("Skill and Conventions") of the backlog-skill spec — authored `claude/skills/backlog/SKILL.md`, added `decision_mode` documentation to `shared/conventions.md` and the decision-log format reference (with a red→green golden test and `make generate`), and updated spec-janitor/make-it-so/next-task to defer to a repo's declared `decision_mode`. Full test suite (177 tests) and `make lint-drift` pass. Committed as `0432aeb`.
+
+Next up per rune: the "Toolchain" phase (tasks 4–6, stream 2) — BACKLOG.md schema check in `process_status.py`, the sync-claude.sh symlink prune, and align step-6 removal.
+
+Stderr:
+----------------------------------------
+

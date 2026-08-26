@@ -7,9 +7,9 @@ links such as the VS Code prd.agent.md one, or new skills like prd) are
 allowed; removals and renames of the originals are not.
 
 Deliberately retired skills are listed in RETIRED_SKILLS and excluded
-from the baseline: `sendit` and `transit` were removed when the workflow
-reverted to plain approve-and-continue gates and Transit ticket tracking
-was dropped from this branch.
+from the baseline, so their absence is an asserted expectation rather
+than a silent gap. The list is the whole record needed here; why each
+one went is not this test's concern.
 """
 
 import os
@@ -34,11 +34,14 @@ ORIGINAL_LINKS = {
     "~/.claude/rules": '"$REPO_CLAUDE_DIR/rules"',
 }
 
-# Skills deliberately removed from this branch. Excluded from the
-# baseline below so their absence is an asserted expectation rather than
-# a silent gap. Restoring one means deleting it from this list.
+# Skills deliberately removed from this branch (or sunset outright).
+# Excluded from the baseline below so their absence is an asserted
+# expectation rather than a silent gap. Restoring one means deleting it
+# from this list.
 RETIRED_SKILLS = [
+    "nextup",
     "sendit",
+    "spout",
     "transit",
 ]
 
@@ -62,7 +65,6 @@ PRE_FEATURE_SKILLS = [
     "go-test-fixer",
     "make-it-so",
     "next-task",
-    "nextup",
     "permission-analyzer",
     "pr-overview",
     "pr-pilot",
@@ -208,6 +210,74 @@ class TestCodexSkillLinks(unittest.TestCase):
                              "---\nname: starwave-design\n---\nlocal\n")
             self.assertIn("Skipped Codex skill link:", result.stdout)
             self.assertIn("skipped conflicts: 1", result.stdout)
+
+
+class TestOwnedSymlinkPrune(unittest.TestCase):
+    """Req 6.4: prune dangling owned links; never touch foreign ones."""
+
+    def run_sync(self, home: Path):
+        env = os.environ.copy()
+        env["HOME"] = str(home)
+        return subprocess.run(
+            ["bash", str(SYNC_SCRIPT)],
+            cwd=REPO_ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_dangling_owned_link_is_removed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            skills = home / ".agents" / "skills"
+            skills.mkdir(parents=True)
+            ghost = skills / "ghost-skill"
+            ghost.symlink_to(SKILLS_DIR / "ghost-skill")
+
+            self.run_sync(home)
+
+            self.assertFalse(ghost.is_symlink())
+            self.assertFalse(ghost.exists())
+
+    def test_dangling_foreign_link_is_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            skills = home / ".agents" / "skills"
+            skills.mkdir(parents=True)
+            foreign_target = home / "nowhere" / "elsewhere"
+            foreign = skills / "foreign-skill"
+            foreign.symlink_to(foreign_target)
+
+            self.run_sync(home)
+
+            self.assertTrue(foreign.is_symlink())
+            self.assertFalse(foreign.exists())  # still dangling
+            self.assertEqual(os.readlink(foreign), str(foreign_target))
+
+    def test_live_owned_link_is_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            self.run_sync(home)
+            skill_name = sorted(
+                p.name for p in SKILLS_DIR.iterdir() if p.is_dir())[0]
+            target = home / ".agents" / "skills" / skill_name
+
+            # A second run must not prune a link whose target still exists.
+            self.run_sync(home)
+
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(os.readlink(target), str(SKILLS_DIR / skill_name))
+
+    def test_empty_skills_dir_is_a_no_op(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            skills = home / ".agents" / "skills"
+            skills.mkdir(parents=True)
+
+            result = self.run_sync(home)
+
+            self.assertEqual(result.returncode, 0)
 
 
 class TestPreFeatureSkillsPresent(unittest.TestCase):

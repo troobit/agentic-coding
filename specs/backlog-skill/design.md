@@ -29,7 +29,7 @@ Generated files (`claude/CLAUDE.md`, `copilot/instructions/copilot-instructions.
 
 ### Sunset reference audit (AC 6.5)
 
-The gate is a test that greps **git-tracked files only** (`git ls-files` sourced), case-insensitive `nextup|spout`, exempting `specs/`, `CHANGELOG.md`, and the test file itself. Tracked-only is both the correct scope (AC 6.5 concerns the committed toolchain) and what makes the gate stable: untracked working files, the `.worktrees/` sibling checkout, and caches are out by construction. The tracked-tree scope is a superset of AC 6.5's enumerated surfaces — stricter is acceptable.
+The gate is a test that greps **git-tracked files only** (`git ls-files` sourced), case-insensitive `nextup|spout`, exempting `specs/`, `CHANGELOG.md`, the test file itself, and `claude/skills/backlog/SKILL.md` (Decision 15 — that file must name the legacy filenames `nextup.md`/`SPOUT.md` to detect and exclude them, a functional reference rather than leftover debris). Tracked-only is both the correct scope (AC 6.5 concerns the committed toolchain) and what makes the gate stable: untracked working files, the `.worktrees/` sibling checkout, and caches are out by construction. The tracked-tree scope is a superset of AC 6.5's enumerated surfaces — stricter is acceptable.
 
 Work list (every tracked reference at design time):
 
@@ -132,7 +132,7 @@ Normative detail-line grammar: exactly one physical line per entry, `- <source>,
 - **test_process_status.py**: fixture BACKLOG.md variants asserting column value and drift detail — absent (`-`, no drift), valid, **empty-but-valid** (both phases, zero entries → `ok`), gapped numbering (`ok`), U+2192 arrow detail line (`ok`), trailing-whitespace heading (`ok`), rune-unparseable, wrong/extra/case-variant phase, checked entry, **nested checked subtask** (drift via Stats), missing H1. Nextup-column assertions removed.
 - **test_sync_compat.py**: dangling owned link (removed), dangling foreign link (kept), live owned link (kept), empty skills dir (no-op).
 - **test_generate.py**: golden-file update — the decision_mode rules appear in all three generated outputs.
-- **Sunset grep test** (new): `git ls-files` sourced, case-insensitive `nextup|spout`, exempting `specs/`, `CHANGELOG.md`, and itself; permanent guard against reintroduction.
+- **Sunset grep test** (new): `git ls-files` sourced, case-insensitive `nextup|spout`, exempting `specs/`, `CHANGELOG.md`, itself, and `claude/skills/backlog/SKILL.md` (Decision 15); permanent guard against reintroduction.
 - The skill itself is instruction markdown — exercised by the rollout migration (rollout.md carries acceptance scenarios for Requirements 1, 2, and 4), not unit tests; the schema check is what keeps skill drift detectable.
 - Tasks file: encode the AC 6.6 ordering (skill commit before sunset commit) as rune `blocked-by` dependencies so the sequence is mechanical.
 
