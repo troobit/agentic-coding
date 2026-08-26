@@ -8,25 +8,25 @@ references:
 
 ## Skill and Conventions
 
-- [ ] 1. Author claude/skills/backlog/SKILL.md <!-- id:dd74a8k -->
+- [x] 1. Author claude/skills/backlog/SKILL.md <!-- id:dd74a8k -->
   - Six-step workflow per design: preflight parse gate (rune list; missing rune = no BACKLOG writes, no deletions), reconcile (spec folders authoritative, OVERVIEW.md a hint), gather (root nextup.md any tracked status user-zone-only; markers LM/ML/nextup:machine end the zone, USER belongs to it, none = whole file; exclude SPOUT.md, BACKLOG.md, OVERVIEW.md), route (task-file selection rule; per-item confirmation before requirement amendments; no anchor renumbering; staleness task), file (max-existing + 1), clear (per-source outcome listing always; tracked sources retained; one approval per run)
   - Embed the normative BACKLOG.md grammar: H1, phases Idea then Needs Spec always both present, one-line entries, detail line <source>, <YYYY-MM-DD> with arrow-spec suffix only on Needs Spec entries
   - Duplicate criterion is repo-realized (Decision 13); never run rune write commands on BACKLOG.md; never delete tracked files
   - Stream: 1
   - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [2.1](requirements.md#2.1), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [3.1](requirements.md#3.1), [3.2](requirements.md#3.2), [3.3](requirements.md#3.3), [3.4](requirements.md#3.4), [3.6](requirements.md#3.6), [3.7](requirements.md#3.7), [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.3](requirements.md#4.3), [4.4](requirements.md#4.4), [4.5](requirements.md#4.5)
 
-- [ ] 2. decision_mode in generated conventions <!-- id:dd74a8l -->
+- [x] 2. decision_mode in generated conventions <!-- id:dd74a8l -->
   - Stream: 1
   - Requirements: [5.1](requirements.md#5.1), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.4](requirements.md#5.4)
-  - [ ] 2.1. Update test_generate goldens to expect decision_mode rules in all three outputs (red) <!-- id:dd74a8m -->
+  - [x] 2.1. Update test_generate goldens to expect decision_mode rules in all three outputs (red) <!-- id:dd74a8m -->
     - Stream: 1
-  - [ ] 2.2. Add decision_mode rules to shared/conventions.md and the decision-log format reference; run make generate (green) <!-- id:dd74a8n -->
+  - [x] 2.2. Add decision_mode rules to shared/conventions.md and the decision-log format reference; run make generate (green) <!-- id:dd74a8n -->
     - conventions.md Documentation Standards: read .agentic.json decision_mode before revising a decision; overwrite = edit in place same ID new date; supersede/absent = current behavior
     - decision-log-format.md gains a Revising a decision section covering both modes and the manifest read
     - Blocked-by: dd74a8m (Update test_generate goldens to expect decision_mode rules in all three outputs red)
     - Stream: 1
 
-- [ ] 3. Per-skill decision_mode edits in supersede-mandating skills <!-- id:dd74a8o -->
+- [x] 3. Per-skill decision_mode edits in supersede-mandating skills <!-- id:dd74a8o -->
   - spec-janitor/SKILL.md:97 and spec-janitor/references/spec-conventions.md: audit must not flag overwrite-mode logs as drift; also reword its nextup mention
   - make-it-so/SKILL.md:91 and next-task/SKILL.md:33: mid-implementation edit clauses defer to the repo declared mode
   - One sentence each; behavior-scoped list per Decision 14

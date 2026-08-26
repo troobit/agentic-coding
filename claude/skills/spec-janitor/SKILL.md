@@ -11,7 +11,7 @@ The normative rules live in [references/spec-conventions.md](references/spec-con
 
 ## Entry Contract
 
-This is an **interactive-entry skill**: no router (nextup, orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
+This is an **interactive-entry skill**: no router (orbit) dispatches it autonomously, and headless invocation of the full skill is out of contract. The cloud surface (GitHub Copilot coding agent) reaches the janitor only through the report-only agent asset, which runs the mechanical audit and nothing else — no auto-fixes, no gated repairs, no exclusion writes.
 
 ## The Auditor
 
@@ -94,7 +94,7 @@ A declined finding without an exclusion will be re-proposed next run — say so 
 Apply **approved batches only**. Rules:
 
 - **Moves** (`SJ-FILE-001`): the move and the rewrite of all inbound references within `specs/` happen in the same batch; inbound references outside `specs/` (docs/, README) are reported as follow-ups, never edited.
-- **Supersession** (`SJ-SUP-*`, `SJ-FLOW-001`): annotate, never delete. Decision-log entries follow the decision-log format (`superseded by Decision X` status markers); documents mark discarded sections superseded in place; and supersession between specs is recorded in **both directions** — the superseded spec names its successor and the superseding spec names what it replaces.
+- **Supersession** (`SJ-SUP-*`, `SJ-FLOW-001`): annotate, never delete. Decision-log entries follow the decision-log format (`superseded by Decision X` status markers unless the repo's `.agentic.json` sets `decision_mode` to `overwrite`, in which case the entry is edited in place instead); documents mark discarded sections superseded in place; and supersession between specs is recorded in **both directions** — the superseded spec names its successor and the superseding spec names what it replaces.
 - If a file changed between audit and apply, re-run the mechanical audit before proceeding.
 
 ### 7. Index

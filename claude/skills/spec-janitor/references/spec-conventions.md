@@ -174,7 +174,9 @@ task's title (not its number — insertions renumber siblings).
 Supersession is annotated, never deleted: decision-log entries use status
 markers (`superseded by Decision X`), documents mark discarded sections
 superseded in place, and superseding and superseded specs reference each other
-in both directions.
+in both directions. A repo whose `.agentic.json` sets `decision_mode` to
+`overwrite` edits decision-log entries in place instead — the audit MUST NOT
+flag an overwrite-mode repo's in-place-edited entries as missing supersession.
 
 ### SJ-SUP-001 — duplicate or silently superseding specs
 

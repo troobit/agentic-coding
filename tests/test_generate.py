@@ -88,6 +88,18 @@ class ConventionsAssemblyTests(unittest.TestCase):
         self.assertIn(conventions, copilot_block)
         self.assertIn(conventions, codex_block)
 
+    def test_real_outputs_document_decision_mode(self):
+        """Req 5.4: the shared convention text documents decision_mode's
+        overwrite/supersede modes and the .agentic.json manifest read, and
+        reaches all three toolchains via generation."""
+        claude_block = agentic_lib.build_claude_block(REPO_ROOT / "shared")
+        copilot_block = agentic_lib.build_copilot_block(REPO_ROOT / "shared")
+        codex_block = agentic_lib.build_codex_block(REPO_ROOT / "shared")
+        for block in (claude_block, copilot_block, codex_block):
+            self.assertIn("decision_mode", block)
+            self.assertIn(".agentic.json", block)
+            self.assertIn("overwrite", block)
+
 
 class ManagedBlockWriterTests(unittest.TestCase):
     """Task 1: managed-block semantics (Decision 15)."""

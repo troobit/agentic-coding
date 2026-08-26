@@ -49,6 +49,8 @@ If `run_silent` is available (check with `which run_silent`), use it to reduce t
 
 Decision log entries use the Enhanced Nygard ADR structure with required fields (ID, Date, Status, Context, Decision, Rationale) and recommended fields (Alternatives Considered, Consequences). Document at least two alternatives with rejection reasons, and list both positive and negative consequences. Entries live in the feature's `decision_log.md`, separated by horizontal rules.
 
+Before revising a decision, read the repo's `.agentic.json` for a top-level `decision_mode` key. `overwrite` means edit the existing entry in place — same ID, updated date, no superseding entry appended. `supersede`, or `decision_mode` absent entirely, keeps the default behavior: mark the old entry `superseded by Decision X` and append the new one.
+
 # Skills Usage
 
 This project uses custom skills extensively. Available skills include: spec creation, PR review fixing, pre-push review, and explain-like. Check `.claude/skills/` for the full list before suggesting manual approaches.

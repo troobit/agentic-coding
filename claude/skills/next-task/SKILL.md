@@ -30,7 +30,7 @@ Implement the next unfinished group of tasks from the tasks list. A group of tas
 - Use tools and skills as appropriate while implementing the task. For example, if you need to know the capabilities of a library, use context7, and if you want to verify your code is efficient, use the efficiency-optimizer skill
 
 **Mid-Implementation Spec Edits:**
-Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`).
+Any edit to documents under `specs/` made during implementation (revising a design, appending tasks, recording decisions) follows the spec-conventions reference distributed with the spec-janitor skill: a direction change marks the discarded sections superseded in the same edit rather than deleting or silently contradicting them (`SJ-SUP-*`), and tasks appended to an existing task file carry the same schema as its existing tasks — same metadata shape and stable-ID style (`SJ-TASK-*`). Recording or revising a decision-log entry defers to the repo's declared `decision_mode` (read from `.agentic.json`; default `supersede`) rather than always superseding.
 
 **Parallel Execution with Multiple Streams:**
 When a phase is pulled in and multiple streams have ready tasks:

@@ -124,6 +124,15 @@ The standard library provides all necessary functionality for our use case. It's
 - **File header**: `# Decision Log: {Feature Name}`
 - **Separator**: Use `---` between decisions
 
+## Revising a decision
+
+A repo may declare, via a top-level `decision_mode` key in its `.agentic.json`, how a workflow revises an existing decision. Read that key at run time before writing any revision:
+
+- **`overwrite`**: edit the existing entry in place — same ID, `**Date**` updated to today, `**Status**` and body rewritten to reflect the new decision. No superseding entry is appended, and the entry's history lives only in git, not in the file.
+- **`supersede`, or the key absent**: today's default. Mark the old entry's status `superseded by Decision X` and append a new entry with the next sequential ID, following the template above.
+
+A repo with no `.agentic.json`, or one that omits `decision_mode`, is `supersede` — the same behavior this document already described before overwrite mode existed.
+
 ## Quick Checklist
 
 When adding a decision, ensure:
