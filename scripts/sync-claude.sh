@@ -53,6 +53,27 @@ for skill_dir in "$REPO_CLAUDE_DIR/skills"/*; do
     fi
 done
 
+# Prune dangling owned links: a symlink under ~/.agents/skills whose
+# target is one of this repo's skill dirs, but that skill dir no longer
+# exists (renamed or removed skill). Foreign links, and links whose
+# target still exists, are never touched. Literal prefix comparison is
+# sufficient since the loop above only ever creates absolute links.
+codex_pruned=0
+shopt -s nullglob
+for link in "$AGENTS_SKILLS_DIR"/*; do
+    [ -L "$link" ] || continue
+    link_target="$(readlink "$link")"
+    case "$link_target" in
+        "$REPO_CLAUDE_DIR/skills/"*)
+            if [ ! -e "$link" ]; then
+                rm "$link"
+                codex_pruned=$((codex_pruned + 1))
+            fi
+            ;;
+    esac
+done
+shopt -u nullglob
+
 # VS Code Copilot: user-level PRD custom agent (Req 3.1, 3.4)
 ln -sfn "$REPO_CLAUDE_DIR/../copilot/agents/prd.agent.md" "$VSCODE_PROMPTS_DIR/prd.agent.md"
 
@@ -70,4 +91,4 @@ echo "Symlinked to VS Code profile:"
 echo "  $VSCODE_PROMPTS_DIR/prd.agent.md -> $REPO_CLAUDE_DIR/../copilot/agents/prd.agent.md"
 echo "  $VSCODE_PROMPTS_DIR/spec-janitor.agent.md -> $REPO_CLAUDE_DIR/../copilot/agents/spec-janitor.agent.md"
 echo "Codex skills in ~/.agents/skills:"
-echo "  linked: $codex_linked, already linked: $codex_existing, skipped conflicts: $codex_skipped"
+echo "  linked: $codex_linked, already linked: $codex_existing, skipped conflicts: $codex_skipped, pruned dangling: $codex_pruned"

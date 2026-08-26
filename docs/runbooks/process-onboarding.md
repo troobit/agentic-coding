@@ -1,4 +1,4 @@
-# Runbook: onboarding a repo to the nextup/starwave process
+# Runbook: onboarding a repo to the starwave process
 
 How any repository under `~/repos/` joins the process owned by this repository
 (agentic-coding). Everything is driven by `scripts/align.py` run from here —
@@ -37,15 +37,6 @@ the target repo is never edited by hand.
 ## What gets seeded
 
 - `.agentic.json` — the manifest (first run; read-only to align afterwards).
-- `nextup.example.md` — the tracked session template, copied verbatim from
-  this repo's canonical copy when absent. If the target already has one, only
-  the part from the first `<!-- LM -->` marker down is converged to canonical
-  (now just the marker plus an inert reserved-for-tooling line); the user
-  zone above the marker is preserved byte-for-byte. A file without the
-  marker is treated as hand-written and skipped, never overwritten.
-- A `nextup.md` entry in the target's `.gitignore` (appended if missing,
-  `.gitignore` created if absent). `nextup.md` itself is session-local and
-  never created, modified, or deleted by align.
 - MCP config — `.mcp.json` and `.vscode/mcp.json` converged to the manifest's
   server subset of the canonical `mcp/servers.json` (created if missing;
   non-canonical entries preserved).
@@ -53,27 +44,29 @@ the target repo is never edited by hand.
   cloud assets (`copilot-instructions.md`, `agents/prd.agent.md`,
   `skills/prd/**`) as managed blocks.
 
+Skills (`/backlog`, `/starwave:*`, and the rest) are distributed by the
+symlink mechanism in `scripts/sync-claude.sh` / `scripts/bootstrap.sh`, not by
+align — align's job is manifest, MCP config, and opt-in cloud assets only.
+
 ## First session
 
-`nextup.md` is not seeded by align — the first `/nextup` session in the target
-repo does it. `/nextup` looks for `nextup.md` at the repo root and, finding
-none, copies `nextup.example.md` into place and carries on. From then on the
-user writes instructions in the user zone (above `<!-- LM -->`); `/nextup`
-routes them and never writes the file. Below the marker sits only an inert
-reserved-for-tooling line — no session status is kept there; progress lives
-in `specs/` (see `specs/OVERVIEW.md`), rune task lists, and the session's
-closing message. Because `nextup.md` is gitignored, each clone seeds its own
-from the tracked template.
+`/backlog` is the tracked entry point for forward intent in a newly onboarded
+repo: bare invocation captures any loose `*.md` files at the repo root or
+under `specs/` (outside a spec folder) into `specs/BACKLOG.md`, routing each
+item to an existing spec or filing it as a backlog entry. There is no
+session-status file to seed — progress lives in `specs/` (see
+`specs/OVERVIEW.md`) and rune task lists.
 
 ## The lanes
 
-`/nextup` routes each session's intent to the lightest destination that fits.
-The **direct** lane executes plain instructions inline,
-exactly like any prompt — no spec folder. The **light** lane sends bounded
-jobs to a focused skill (`/fix-bug`, `/starwave:smolspec`, and similar)
-without requirements/design ceremony. **`/prd`** authors a standalone
-`specs/{name}/prd.md` for a small project or first MVP and closes out there —
-authoring only, with no execution step. The **gated starwave** lane is the
-spec-driven chain (`/starwave:creating-spec` through requirements, design,
-and tasks, each with an approval gate) recommended for substantial
-feature-shaped work — a recommendation, never an enforcement.
+Each session routes its intent to the lightest destination that fits. The
+**direct** lane executes plain instructions inline, exactly like any prompt —
+no spec folder. The **light** lane sends bounded jobs to a focused skill
+(`/fix-bug`, `/starwave:smolspec`, and similar) without requirements/design
+ceremony. **`/prd`** authors a standalone `specs/{name}/prd.md` for a small
+project or first MVP and closes out there — authoring only, with no execution
+step. The **gated starwave** lane is the spec-driven chain
+(`/starwave:creating-spec` through requirements, design, and tasks, each with
+an approval gate) recommended for substantial feature-shaped work — a
+recommendation, never an enforcement. Loose intent that doesn't fit any of
+these yet — a note, an idea, an audit finding — goes to `/backlog`.

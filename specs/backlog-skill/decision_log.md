@@ -414,3 +414,35 @@ Deliver the mode through both channels: the generated conventions text (all thre
 - Four skill files gain a mode-awareness sentence that future skill authors must remember to include when a new skill touches decision logs.
 
 ---
+
+## Decision 15: Sunset grep gate exempts the /backlog skill's own functional legacy-filename references
+
+**Date**: 2026-08-26
+**Status**: accepted
+
+### Context
+
+Implementing task 7.1 (the sunset grep test itself) surfaced that `claude/skills/backlog/SKILL.md` legitimately contains the literal strings `nextup` (in `nextup.md`) and `spout` (in `SPOUT.md`), because the skill's own job is to detect a legacy `nextup.md` file and exclude a generated `SPOUT.md` file by name. AC 6.5's exemption list (`specs/`, `CHANGELOG.md`, the test file) did not anticipate this: without an added exemption, the grep gate would stay red forever after task 7.2's removals land, flagging load-bearing skill behavior as if it were leftover sunset debris.
+
+### Decision
+
+Add `claude/skills/backlog/SKILL.md` to the sunset grep gate's exemption list, alongside `specs/` and `CHANGELOG.md`.
+
+### Rationale
+
+Exempting the whole file is the smallest fix that doesn't compromise the file's own correctness — its filename references are load-bearing spec behavior (Requirement 1.2's `nextup.md` detection, 1.3's `SPOUT.md` exclusion), not cleanup debris, and no rewording describes "detect a file named nextup.md" without the literal string.
+
+### Alternatives Considered
+
+- **Reword SKILL.md to avoid literal filename strings**: describe rather than name the files - Rejected because the skill's job is literally to look for files with those names; obscuring the string makes the instructions harder to follow correctly, for zero grep-gate benefit.
+- **Narrow the grep pattern to exclude filename-shaped matches**: keep the exemption list short - Rejected as fragile pattern engineering that would also blind the gate to genuine future regressions elsewhere.
+
+### Consequences
+
+**Positive:**
+- The grep gate can actually reach green once 7.2 lands; the exemption is narrow (one file) rather than a broad pattern change.
+
+**Negative:**
+- A fourth exempt path (beyond the original three-item list) is something future maintainers must remember when reasoning about what "exempt" covers.
+
+---

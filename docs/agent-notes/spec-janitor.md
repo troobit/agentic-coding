@@ -62,7 +62,7 @@ The managed-block mechanism (`write_managed`) is markdown-only by construction �
 ## Gotchas
 
 - The skill runs auto-fix (step 3) before triage (step 5) deliberately: recording exclusions dirties `specs/`, which would then block `--fix`. Ordering is a constraint, not a preference.
-- Interactive-entry only: no router (nextup, orbit) dispatches the skill autonomously; headless invocation is out of contract. The cloud surface only ever gets the report-only agent.
+- Interactive-entry only: no router (orbit) dispatches the skill autonomously; headless invocation is out of contract. The cloud surface only ever gets the report-only agent.
 - Plain-text `Requirements: 1.1` (no markdown link) is an SJ-TASK-001 structure finding, not an SJ-REF reference finding — the anchor grammar only applies to actual links (`<a name>` anchors or GitHub heading slugs).
 - Older specs in this repo commonly use folder-relative `references:` entries (`prd.md` instead of `specs/<name>/prd.md`); these fire SJ-REF-002 and are the auto-fix's main real-world target (seen in the self-audit smoke run).
-- Guardrail edits citing SJ rule IDs live in starwave-smolspec, starwave-tasks, fix-bug, next-task and make-it-so. nextup is deliberately excluded — it is a pure router that performs no spec edits.
+- Guardrail edits citing SJ rule IDs live in starwave-smolspec, starwave-tasks, fix-bug, next-task and make-it-so.

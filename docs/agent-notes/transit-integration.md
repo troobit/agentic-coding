@@ -11,7 +11,7 @@
 >
 > Still Transit-coupled and therefore dormant: `claude/skills/bug-blitz/` and
 > `claude/skills/blitz-merge/`, which source their bug list from Transit.
-> `/nextup` no longer routes to them.
+> No skill currently routes session entry into them automatically.
 >
 > Note: the `/engage` rows in the tables below are obsolete regardless of
 > Transit. That skill was deleted outright when the PRD lane was cut back to
@@ -37,7 +37,7 @@ stage, and what triggers the transition INTO the status.
 
 | Status (column) | Workflow stage | Driving skill(s) | Transition trigger |
 |---|---|---|---|
-| `idea` (Idea) | Captured, not yet scoped | `/nextup` (session entry), `/code-audit` (creates tickets from findings), manual creation | Ticket created |
+| `idea` (Idea) | Captured, not yet scoped | session entry point, `/code-audit` (creates tickets from findings), manual creation | Ticket created |
 | `planning` (Planning) | Scoping: full spec vs smolspec vs PRD | `/transit` (routes by type), `/starwave:creating-spec` (scope assessment), `/starwave:smolspec` | Scoping/authoring work starts on the ticket |
 | `spec` (Spec) | Spec authoring: requirements → design → tasks, with approval gates and `/sendit` round-trips to Prism | `/starwave:requirements`, `/starwave:design`, `/starwave:tasks`, `/sendit` | `/starwave:creating-spec` moves it after scope assessment approval |
 | `ready-for-implementation` (Spec) | Spec approved, branch created, awaiting implementation | `/starwave:creating-spec` Phase 5 | Tasks approved + feature branch created (end of Phase 5) |

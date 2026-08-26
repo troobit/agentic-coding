@@ -115,7 +115,7 @@ python move_code_section.py src/main.go 15 25 src/utils.go --create-if-missing
 
 ### process_status.py
 
-**Purpose**: Read-only process-status report over participating repos — session-file presence, spec-document coverage per `specs/` subfolder, git state, and drift flags. Exposed as `make status`.
+**Purpose**: Read-only process-status report over participating repos — BACKLOG.md schema status, spec-document coverage per `specs/` subfolder, git state, and drift flags. Exposed as `make status`.
 
 **Usage**:
 ```bash
@@ -126,9 +126,9 @@ python3 process_status.py [repo ...]   # or: make status [REPOS="path1 path2"]
 - `repo ...`: Repo paths to report on. With no arguments it reports this repo plus the checked-in default list (`${HOME}/repos/{medata,netmap,tocs,rtob,localml,loshop}`).
 
 **Behavior**:
-- One summary row per repo: branch, dirty/clean tree, last commit date, nextup.md presence, nextup.example.md and .agentic.json presence, drift flags. `nextup.md` is a user-intent file with no session status inside (the nextup skill is a pure router), so only its presence is checked.
+- One summary row per repo: branch, dirty/clean tree, last commit date, BACKLOG.md schema status, .agentic.json presence, drift flags.
 - Indented detail lines list each `specs/` subfolder with which of requirements.md/design.md/tasks.md/smolspec.md/prd.md it contains.
-- Drift flags: `spec-gap` (requirements.md without design.md or tasks.md), `rune-drift` (a `specs/**` task file fails `rune list` parsing), `no-agentic-json`.
+- Drift flags: `spec-gap` (requirements.md without design.md or tasks.md), `rune-drift` (a `specs/**` task file fails `rune list` parsing), `backlog-drift` (specs/BACKLOG.md fails schema or parse checks), `no-agentic-json`.
 - Strictly read-only against target repos (`git --no-optional-locks` porcelain reads only); missing paths are reported on their row, never a crash.
 
 ### test-conversion/ (Go Application)

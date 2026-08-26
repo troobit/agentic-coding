@@ -48,11 +48,11 @@ Behavioural contract pinned here (from requirements 5.1-5.3, 6.1 and the design)
   reported, skipped, never overwritten. Files seeded by align (e.g.
   .github/agents/prd.agent.md) must not trigger the zero-stale-pack-matches
   warning on later runs.
-- Nextup template step (PRD nextup-starwave-refinement, Align tooling reqs
-  1-5): seed nextup.example.md verbatim when absent; otherwise converge only
-  the machine zone (first <!-- LM --> marker down) to canonical, preserving
-  the user zone byte-for-byte; ensure .gitignore carries a nextup.md entry;
-  never create, modify, or delete the target's session-local nextup.md.
+- Align no longer seeds or converges a session-template file, and no longer
+  manages any .gitignore entry (spec backlog-skill, Decision 11): a stray
+  file it no longer manages, already present in a target, is left untouched
+  — stop managing it means no touch, not delete — and align never writes
+  .gitignore.
 
 Run with: python3 -m unittest discover -s tests
 """
@@ -543,171 +543,39 @@ class ManifestPreservationTest(AlignFixtureCase):
         )
 
 
-LM_MARKER = "<!-- LM -->"
-CANONICAL_NEXTUP = FIXTURES / "seed-root" / "nextup.example.md"
+class StopManagingSessionTemplateTest(AlignFixtureCase):
+    """Spec backlog-skill, Decision 11: align no longer seeds or converges
+    a session-template file, and no longer manages any .gitignore entry.
+    Stop-managing means no touch, not delete."""
 
+    def test_stray_unmanaged_file_is_left_untouched(self):
+        repo = self.make_repo("missing-cloud-assets")
+        stray = repo / "session-template.example.md"
+        stray.write_text("<!-- USER -->\nleftover content\n")
+        before = sha256(stray)
 
-class NextupTemplateSeedTest(AlignFixtureCase):
-    """PRD nextup-starwave-refinement, Align tooling req 1: seed the template
-    when absent; a second run reports no pending changes."""
-
-    def test_seeds_byte_identical_copy_when_absent(self):
-        repo = self.make_repo("nextup-missing")
-        report = self.run_align(repo)
-        self.assertEqual(
-            sha256(repo / "nextup.example.md"), sha256(CANONICAL_NEXTUP),
-            "seeded nextup.example.md must be byte-identical to the canonical copy",
-        )
-        self.assertIn("nextup.example.md", self.change_paths(report))
-
-    def test_second_run_reports_no_pending_changes(self):
-        repo = self.make_repo("nextup-missing")
         self.run_align(repo)
-        after_first = self.snapshot(repo)
-        second = self.run_align(repo)
-        self.assertEqual(second.changes, [], "the seed must be idempotent")
-        self.assertEqual(self.snapshot(repo), after_first)
 
-
-class NextupTemplateConvergenceTest(AlignFixtureCase):
-    """Req 2: converge the machine zone (first <!-- LM --> marker down) to
-    canonical; preserve the user zone byte-for-byte."""
-
-    def test_user_zone_preserved_machine_zone_converged(self):
-        repo = self.make_repo("nextup-user-zone")
-        fixture = (FIXTURE_REPOS / "nextup-user-zone" / "nextup.example.md").read_text()
-        canonical = CANONICAL_NEXTUP.read_text()
-        report = self.run_align(repo)
-
-        text = (repo / "nextup.example.md").read_text()
-        self.assertEqual(
-            text[: text.index(LM_MARKER)],
-            fixture[: fixture.index(LM_MARKER)],
-            "user zone above the first LM marker must survive byte-for-byte",
-        )
-        self.assertEqual(
-            text[text.index(LM_MARKER):],
-            canonical[canonical.index(LM_MARKER):],
-            "machine zone from the first LM marker down must converge to canonical",
-        )
-        self.assertNotIn("STALE DRIFTED MACHINE ZONE", text)
-        self.assertIn("nextup.example.md", self.change_paths(report))
-
-    def test_already_canonical_reports_no_change(self):
-        repo = self.make_repo("nextup-canonical")
-        before = sha256(repo / "nextup.example.md")
-        report = self.run_align(repo)
-        self.assertEqual(sha256(repo / "nextup.example.md"), before)
-        self.assertNotIn("nextup.example.md", self.change_paths(report))
-
-    def test_markerless_template_skipped_never_overwritten(self):
-        repo = self.make_repo("nextup-markerless")
-        before = sha256(repo / "nextup.example.md")
-        report = self.run_align(repo)
-        self.assertEqual(
-            sha256(repo / "nextup.example.md"), before,
-            "a template with no LM marker is hand-written and must not be touched",
-        )
-        self.assertIn("nextup.example.md", report.skipped)
-        self.assertNotIn("nextup.example.md", self.change_paths(report))
-
-
-class NextupGitignoreTest(AlignFixtureCase):
-    """Req 3: ensure the target's .gitignore carries a nextup.md entry."""
-
-    def test_appends_exactly_one_entry_when_missing(self):
-        repo = self.make_repo("nextup-gitignore-append")
-        fixture_lines = (
-            (FIXTURE_REPOS / "nextup-gitignore-append" / ".gitignore")
-            .read_text().splitlines()
-        )
-        report = self.run_align(repo)
-        lines = (repo / ".gitignore").read_text().splitlines()
-        self.assertEqual(
-            lines, fixture_lines + ["nextup.md"],
-            "exactly one nextup.md line must be appended, existing rules kept",
-        )
-        self.assertIn(".gitignore", self.change_paths(report))
-
-        second = self.run_align(repo)
-        self.assertEqual(second.changes, [])
-        self.assertEqual(
-            (repo / ".gitignore").read_text().splitlines().count("nextup.md"), 1,
-            "repeated runs must never duplicate the entry",
-        )
-
-    def test_already_ignoring_repo_is_unchanged(self):
-        repo = self.make_repo("nextup-missing")  # fixture already ignores nextup.md
-        before = sha256(repo / ".gitignore")
-        report = self.run_align(repo)
-        self.assertEqual(sha256(repo / ".gitignore"), before)
-        self.assertNotIn(".gitignore", self.change_paths(report))
-
-    def test_creates_gitignore_when_absent(self):
-        repo = self.make_repo("nextup-gitignore-create")
-        report = self.run_align(repo)
-        self.assertEqual((repo / ".gitignore").read_text(), "nextup.md\n")
-        self.assertIn(".gitignore", self.change_paths(report))
-
-
-class NextupSessionFileTest(AlignFixtureCase):
-    """Req 4: nextup.md is session-local — align must never create, modify,
-    or delete it in the target repo."""
-
-    def test_existing_nextup_md_ends_bit_identical(self):
-        repo = self.make_repo("nextup-session-file")
-        before = sha256(repo / "nextup.md")
-        report = self.run_align(repo)
-        self.assertEqual(
-            sha256(repo / "nextup.md"), before,
-            "nextup.md must end the run bit-identical",
-        )
-        self.assertNotIn("nextup.md", self.change_paths(report))
         self.assertTrue(
-            (repo / "nextup.example.md").exists(),
-            "the template must still be seeded alongside the untouched nextup.md",
+            stray.exists(),
+            "align must not delete a stray file it no longer manages",
         )
-
-    def test_align_never_creates_nextup_md(self):
-        repo = self.make_repo("nextup-missing")
-        self.run_align(repo)
-        self.assertFalse(
-            (repo / "nextup.md").exists(),
-            "align must not create the session-local nextup.md",
-        )
-
-
-class NextupPlanOnlyTest(AlignFixtureCase):
-    """Req 5: the plan-only contract covers nextup-template fixes — pending
-    seed/convergence is reported but not applied; nothing but the first-run
-    .agentic.json changes on disk."""
-
-    def test_plan_only_reports_pending_convergence_without_applying(self):
-        repo = self.make_repo("nextup-plan-only")
-        before = self.snapshot(repo)
-        report = self.run_align(repo, assume_yes=False)
-
-        self.assertFalse(report.applied)
-        changed = self.change_paths(report)
-        self.assertIn("nextup.example.md", changed, "pending convergence must be listed")
-        self.assertIn(".gitignore", changed, "pending gitignore fix must be listed")
-
-        after = self.snapshot(repo)
-        after.pop(".agentic.json", None)
         self.assertEqual(
-            after, before,
-            "a plan-only run must change nothing but the first-run manifest",
+            sha256(stray), before,
+            "align must not modify a stray file it no longer manages",
         )
 
-    def test_plan_only_reports_pending_seed_when_template_absent(self):
-        repo = self.make_repo("no-manifest")
-        report = self.run_align(repo, assume_yes=False)
-        self.assertFalse(report.applied)
-        self.assertIn("nextup.example.md", self.change_paths(report))
+    def test_align_never_writes_gitignore(self):
+        repo = self.make_repo("stale-user-path")
+        self.assertFalse((repo / ".gitignore").exists())
+
+        report = self.run_align(repo)
+
         self.assertFalse(
-            (repo / "nextup.example.md").exists(),
-            "the seed must not land on disk in a plan-only run",
+            (repo / ".gitignore").exists(),
+            "align must not create .gitignore",
         )
+        self.assertNotIn(".gitignore", self.change_paths(report))
 
 
 class NonGitDirectoryTest(AlignFixtureCase):

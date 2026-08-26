@@ -21,10 +21,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Orbit integration**: `.orbit.yaml` configuration file enabling backlog-skill distribution via the Codex toolchain
 
+- **BACKLOG.md schema check** (`scripts/process_status.py`): `_backlog_status` hybrid check replaces the two nextup presence columns with a single `BACKLOG` column (`-`/`ok`/`drift`) — a rune parse gate, a raw-text H2 phase set/order scan (catches an empty-but-valid backlog with no `PhaseMarkers` in rune's JSON), a `rune list` Stats pending-only invariant (catches a nested checked subtask a top-level checkbox scan would miss), and a raw H1-title presence scan; a `backlog-drift` flag joins `drift_flags()` with the reason named in the repo's detail line
+
+- **Owned-symlink pruning** (`scripts/sync-claude.sh`): removes dangling symlinks under `~/.agents/skills` that point into this repo's `claude/skills/` but whose target no longer exists, without touching foreign links it doesn't own
+
+- **`tests/test_sunset_grep.py`**: permanent regression gate — greps every git-tracked file (`git ls-files`-sourced) case-insensitively for `nextup`/`spout`, exempting `specs/` (historical), `CHANGELOG.md`, itself, `claude/skills/backlog/SKILL.md` (must name the legacy filenames literally to detect/exclude them), and `tests/test_sync_compat.py` (must name the retired skills literally in `RETIRED_SKILLS`)
+
+- **`docs/agent-notes/backlog-skill.md`**: architecture notes covering the BACKLOG.md hybrid schema check, the `decision_mode` convention, and the nextup/spout sunset ordering and gate
+
 - **Specs overview update**: `specs/OVERVIEW.md` with backlog-skill spec entry and status tracking
 
 ### Changed
-- **.gitignore**: Added `.worktrees/*` for git worktree isolation pattern used by parallel execution skills
+- **.gitignore**: Added `.worktrees/*` for git worktree isolation pattern used by parallel execution skills; removed the now-dead `/nextup.md` and `/SPOUT.md` entries and their comments — the tooling that managed them is gone
+- **`scripts/align.py`**: deleted the nextup-template convergence step (`_converge_nextup_template`, `NEXTUP_EXAMPLE`, `NEXTUP_LM_MARKER`, the `.gitignore`-append helper, and the seed-root existence check for the canonical template) in the same change as deleting the canonical `nextup.example.md`, so align never runs against a seed root missing a file it requires; remaining pipeline steps renumbered
+- **`docs/runbooks/process-onboarding.md`**: rewritten — onboarding no longer seeds a session template or manages `.gitignore`; the "First session" section now points at `/backlog` as the tracked entry point for forward intent
+- **`docs/agent-notes/{align-tooling,process-status,spec-janitor,transit-integration}.md`**, **`scripts/README.md`**: reworded or dropped sections describing the removed nextup columns/step and the retired skill
+- **`tests/test_sync_compat.py`**: moved `nextup` from `PRE_FEATURE_SKILLS` to `RETIRED_SKILLS` and added `spout`, matching the existing `sendit`/`transit` retirement pattern
+- **`tests/test_process_status.py`**, **`tests/test_align.py`**: dropped the now-dead `nextup`/`example` fixture kwargs and the `nextup_text()` helper; genericized the stray-unmanaged-file regression test to no longer name the retired template
+
+### Removed
+- **`claude/skills/nextup/`, `claude/skills/spout/`**: deleted outright; README skill registry now lists `backlog` in their place
+- **`claude/uplift-candidates.md`**: closed, fully-implemented historical mining report with no remaining references elsewhere in the tree; deleted rather than purged line-by-line
+- **Align nextup fixtures**: the eight `tests/fixtures/align/repos/nextup-*` repos, their `.gitignore` files, and `seed-root/nextup.example.md`, along with the step-6 test classes in `tests/test_align.py`
 
 ## [2026-08-26]
 
