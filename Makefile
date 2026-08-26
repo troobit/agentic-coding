@@ -2,7 +2,8 @@
 #
 # bootstrap one-script new-machine setup (scripts/bootstrap.sh)
 # generate  rebuild the checked-in generated files (claude/CLAUDE.md,
-#           copilot/instructions/copilot-instructions.md) and MCP configs
+#           copilot/instructions/copilot-instructions.md, codex/AGENTS.md)
+#           and MCP configs
 # sync      create the ~/.claude and VS Code profile symlinks
 # align     align this repository's own agent configs
 # status    read-only process-status report over participating repos
@@ -48,12 +49,15 @@ lint-drift:
 	@tmp="$$(mktemp -d)"; \
 	cp claude/CLAUDE.md "$$tmp/CLAUDE.md"; \
 	cp copilot/instructions/copilot-instructions.md "$$tmp/copilot-instructions.md"; \
+	cp codex/AGENTS.md "$$tmp/AGENTS.md"; \
 	python3 scripts/generate.py; \
 	status=0; \
 	diff -u "$$tmp/CLAUDE.md" claude/CLAUDE.md || status=1; \
 	diff -u "$$tmp/copilot-instructions.md" copilot/instructions/copilot-instructions.md || status=1; \
+	diff -u "$$tmp/AGENTS.md" codex/AGENTS.md || status=1; \
 	cp "$$tmp/CLAUDE.md" claude/CLAUDE.md; \
 	cp "$$tmp/copilot-instructions.md" copilot/instructions/copilot-instructions.md; \
+	cp "$$tmp/AGENTS.md" codex/AGENTS.md; \
 	rm -rf "$$tmp"; \
 	if [ "$$status" -ne 0 ]; then \
 		echo "Generated files drift from their sources; run 'make generate' and commit."; \

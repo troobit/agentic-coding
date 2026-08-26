@@ -41,8 +41,9 @@ Fixes agentic drift in a target repo, in pipeline order:
    creates, modifies, or deletes it.
 
 Managed files only (design Data Models): .mcp.json, .vscode/mcp.json,
-.agentic.json, .github/copilot-instructions.md, .github/agents/prd.agent.md,
-.github/agents/spec-janitor.agent.md, .github/skills/prd/**,
+.codex/config.toml, .agentic.json, .github/copilot-instructions.md,
+.github/agents/prd.agent.md, .github/agents/spec-janitor.agent.md,
+.github/skills/prd/**,
 .github/skills/spec-janitor/**, stale-pack files under .github/agents/,
 plus nextup.example.md and the nextup.md entry in .gitignore.
 

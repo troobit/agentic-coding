@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This feature makes the agentic-coding repository the single source of truth for agent tooling across Claude Code and GitHub Copilot (VS Code and the cloud coding agent). It adds a PRD lane — one document per target repository, from which rune task files are derived and executed autonomously — consolidates the scattered Copilot and per-repo configuration, codifies MCP server definitions in one place, exposes localml models to VS Code, and turns the repository into a complete new-machine bootstrap: clone, run one script, authenticate. The existing gated starwave workflow in Claude Code is unchanged.
+This feature makes the agentic-coding repository the single source of truth for agent tooling across Claude Code, GitHub Copilot (VS Code and the cloud coding agent), and Codex. It adds a PRD lane — one document per target repository, from which rune task files are derived and executed autonomously — consolidates the scattered Copilot and per-repo configuration, codifies MCP server definitions in one place, exposes localml models to VS Code, and turns the repository into a complete new-machine bootstrap: clone, run one script, authenticate. The existing gated starwave workflow remains source-compatible with Claude Code while its Agent Skill instructions are made discoverable by Codex where the host supports the open `SKILL.md` format.
 
 ## Non-Goals
 
@@ -15,6 +15,7 @@ This feature makes the agentic-coding repository the single source of truth for 
 - macOS (Apple Silicon) only; no Windows or Linux support.
 - No functional changes to the PR-lifecycle or Transit skills beyond what config consolidation touches.
 - No secret values stored in this repository or in generated configs.
+- No Codex plugin packaging or remote skill upload; this feature uses local Agent Skill folders and symlinks only.
 
 ## Requirements
 
@@ -65,6 +66,7 @@ This feature makes the agentic-coding repository the single source of truth for 
 3. <a name="4.3"></a>Generated configs SHALL contain no secret values; the generator SHALL emit each target's native secret-reference mechanism (environment-variable expansion for Claude Code, prompt inputs for VS Code), and generation SHALL fail with an error for a target that has no such mechanism for a required secret.
 4. <a name="4.4"></a>Per-repo generation SHALL support selecting a subset of the canonical server set.
 5. <a name="4.5"></a>Rerunning generation SHALL converge entries whose names are in the canonical set back to canonical; entries outside the canonical set SHALL be preserved and reported, never silently removed.
+6. <a name="4.6"></a>The generation command SHALL produce Codex MCP configuration for the user-level `~/.codex/config.toml` and per-repo `.codex/config.toml` config shapes, preserving unrelated Codex settings.
 
 ### 5. Per-Repo Config Alignment
 
@@ -100,7 +102,7 @@ This feature makes the agentic-coding repository the single source of truth for 
 
 **Acceptance Criteria:**
 
-1. <a name="8.1"></a>A single script SHALL: create the Claude and Copilot symlinks, install the workflow's CLI dependencies (rune via its Homebrew tap, orbit via `go install`, mcp-devtools, uv, gh, node/npx, and podman for the container-based MCP servers), generate all MCP configs per Requirement 4, and seed the required VS Code settings per Requirement 7. IF a dependency cannot be installed unauthenticated (e.g. a private clone before `gh auth login`), the script SHALL skip it with a report and add it to the remaining-steps list per Requirement 8.3.
+1. <a name="8.1"></a>A single script SHALL: create the Claude, Copilot, and Codex links, install the workflow's CLI dependencies (rune via its Homebrew tap, orbit via `go install`, mcp-devtools, uv, gh, node/npx, and podman for the container-based MCP servers), generate all MCP configs per Requirement 4, seed Codex and VS Code instruction/config files, and seed the required VS Code settings per Requirement 7. IF a dependency cannot be installed unauthenticated (e.g. a private clone before `gh auth login`), the script SHALL skip it with a report and add it to the remaining-steps list per Requirement 8.3.
 2. <a name="8.2"></a>The script SHALL be idempotent: rerunning it on a configured machine SHALL make no destructive changes and SHALL leave a working setup.
 3. <a name="8.3"></a>WHEN the script completes, it SHALL list the remaining manual authentication steps (gh auth login, Claude Code login, Copilot sign-in, MCP tokens).
 4. <a name="8.4"></a>IF the script encounters an existing file it does not manage at a target location, it SHALL preserve that file (back up or skip with a report); within managed config files, only canonical-named entries are rewritten per Requirement 4.5.
@@ -123,3 +125,16 @@ This feature makes the agentic-coding repository the single source of truth for 
 2. <a name="10.2"></a>WHEN the user zone references a PRD (or a `specs/{name}/prd.md` exists for the named work), nextup SHALL route it to the PRD execution lane.
 3. <a name="10.3"></a>WHEN an act-autonomously flag is present in the user zone, nextup SHALL prefer the ungated lane end-to-end (PRD derivation and execution, no approval gates), using gated-lane routing only when the user zone explicitly demands it.
 4. <a name="10.4"></a>WHERE work is feature-shaped and no autonomy flag is set, nextup MAY recommend the gated lane, but SHALL NOT withhold direct execution when the user zone asks for it.
+
+### 11. Codex Agent Skills Discovery
+
+**User Story:** As the user, I want the Starwave and related skills discoverable by Codex from the same source as Claude Code, so that the specification-driven process is available in Codex without copied local files.
+
+**Acceptance Criteria:**
+
+1. <a name="11.1"></a>The sync workflow SHALL expose every top-level skill directory under `claude/skills/` to Codex through `~/.agents/skills/{skill-name}`.
+2. <a name="11.2"></a>WHEN `~/.agents/skills/{skill-name}` already exists and is not a symlink to the repository skill, the sync workflow SHALL preserve it and report the conflict instead of overwriting it.
+3. <a name="11.3"></a>WHEN the sync workflow is run repeatedly, Codex skill links that already point at repository skills SHALL remain unchanged and the run SHALL not create duplicate files or directories.
+4. <a name="11.4"></a>The sync and bootstrap documentation SHALL describe Codex discovery through `~/.agents/skills`, including the fact that host-specific Claude mechanisms still depend on the host's available tools.
+5. <a name="11.5"></a>The sync workflow SHALL keep the existing Claude Code link map unchanged while adding Codex links.
+6. <a name="11.6"></a>The generation workflow SHALL produce Codex global instructions at `~/.codex/AGENTS.md` from the shared conventions plus a Codex-specific wrapper, preserving content outside the managed block.

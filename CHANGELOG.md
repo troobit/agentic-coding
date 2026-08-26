@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-08-26]
+
+### Added
+- **Codex support** through the generation toolchain: `codex/AGENTS.md` (generated from `shared/codex-wrapper.md`) distributes to `~/.codex/AGENTS.md` via `scripts/generate.py --user`, with Codex-specific skill guidance and communication conventions matching Claude and Copilot instructions
+- **Agent Skills linking for Codex**: `scripts/sync-claude.sh` symlinks each top-level skill under `claude/skills/` individually into `~/.agents/skills` for Codex discovery, preserving existing user-installed skills and reporting conflicts
+- **Codex MCP configuration**: `scripts/generate.py` writes Codex MCP settings to `~/.codex/config.toml` managed blocks; `scripts/align.py` converges per-repo `.codex/config.toml` MCP tables while preserving unrelated Codex settings
+- **Bootstrap and sync updates**: `scripts/bootstrap.sh` now creates `~/.agents/skills` and `~/.codex` directories; sync-claude.sh updated to include Codex skill links; Makefile includes `codex/AGENTS.md` in generate and lint-drift checks
+
+### Changed
+- **README.md**: Expanded to document Codex integration, three-tool setup, Agent Skills discovery path, and the full suite of scripts supporting Claude/Copilot/Codex configuration
+- **`docs/agent-notes/bootstrap-and-sync.md`**: Documented the Codex bootstrap sequence (mkdir targets, Codex skill links, AGENTS.md seeding, config.toml)
+
+### Fixed
+- **Test suite**: Added golden fixtures (`tests/fixtures/golden/AGENTS.md`, `tests/fixtures/golden/codex-mcp.toml`) and test cases for Codex AGENTS.md generation and `.codex/config.toml` alignment; updated `tests/test_sync_compat.py` for Codex skill symlink validation
+
 ## [2026-08-20]
 
 ### Added

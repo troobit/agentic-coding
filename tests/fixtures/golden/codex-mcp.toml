@@ -1,0 +1,11 @@
+[mcp_servers.alpha]
+command = "alpha-cmd"
+
+[mcp_servers.alpha.env]
+MODE = "full"
+
+[mcp_servers.bravo]
+url = "https://bravo.example/mcp"
+
+[mcp_servers.bravo.env_http_headers]
+Authorization = "BRAVO_AUTH_TOKEN"

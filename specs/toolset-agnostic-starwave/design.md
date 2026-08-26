@@ -15,7 +15,8 @@ agentic-coding/
 ├── shared/
 │   ├── conventions.md            # NEW: single-source core conventions (Req 3.3)
 │   ├── claude-wrapper.md         # NEW: Claude-only sections (AskUserQuestion contract, skill routing)
-│   └── copilot-wrapper.md        # NEW: Copilot-only preamble
+│   ├── copilot-wrapper.md        # NEW: Copilot-only preamble
+│   └── codex-wrapper.md          # NEW: Codex-only preamble
 ├── mcp/
 │   └── servers.json              # NEW: canonical MCP definitions (Req 4.1)
 ├── claude/
@@ -27,6 +28,8 @@ agentic-coding/
 │   ├── agents/prd.agent.md       # NEW: custom agent wrapper for VS Code + cloud
 │   ├── instructions/copilot-instructions.md   # GENERATED (checked in)
 │   └── prompts/                  # DELETED: all 8 stale gated-lane files (Req 3.2)
+├── codex/
+│   └── AGENTS.md                 # GENERATED (checked in): codex wrapper + conventions
 └── scripts/
     ├── bootstrap.sh              # NEW: one-script machine setup (Req 8)
     ├── sync-claude.sh            # existing links unchanged (Req 9.1); ADDS VS Code profile links (Req 3.1)
@@ -45,22 +48,32 @@ flowchart LR
     M[mcp/servers.json] --> G
     G --> CM[claude/CLAUDE.md]
     G --> CI[copilot/instructions/copilot-instructions.md]
+    G --> CA[codex/AGENTS.md]
     G --> UC[~/.claude.json mcpServers]
     G --> UV["VS Code user mcp.json"]
+    G --> UX["~/.codex/AGENTS.md + config.toml"]
     A[".agentic.json (per repo)"] --> AL[scripts/align.py]
     M --> AL
-    AL --> PR[".mcp.json + .vscode/mcp.json"]
+    AL --> PR[".mcp.json + .vscode/mcp.json + .codex/config.toml"]
     AL --> GH[".github/agents + skills + copilot-instructions.md"]
 ```
 
 ### Surface discovery map (Req 3.4)
 
-| Asset | Claude Code | VS Code Copilot | Cloud coding agent |
-|---|---|---|---|
-| Skills (`SKILL.md`) | `~/.claude/skills` symlink (existing) | reads `~/.claude/skills` natively | `.github/skills/` seeded by align |
-| PRD custom agent | n/a (skill suffices) | symlink in VS Code profile `User/prompts/` → repo `copilot/agents/prd.agent.md` (created by **sync-claude.sh**, so a sync-only machine discovers it per Req 3.1); `chat.agentFilesLocations` as fallback if profile discovery fails — verify during implementation | `.github/agents/` seeded by align |
-| Instructions | `~/.claude/CLAUDE.md` symlink | `chat.instructionsFilesLocations` → repo `copilot/instructions/` (the generated Copilot file; `chat.useClaudeMdFile` stays OFF — it would deliver the Claude wrapper to Copilot, defeating Req 3.3); repo-level via seeded `.github/copilot-instructions.md` | `.github/copilot-instructions.md` seeded by align |
-| MCP | `~/.claude.json` (user) / `.mcp.json` (repo) | user + `.vscode/mcp.json` | paste-ready JSON + runbook (Req 6.2) |
+| Asset | Claude Code | VS Code Copilot | Cloud coding agent | Codex |
+|---|---|---|---|---|
+| Skills (`SKILL.md`) | `~/.claude/skills` symlink (existing) | reads `~/.claude/skills` natively | `.github/skills/` seeded by align | per-skill symlinks from `claude/skills/*` into `~/.agents/skills/*` |
+| PRD custom agent | n/a (skill suffices) | symlink in VS Code profile `User/prompts/` → repo `copilot/agents/prd.agent.md` (created by **sync-claude.sh**, so a sync-only machine discovers it per Req 3.1); `chat.agentFilesLocations` as fallback if profile discovery fails — verify during implementation | `.github/agents/` seeded by align | n/a (the `prd` skill is linked into `~/.agents/skills`) |
+| Instructions | `~/.claude/CLAUDE.md` symlink | `chat.instructionsFilesLocations` → repo `copilot/instructions/` (the generated Copilot file; `chat.useClaudeMdFile` stays OFF — it would deliver the Claude wrapper to Copilot, defeating Req 3.3); repo-level via seeded `.github/copilot-instructions.md` | `.github/copilot-instructions.md` seeded by align | `~/.codex/AGENTS.md` managed block from `codex/AGENTS.md`; per-repo Codex guidance can use repo `AGENTS.md` in later alignment work |
+| MCP | `~/.claude.json` (user) / `.mcp.json` (repo) | user + `.vscode/mcp.json` | paste-ready JSON + runbook (Req 6.2) | `~/.codex/config.toml` and `.codex/config.toml` `[mcp_servers.*]` tables |
+
+### Codex Agent Skills linking (Req 11)
+
+Codex uses the same Agent Skill directory shape (`SKILL.md` plus optional `references/`, `scripts/`, and `assets/`) and discovers local user skills under `~/.agents/skills`. `sync-claude.sh` therefore creates `~/.agents/skills` and links each top-level directory in `claude/skills/` to `~/.agents/skills/{skill-name}` individually.
+
+A whole-directory symlink is rejected because `~/.agents/skills` may already contain curated or user-installed skills. Per-skill linking preserves those entries and makes conflicts explicit: an existing non-matching file, directory, or symlink is skipped and reported; an existing matching symlink is left alone. This keeps the Claude link map untouched while exposing Starwave, `rune`, `next-task`, and related skills to Codex.
+
+Host-specific instructions inside some skills remain conditional on the host's available tools. This feature makes the skill instructions discoverable by Codex; it does not rewrite every Claude-specific subagent or approval mechanism into a Codex-native equivalent.
 
 ## Components and Interfaces
 
@@ -94,8 +107,9 @@ Orbit path (documented in the skill and README, not code): one orbit process per
 `generate.py` concatenates `shared/conventions.md` between wrapper fragments:
 - `claude/CLAUDE.md` = conventions + `shared/claude-wrapper.md`
 - `copilot/instructions/copilot-instructions.md` = `shared/copilot-wrapper.md` + conventions
+- `codex/AGENTS.md` = `shared/codex-wrapper.md` + conventions
 
-Contract: wrappers own all tool-specific text; `conventions.md` must render correctly in both outputs, so it references no tool-specific mechanisms (no skill names, no AskUserQuestion) **and no Claude-tree file paths** (`rules/references/...`, `.claude/scripts/...` — such references live in the claude wrapper only; the conventions test asserts none survive into the Copilot output).
+Contract: wrappers own all tool-specific text; `conventions.md` must render correctly in every output, so it references no tool-specific mechanisms (no skill names, no AskUserQuestion) **and no Claude-tree file paths** (`rules/references/...`, `.claude/scripts/...` — such references live in the claude wrapper only; the conventions test asserts none survive into the Copilot output).
 
 **Managed-block provenance (used by every generated/seeded markdown and JSON-adjacent file):** generated content sits between `<!-- agentic:begin -->` / `<!-- agentic:end -->` markers. Generators and align rewrite only the block; content outside it is preserved verbatim. This solves two otherwise-fatal interactions: Claude Code's `#`-memory appends to `~/.claude/CLAUDE.md` (the generated file) survive regeneration as tail content, and repo-specific additions to a seeded `.github/copilot-instructions.md` survive re-alignment. A target file that exists **without** markers is treated as hand-written: reported and skipped, never overwritten (Req 8.4). `make lint` warns when tail content in `claude/CLAUDE.md` looks like a convention that belongs in `shared/`.
 
@@ -109,13 +123,13 @@ Contract: wrappers own all tool-specific text; `conventions.md` must render corr
     "transport": {"type": "stdio", "command": "mcp-devtools",
                    "env": {"ENABLE_ADDITIONAL_TOOLS": "sequential_thinking,gemini-agent,codex-agent"}},
     "secrets": {},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": ["*"]
   },
   "github": {
     "transport": {"type": "http", "url": "https://api.githubcopilot.com/mcp/"},
     "secrets": {"AUTH_TOKEN": {"header": "Authorization"}},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": []
   }
 }
@@ -123,10 +137,10 @@ Contract: wrappers own all tool-specific text; `conventions.md` must render corr
 
 - `surfaces` handles per-surface applicability (e.g. awesome-copilot: `["vscode"]`).
 - `default_for` drives first-run manifest inference in align (glob/marker rules, e.g. svelte → `svelte.config.js` present).
-- Secret mapping (Req 4.3): claude/`.mcp.json` targets emit `${VAR}` env expansion; VS Code targets emit `inputs` prompt entries; the cloud artifact names `COPILOT_MCP_*` secrets. A secret with no mechanism for a requested target aborts generation with a named error.
+- Secret mapping (Req 4.3): claude/`.mcp.json` targets emit `${VAR}` env expansion; VS Code targets emit `inputs` prompt entries; Codex targets emit `env_http_headers` for HTTP header secrets and `env_vars` for exact-name stdio env secrets; the cloud artifact names `COPILOT_MCP_*` secrets. A secret with no mechanism for a requested target aborts generation with a named error.
 - Commands are written portably: bare command names (PATH-resolved), never absolute user paths (Req 5.1's target state).
 
-Write behavior (Req 4.5): for `~/.claude.json` (which holds unrelated Claude state) and all `mcp.json` shapes, the generator parses existing JSON, replaces only canonical-named server entries, preserves everything else, and prints preserved non-canonical entries. Missing file → created; invalid JSON at a target → backed up alongside (`.bak-<date>`) and regenerated, reported. For the Claude user scope specifically, the generator prefers `claude mcp add-json <name> <json> --scope user` when the CLI is on PATH (avoids racing a running Claude Code instance that rewrites `~/.claude.json`), falling back to direct merge otherwise.
+Write behavior (Req 4.5): for `~/.claude.json` (which holds unrelated Claude state) and all `mcp.json` shapes, the generator parses existing JSON, replaces only canonical-named server entries, preserves everything else, and prints preserved non-canonical entries. Missing file → created; invalid JSON at a target → backed up alongside (`.bak-<date>`) and regenerated, reported. For the Claude user scope specifically, the generator prefers `claude mcp add-json <name> <json> --scope user` when the CLI is on PATH (avoids racing a running Claude Code instance that rewrites `~/.claude.json`), falling back to direct merge otherwise. Codex `config.toml` is text-merged: unrelated settings and non-canonical MCP tables are preserved, canonical `[mcp_servers.*]` tables are replaced inside a `# agentic:begin codex-mcp` block.
 
 Cloud artifact (Req 6.2): `align.py --cloud-mcp` prints the paste-ready cloud-agent MCP JSON for the repo's manifest subset with `COPILOT_MCP_*` secret names; the application steps live in `docs/runbooks/cloud-agent-mcp.md`.
 
@@ -151,7 +165,7 @@ Idempotence (Req 5.3) is a hard contract: the second applying run must produce a
 
 ### Bootstrap — `scripts/bootstrap.sh` (Req 8)
 
-Order: Homebrew present? (install if not) → `brew bundle` (Brewfile includes the `visual-studio-code` cask and codex CLI alongside gh, uv, node, podman, go, rune; Claude Code installed via its documented installer step) → `go install` for orbit and mcp-devtools → `mkdir -p ~/.claude` and the VS Code `User/` settings dir (fresh machine: neither exists before first app launch) → `sync-claude.sh` → `generate.py --user` (user-level MCP + conventions + the VS Code `settings.json` key merge — bootstrap.sh does no JSON manipulation itself, per Decision 12's rationale) → remove `~/.copilot/agents/prd.agent.md` if present (Req 1.4, reported) → print remaining manual steps (gh auth login, `claude` login, Copilot sign-in, GitHub MCP token, `codex login` for peer review), ending with "re-run bootstrap.sh after authenticating" so auth-skipped steps complete.
+Order: Homebrew present? (install if not) → `brew bundle` (Brewfile includes the `visual-studio-code` cask and codex CLI alongside gh, uv, node, podman, go, rune; Claude Code installed via its documented installer step) → `go install` for orbit and mcp-devtools → `mkdir -p ~/.claude`, `~/.agents/skills`, `~/.codex`, and the VS Code `User/` settings dir (fresh machine: none may exist before first app launch) → `sync-claude.sh` → `generate.py --user` (user-level MCP + conventions + Codex `AGENTS.md` + the VS Code `settings.json` key merge — bootstrap.sh does no JSON manipulation itself, per Decision 12's rationale) → remove `~/.copilot/agents/prd.agent.md` if present (Req 1.4, reported) → print remaining manual steps (gh auth login, `claude` login, Copilot sign-in, GitHub MCP token, `codex login` for peer review), ending with "re-run bootstrap.sh after authenticating" so auth-skipped steps complete.
 
 VS Code seeding merges keys into the user `settings.json` (preserving all others): `chat.instructionsFilesLocations` → the generated `copilot/instructions/` (never `chat.useClaudeMdFile` — see surface map), the PRD agent symlink into the profile `User/prompts/` dir (fallback: `chat.agentFilesLocations`), and the localml provider under `github.copilot.chat.customOAIModels` (baseUrl `http://127.0.0.1:8080/v1`, model id placeholder). The API key lives in VS Code secret storage and cannot be file-seeded — the runbook covers that prompt (any non-empty string; localml ignores it).
 
@@ -165,7 +179,7 @@ Step-by-step only: start command, Manage Language Models entries, API-key placeh
 
 - `.agentic.json` — `{servers: string[], cloud_assets: bool}`. Committed per repo.
 - `mcp/servers.json` — schema above; the only hand-edited MCP file anywhere. `default_for` grammar: an array of marker-file globs evaluated against the repo root (`"svelte.config.js"`, `"*.go"`); the literal `"*"` means always included.
-- Align's managed files (the complete set steps 1–5 may touch): `.mcp.json`, `.vscode/mcp.json`, `.agentic.json`, `.github/copilot-instructions.md`, `.github/agents/prd.agent.md`, `.github/skills/prd/**`, plus stale-pack files under `.github/agents/`. Nothing else in a target repo is read or written.
+- Align's managed files (the complete set steps 1–5 may touch): `.mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`, `.agentic.json`, `.github/copilot-instructions.md`, `.github/agents/prd.agent.md`, `.github/skills/prd/**`, plus stale-pack files under `.github/agents/`. Nothing else in a target repo is read or written.
 - PRD spec folder — `specs/{prd-name}/prd.md` + `tasks-{context}.md` per context (rune format, phases + streams, front-matter reference to `prd.md`).
 
 ## Error Handling
@@ -181,7 +195,7 @@ Python tests (stdlib `unittest`, run via `make test`) with golden-file fixtures:
 
 - **Generator**: each target shape from a fixture `servers.json` → golden output; secret-mechanism failure case; preservation of non-canonical entries and unrelated `~/.claude.json` keys.
 - **Align**: one fixture repo per drift class (stale path, invalid JSON, drifted canonical entry, stale agent pack, missing cloud assets, **hand-edited seeded file with local additions outside the managed block**, **markerless pre-existing file**) → fixed state matches golden; **idempotence property on every fixture: second applying run reports zero changes** (Req 5.3). The invalid-JSON fixture asserts the report warns about possible non-canonical entries in the `.bak`.
-- **Conventions**: Copilot output contains no Claude-only wrapper content and no Claude-tree path references; both outputs contain the shared block verbatim; tail content outside the managed block survives regeneration.
+- **Conventions**: Copilot output contains no Claude-only wrapper content and no Claude-tree path references; Claude, Copilot, and Codex outputs contain the shared block verbatim; tail content outside the managed block survives regeneration.
 - **Shell**: `shellcheck` on bootstrap.sh/sync-claude.sh in `make lint`; bootstrap gets a `--dry-run` flag, and AC 8.2 is verified by a second real run on the configured machine reporting no changes during rollout.
-- **Backwards compat (Req 9.1)**: test asserts sync-claude.sh's link map is unchanged and `claude/skills/` contains every pre-feature skill directory name.
+- **Backwards compat (Req 9.1, 11.5)**: test asserts sync-claude.sh's Claude link map is unchanged and `claude/skills/` contains every pre-feature skill directory name. A temp-`HOME` sync test asserts every repo skill is linked into `~/.agents/skills`, conflicts are skipped, and a second run is idempotent.
 - **PRD lane**: skill documents are exercised by a worked example in a scratch repo during rollout; the example MUST have at least two contexts each with streams, so the context-qualified branch naming is actually exercised.

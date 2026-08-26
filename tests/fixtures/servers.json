@@ -6,7 +6,7 @@
       "env": {"MODE": "full"}
     },
     "secrets": {},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": ["*"]
   },
   "bravo": {
@@ -15,7 +15,7 @@
       "url": "https://bravo.example/mcp"
     },
     "secrets": {"AUTH_TOKEN": {"header": "Authorization"}},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": []
   },
   "envy": {

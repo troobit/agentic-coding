@@ -2,7 +2,7 @@
 
 This repository contains my current process for working with agentic coding assistants. It's focused around spec-driven development and has a number of helpful tools and commands. Feel free to use what you see here and/or propose improvements.
 
-The repository is the single source of truth for agent tooling across Claude Code and GitHub Copilot (VS Code and the cloud coding agent): shared conventions and MCP server definitions are generated into each tool's config shape, and one bootstrap script sets up a new machine.
+The repository is the single source of truth for agent tooling across Claude Code, GitHub Copilot (VS Code and the cloud coding agent), and Codex: shared conventions and MCP server definitions are generated into each tool's config shape, portable Agent Skills are linked into each host's discovery path, and one bootstrap script sets up a new machine.
 
 ## New-Machine Quickstart
 
@@ -83,7 +83,7 @@ For a small project or a first MVP, `/prd` writes a single standalone PRD for on
 
 Top-level layout:
 
-- `shared/` - Single-source conventions (`conventions.md`) plus the Claude and Copilot wrapper fragments they are combined with
+- `shared/` - Single-source conventions (`conventions.md`) plus the Claude, Copilot, and Codex wrapper fragments they are combined with
 - `mcp/servers.json` - Canonical MCP server definitions, including which values are secret
 - `claude/` - Claude Code configuration:
   - `claude/CLAUDE.md` - User-level instructions (generated from `shared/`, checked in)
@@ -92,6 +92,7 @@ Top-level layout:
   - `claude/rules/` - Language rules and reference documentation formats
 - `copilot/agents/prd.agent.md` - Custom agent wrapper for VS Code and the cloud coding agent
 - `copilot/instructions/copilot-instructions.md` - Copilot instructions (generated from `shared/`, checked in)
+- `codex/AGENTS.md` - Codex instructions (generated from `shared/`, checked in and also seeded to `~/.codex/AGENTS.md`)
 - `scripts/bootstrap.sh` - One-script new-machine setup
 - `scripts/generate.py` - Regenerates the instruction files and MCP configs from `shared/` and `mcp/servers.json`
 - `scripts/align.py` - Brings any repository's agent configs into line (stale paths, invalid JSON, drifted MCP entries, cloud-agent assets)
@@ -111,23 +112,31 @@ The old `copilot/prompts/` prompt files are gone — the gated starwave lane is 
 - **Cloud coding agent** discovers repo-level assets that `scripts/align.py` seeds into a target repository: `.github/skills/` (the PRD-lane skills), `.github/agents/prd.agent.md`, and `.github/copilot-instructions.md`. MCP setup for the cloud agent is covered by [docs/runbooks/cloud-agent-mcp.md](docs/runbooks/cloud-agent-mcp.md).
 - **Instructions** are generated: `copilot/instructions/copilot-instructions.md` is produced from `shared/conventions.md` plus the Copilot wrapper, so the core conventions stay in one source shared with `claude/CLAUDE.md`.
 
+## Codex Integration
+
+Codex discovers Agent Skills from `~/.agents/skills`. `scripts/sync-claude.sh` links each top-level directory under `claude/skills/` into that location individually, so Starwave, `rune`, `next-task`, and the related workflow skills are available to Codex from the same repository source.
+
+The script does not replace `~/.agents/skills`; existing Codex/user-installed skills are preserved. If a target skill name already exists and does not point at this repository, sync reports the conflict and leaves it alone. Some skill bodies still mention Claude-specific tools or approval mechanisms, so Codex can follow the portable `SKILL.md` instructions while host-specific behavior depends on the tools available in the Codex session.
+
+Codex instructions and MCP settings are generated too: `make generate` rebuilds the checked-in `codex/AGENTS.md`, `scripts/generate.py --user` writes managed blocks to `~/.codex/AGENTS.md` and `~/.codex/config.toml`, and `scripts/align.py <repo>` converges per-repo `.codex/config.toml` MCP tables while preserving unrelated Codex settings.
+
 ## Scripts Directory
 
 The `scripts/` directory contains helper scripts for AI-assisted development:
 
 - **`bootstrap.sh`** - One-script new-machine setup (see the quickstart above)
-- **`sync-claude.sh`** - Syncs configuration from `claude/` to `~/.claude/` by creating symlinks, and links the PRD agent into the VS Code profile
-- **`generate.py`** - Regenerates the instruction files and MCP configs from the canonical sources
-- **`align.py`** - Aligns a target repository's agent configs with the canonical sources
+- **`sync-claude.sh`** - Syncs configuration from `claude/` to `~/.claude/`, links repo skills into Codex's `~/.agents/skills`, and links the PRD agent into the VS Code profile
+- **`generate.py`** - Regenerates the instruction files and MCP configs from the canonical sources, including Codex `AGENTS.md` and `config.toml`
+- **`align.py`** - Aligns a target repository's agent configs with the canonical sources, including `.codex/config.toml`
 
 To set up your global Claude Code configuration on an already-bootstrapped machine, run:
 ```bash
 ./scripts/sync-claude.sh
 ```
 
-This creates symlinks from `~/.claude/` pointing to the files in this repository's `claude/` directory, keeping your configuration centralized and version-controlled.
+This creates symlinks from `~/.claude/` pointing to the files in this repository's `claude/` directory and per-skill symlinks under `~/.agents/skills` for Codex, keeping your configuration centralized and version-controlled.
 
-This framework is designed to work with Claude Code and GitHub Copilot (VS Code and the cloud coding agent).
+This framework is designed to work with Claude Code, GitHub Copilot (VS Code and the cloud coding agent), and Codex.
 
 ## GitHub Action
 

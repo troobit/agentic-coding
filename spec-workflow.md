@@ -12,7 +12,7 @@ The workflow follows a four-phase approach:
 
 This is constantly being worked on, and will evolve over time. There are two lanes, with different tool support:
 
-- **Gated starwave lane** (this document): Claude Code only. The approval gates, sub-agent reviews, and skills below are not ported to other tools.
+- **Gated starwave lane** (this document): authored as Agent Skills in this repo. Claude Code remains the full-fidelity host for approval gates and sub-agent reviews; Codex can discover the same `SKILL.md` files through `~/.agents/skills`, with host-specific steps depending on available Codex tools.
 - **PRD authoring**: toolset-agnostic. Works in Claude Code (the `prd` skill), VS Code Copilot (the same skills via the shared `~/.claude/skills` link), the cloud coding agent (via the assets `scripts/align.py` seeds into a repo), and orbit as a headless local executor.
 
 ### PRDs
@@ -41,6 +41,8 @@ All spec-driven development skills are organized under the `starwave` namespace:
 | `/starwave:requirements` | Generate and refine requirements in EARS format |
 | `/starwave:design` | Create design documents based on requirements |
 | `/starwave:tasks` | Convert designs into actionable task lists |
+
+`scripts/sync-claude.sh` links these same skill directories into Codex's user skill path, `~/.agents/skills`, one skill at a time. Existing Codex skills at the same names are preserved and reported as conflicts rather than overwritten. The shared conventions are also generated into `codex/AGENTS.md` and seeded to `~/.codex/AGENTS.md`; MCP servers are generated into Codex `config.toml` files from the same `mcp/servers.json` source.
 
 ## Smolspec: Lightweight Specifications
 

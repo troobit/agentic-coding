@@ -517,8 +517,6 @@ Direct user steering. The spec-driven gates exist to keep a human in the loop, w
 
 ---
 
----
-
 ## Decision 17: Retire `/sendit` and `/engage`; `/prd` Becomes Standalone Authoring
 
 **Date**: 2026-07-27
@@ -593,5 +591,67 @@ and rejected — see Alternatives.
 `/prd`-as-document. `prd` reframed as authoring-only. `spec-janitor`,
 `README.md`, `spec-workflow.md`, and the runbooks updated. `sendit` added to
 `RETIRED_SKILLS` in `tests/test_sync_compat.py`.
+
+---
+
+## Decision 18: Codex Uses Per-Skill Symlinks Into `~/.agents/skills`
+
+**Date**: 2026-08-21
+**Status**: accepted
+
+### Context
+
+The Starwave skills in `claude/skills/starwave-*` are the current source of truth for the specification-driven workflow. OpenAI Docs says Codex discovers user skills from `~/.agents/skills` and follows symlinked skill folders. The user's machine already has curated skills installed there, so replacing the entire directory would hide existing capabilities.
+
+### Decision
+
+Keep `claude/skills/` as the authored source for now and have `scripts/sync-claude.sh` link each top-level skill directory individually into `~/.agents/skills/{skill-name}`. Existing non-matching targets are skipped and reported; matching symlinks are left alone.
+
+### Rationale
+
+Per-skill symlinks give Codex the same `SKILL.md` assets without copying files or clobbering installed skills. This also keeps the existing Claude Code symlink map unchanged, satisfying the backwards-compatibility requirement while extending discovery to Codex.
+
+### Alternatives Considered
+
+- **Whole-directory symlink `~/.agents/skills -> claude/skills`**: Simpler - Rejected because it would replace or shadow existing Codex/user skills.
+- **Duplicate skill files under a new repo `.agents/skills` tree**: More idiomatic for Codex - Rejected for now because it creates another source of truth; a future repository-layout rename can be handled as a separate migration.
+- **Package a Codex plugin**: Better for distribution - Rejected as out of scope; local setup and bootstrap are the target for this feature.
+
+### Consequences
+
+**Positive:**
+- Codex can discover Starwave and related skills from the canonical repo assets.
+- Existing `~/.agents/skills` entries survive sync and bootstrap.
+
+**Negative:**
+- Some skill bodies still mention Claude-specific tools or gates; Codex can read the workflow, but host-specific mechanisms need later portability work where behavior cannot be expressed as plain instructions.
+
+---
+
+## Decision 19: Codex Instructions and MCP Are In Scope
+
+**Date**: 2026-08-21
+**Status**: accepted
+
+### Context
+
+After Codex skill linking landed, the remaining open question was whether Codex should also receive generated instructions and MCP config. OpenAI Docs documents `~/.codex/AGENTS.md` for global guidance and `~/.codex/config.toml` / `.codex/config.toml` for MCP server tables.
+
+### Decision
+
+Generate a checked-in `codex/AGENTS.md` from `shared/codex-wrapper.md` plus `shared/conventions.md`, and have `generate.py --user` write the managed block to `~/.codex/AGENTS.md`. Extend MCP generation to Codex `config.toml` shapes at user and repo scope.
+
+### Rationale
+
+Skills alone make the workflows discoverable, but global instructions and MCP definitions are also part of the toolset-agnostic setup. Keeping them generated from the same sources preserves the one-repo source of truth.
+
+### Consequences
+
+**Positive:**
+- Codex starts with the same shared conventions as Claude Code and Copilot.
+- Codex receives canonical MCP servers from `mcp/servers.json`.
+
+**Negative:**
+- Codex TOML merging is text-based because Python 3.9 has no stdlib TOML writer; the implementation must keep its owned `[mcp_servers.*]` tables narrow and heavily tested.
 
 ---

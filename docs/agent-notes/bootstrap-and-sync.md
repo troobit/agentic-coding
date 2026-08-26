@@ -4,7 +4,8 @@
 
 - One-script new-machine setup (Req 8); order is fixed by design.md's
   Bootstrap section: Homebrew → `brew bundle` → Claude Code installer →
-  `go install` orbit + mcp-devtools + rune → `mkdir -p` targets → `sync-claude.sh`
+  `go install` orbit + mcp-devtools + rune → `mkdir -p` targets (`~/.claude`,
+  `~/.agents/skills`, `~/.codex`, VS Code User dir) → `sync-claude.sh`
   → `generate.py --user` → remove stale `~/.copilot/agents/prd.agent.md`
   → print manual auth steps, ending with "re-run scripts/bootstrap.sh after
   authenticating".
@@ -37,9 +38,12 @@
   `/usr/local/bin/brew` (fresh installs aren't on PATH yet); after the
   Homebrew step it `eval "$($BREW shellenv)"` so the rest of the run sees
   brew and everything brew bundle installed.
-- All JSON work (user MCP configs, VS Code settings merge) is delegated to
+- All JSON/TOML work (user MCP configs, VS Code settings merge, Codex
+  `config.toml`) is delegated to
   `generate.py --user` per Decision 12 — the shell only mkdirs, symlinks
-  (via sync-claude.sh), and removes the one known stale file.
+  (via sync-claude.sh, including Codex `~/.agents/skills` links), seeds
+  `~/.codex/AGENTS.md` through generate.py, and removes the one known stale
+  file.
 - `make bootstrap` wraps it. shellcheck 0.11.0 is installed (via the
   Brewfile) and `make lint` passes clean; claude-remote.sh carries a
   justified `shellcheck disable=SC2153` (`IS_SANDBOX` is an env var set by
@@ -61,12 +65,13 @@
 ## Makefile
 
 - `lint` = `lint-shell` (shellcheck on `scripts/*.sh`, hard-fails if shellcheck is not installed) + `lint-drift`.
-- `lint-drift` avoids needing a temp-output flag on generate.py: it snapshots the two checked-in generated files, runs `python3 scripts/generate.py` in place, diffs, then always restores the snapshots — so a drifting lint run never leaves the working tree modified.
+- `lint-drift` avoids needing a temp-output flag on generate.py: it snapshots the checked-in generated instruction files (`claude/CLAUDE.md`, `copilot/instructions/copilot-instructions.md`, `codex/AGENTS.md`), runs `python3 scripts/generate.py` in place, diffs, then always restores the snapshots — so a drifting lint run never leaves the working tree modified.
 - `generate`/`align` reference `scripts/generate.py` and `scripts/align.py` by path; those are owned by other streams of the feature.
 
 ## sync-claude.sh
 
 - The six original `~/.claude` symlink lines must stay byte-for-byte identical (Req 9.1). `tests/test_sync_compat.py` enforces the exact target->source map (and that no seventh `~/.claude/*` link appears) plus the presence of every pre-feature skill directory.
-- New: `mkdir -p` for `$HOME/.claude` and the VS Code prompts dir (fresh machine: neither exists), and a symlink `"$HOME/Library/Application Support/Code/User/prompts/prd.agent.md"` -> repo `copilot/agents/prd.agent.md`. The space in "Application Support" means every use must be quoted.
+- New: `mkdir -p` for `$HOME/.claude`, `$HOME/.agents/skills`, and the VS Code prompts dir (fresh machine: none may exist), and a symlink `"$HOME/Library/Application Support/Code/User/prompts/prd.agent.md"` -> repo `copilot/agents/prd.agent.md`. The space in "Application Support" means every use must be quoted.
+- Codex skill linking is per top-level `claude/skills/*` directory into `$HOME/.agents/skills/{skill-name}`. Do not replace the whole `~/.agents/skills` directory: it may contain curated or user-installed Codex skills. Existing non-matching targets are skipped and reported.
 - If VS Code profile discovery fails (non-default profile active), the fallback is the `chat.agentFilesLocations` setting pointing at the repo's `copilot/agents/` dir — documented in the script header comment.
 - The link target `copilot/agents/prd.agent.md` may not exist yet (created by another stream); `ln -sfn` happily creates a dangling link, which resolves once the file lands.

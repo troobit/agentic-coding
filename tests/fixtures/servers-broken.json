@@ -5,7 +5,7 @@
       "command": "broken-cmd"
     },
     "secrets": {"TOKEN": {"keychain": "some-item"}},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": []
   }
 }

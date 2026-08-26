@@ -8,8 +8,10 @@ so align.py can import it.
 Usage:
   generate.py                 regenerate checked-in conventions outputs
   generate.py --user          user-level targets (Claude MCP, VS Code
-                              mcp.json, VS Code settings merge)
-  generate.py --repo PATH     per-repo .mcp.json + .vscode/mcp.json
+                              mcp.json/settings, Codex config.toml +
+                              AGENTS.md)
+  generate.py --repo PATH     per-repo .mcp.json + .vscode/mcp.json +
+                              .codex/config.toml
   generate.py --cloud         print paste-ready cloud-agent MCP JSON
   generate.py --servers a,b   subset of canonical servers (default: all
                               applicable to the surface)

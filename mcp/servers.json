@@ -8,7 +8,7 @@
       }
     },
     "secrets": {},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": ["*"]
   },
   "svelte": {
@@ -18,7 +18,7 @@
       "args": ["-y", "@sveltejs/mcp"]
     },
     "secrets": {},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": ["svelte.config.js"]
   },
   "github": {
@@ -32,7 +32,7 @@
         "description": "GitHub MCP Authorization header: enter 'Bearer <PAT>' - the 'Bearer ' prefix is required"
       }
     },
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": []
   },
   "transit": {
@@ -42,7 +42,7 @@
       "url": "http://localhost:3141/mcp"
     },
     "secrets": {},
-    "surfaces": ["claude", "vscode"],
+    "surfaces": ["claude", "vscode", "codex"],
     "default_for": []
   },
   "azure": {
@@ -52,7 +52,7 @@
       "args": ["-y", "@azure/mcp@latest", "server", "start"]
     },
     "secrets": {},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": []
   },
   "terraform": {
@@ -62,7 +62,7 @@
       "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server:latest"]
     },
     "secrets": {},
-    "surfaces": ["claude", "vscode", "cloud"],
+    "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": []
   },
   "awesome-copilot": {
@@ -72,7 +72,7 @@
       "args": ["run", "-i", "--rm", "ghcr.io/microsoft/mcp-dotnet-samples/awesome-copilot:latest"]
     },
     "secrets": {},
-    "surfaces": ["vscode"],
+    "surfaces": ["vscode", "codex"],
     "default_for": []
   }
 }

@@ -12,7 +12,10 @@ reverted to plain approve-and-continue gates and Transit ticket tracking
 was dropped from this branch.
 """
 
+import os
 import re
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -142,6 +145,69 @@ class TestSpecJanitorAgentLink(unittest.TestCase):
             self.links[target],
             "symlink source for the VS Code spec-janitor agent changed",
         )
+
+
+class TestCodexSkillLinks(unittest.TestCase):
+    """Req 11: sync exposes repo Agent Skills to Codex via ~/.agents/skills."""
+
+    def run_sync(self, home: Path):
+        env = os.environ.copy()
+        env["HOME"] = str(home)
+        return subprocess.run(
+            ["bash", str(SYNC_SCRIPT)],
+            cwd=REPO_ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    def repo_skill_names(self):
+        return sorted(
+            path.name for path in SKILLS_DIR.iterdir() if path.is_dir()
+        )
+
+    def test_every_repo_skill_is_linked_for_codex(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            first = self.run_sync(home)
+            self.assertIn("Codex skills in ~/.agents/skills:", first.stdout)
+
+            codex_skills = home / ".agents" / "skills"
+            for name in self.repo_skill_names():
+                with self.subTest(skill=name):
+                    target = codex_skills / name
+                    self.assertTrue(target.is_symlink())
+                    self.assertEqual(os.readlink(target),
+                                     str(SKILLS_DIR / name))
+
+            before = {
+                name: os.readlink(codex_skills / name)
+                for name in self.repo_skill_names()
+            }
+            second = self.run_sync(home)
+            after = {
+                name: os.readlink(codex_skills / name)
+                for name in self.repo_skill_names()
+            }
+            self.assertEqual(before, after)
+            self.assertIn("skipped conflicts: 0", second.stdout)
+
+    def test_existing_non_matching_codex_skill_is_preserved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            conflict = home / ".agents" / "skills" / "starwave-design"
+            conflict.mkdir(parents=True)
+            marker = conflict / "SKILL.md"
+            marker.write_text("---\nname: starwave-design\n---\nlocal\n")
+
+            result = self.run_sync(home)
+
+            self.assertFalse(conflict.is_symlink())
+            self.assertEqual(marker.read_text(),
+                             "---\nname: starwave-design\n---\nlocal\n")
+            self.assertIn("Skipped Codex skill link:", result.stdout)
+            self.assertIn("skipped conflicts: 1", result.stdout)
 
 
 class TestPreFeatureSkillsPresent(unittest.TestCase):

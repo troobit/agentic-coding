@@ -52,6 +52,12 @@ class ConventionsAssemblyTests(unittest.TestCase):
         golden = (FIXTURES / "golden" / "copilot-instructions.md").read_text()
         self.assertEqual(text, golden)
 
+    def test_codex_agents_md_matches_golden(self):
+        block = agentic_lib.build_codex_block(FIXTURES / "shared")
+        text = agentic_lib.managed_file_text(block)
+        golden = (FIXTURES / "golden" / "AGENTS.md").read_text()
+        self.assertEqual(text, golden)
+
     def test_copilot_output_contains_no_claude_wrapper_content(self):
         block = agentic_lib.build_copilot_block(FIXTURES / "shared")
         wrapper = (FIXTURES / "shared" / "claude-wrapper.md").read_text()
@@ -77,8 +83,10 @@ class ConventionsAssemblyTests(unittest.TestCase):
         conventions = (REPO_ROOT / "shared" / "conventions.md").read_text().strip()
         claude_block = agentic_lib.build_claude_block(REPO_ROOT / "shared")
         copilot_block = agentic_lib.build_copilot_block(REPO_ROOT / "shared")
+        codex_block = agentic_lib.build_codex_block(REPO_ROOT / "shared")
         self.assertIn(conventions, claude_block)
         self.assertIn(conventions, copilot_block)
+        self.assertIn(conventions, codex_block)
 
 
 class ManagedBlockWriterTests(unittest.TestCase):
@@ -164,6 +172,11 @@ class McpEmissionTests(unittest.TestCase):
         got = agentic_lib.emit_cloud_config(self.defs, None)
         self.assertEqual(got, _golden_json("cloud-mcp.json"))
 
+    def test_codex_mcp_toml_matches_golden(self):
+        got = agentic_lib.emit_codex_mcp_toml_block(self.defs, None)
+        golden = (FIXTURES / "golden" / "codex-mcp.toml").read_text().rstrip()
+        self.assertEqual(got, golden)
+
     def test_cloud_json_is_paste_ready_string(self):
         import json
         text = agentic_lib.emit_cloud_json(self.defs, None)
@@ -193,6 +206,7 @@ class McpEmissionTests(unittest.TestCase):
             agentic_lib.emit_repo_mcp(self.defs, None),
             agentic_lib.emit_vscode_mcp(self.defs, None),
             agentic_lib.emit_cloud_config(self.defs, None),
+            agentic_lib.emit_codex_mcp(self.defs, None),
         ):
             text = json.dumps(emitted)
             self.assertNotIn("some-secret-value", text)
@@ -203,6 +217,7 @@ class McpEmissionTests(unittest.TestCase):
             (agentic_lib.emit_repo_mcp, "claude"),
             (agentic_lib.emit_vscode_mcp, "vscode"),
             (agentic_lib.emit_cloud_config, "cloud"),
+            (agentic_lib.emit_codex_mcp, "codex"),
         ):
             with self.assertRaises(agentic_lib.GenerationError) as ctx:
                 emitter(broken, None)
@@ -242,6 +257,9 @@ class McpMergeTests(unittest.TestCase):
                         "preserved non-canonical entry must be reported")
         vs = json.loads((repo / ".vscode" / "mcp.json").read_text())
         self.assertEqual(vs, _golden_json("vscode-mcp.json"))
+        codex = (repo / ".codex" / "config.toml").read_text()
+        self.assertIn("[mcp_servers.alpha]", codex)
+        self.assertIn("[mcp_servers.bravo.env_http_headers]", codex)
 
     def test_repo_generation_is_idempotent(self):
         repo = self.dir / "repo"
@@ -310,6 +328,54 @@ class McpMergeTests(unittest.TestCase):
         for name, spec in golden.items():
             self.assertEqual(result["mcpServers"][name], spec)
         self.assertTrue(any("custom" in str(r) for r in report))
+
+    def test_codex_config_preserves_unrelated_and_noncanonical_tables(self):
+        cfg = self.dir / "config.toml"
+        cfg.write_text(
+            'model = "gpt-5.5"\n\n'
+            '[projects."/tmp/repo"]\n'
+            'trust_level = "trusted"\n\n'
+            '[mcp_servers.custom]\n'
+            'command = "keep-me"\n\n'
+            '[mcp_servers.alpha]\n'
+            'command = "/Users/ronan/stale/alpha"\n'
+        )
+        report = []
+        agentic_lib.update_codex_config(cfg, self.defs, None, report)
+        text = cfg.read_text()
+        self.assertIn('model = "gpt-5.5"', text)
+        self.assertIn('[projects."/tmp/repo"]', text)
+        self.assertIn("[mcp_servers.custom]", text)
+        self.assertIn('command = "keep-me"', text)
+        self.assertIn("# agentic:begin codex-mcp", text)
+        self.assertIn("[mcp_servers.alpha]", text)
+        self.assertIn('command = "alpha-cmd"', text)
+        self.assertNotIn('/Users/ronan/stale/alpha', text)
+        self.assertTrue(any(r.kind == "preserved" and "custom" in r.detail
+                            for r in report))
+        before = cfg.read_text()
+        report = []
+        agentic_lib.update_codex_config(cfg, self.defs, None, report)
+        self.assertEqual(cfg.read_text(), before)
+        self.assertEqual([r for r in report if r.kind != "preserved"], [])
+
+    def test_codex_config_keeps_existing_canonical_tables_outside_subset(self):
+        cfg = self.dir / "config.toml"
+        cfg.write_text(
+            '[mcp_servers.alpha]\n'
+            'command = "stale-alpha"\n\n'
+            '[mcp_servers.bravo]\n'
+            'url = "https://stale.example/mcp"\n'
+        )
+        report = []
+        agentic_lib.update_codex_config(cfg, self.defs, ["alpha"], report)
+        text = cfg.read_text()
+        self.assertIn("[mcp_servers.alpha]", text)
+        self.assertIn('command = "alpha-cmd"', text)
+        self.assertIn("[mcp_servers.bravo]", text)
+        self.assertIn('url = "https://bravo.example/mcp"', text)
+        self.assertNotIn("stale-alpha", text)
+        self.assertNotIn("https://stale.example/mcp", text)
 
     def test_claude_cli_commands_use_user_scope(self):
         cmds = agentic_lib.build_claude_cli_commands(self.defs, None)
@@ -583,7 +649,7 @@ class VscodeSettingsMergeTests(unittest.TestCase):
 
 
 class UserConfigWiringTests(unittest.TestCase):
-    """Task 8: generate_user_configs writes all three injected targets."""
+    """Task 8: generate_user_configs writes all injected user targets."""
 
     def test_user_generation_with_injected_paths(self):
         import json
@@ -592,6 +658,14 @@ class UserConfigWiringTests(unittest.TestCase):
             claude_cfg = d / "claude.json"
             vs_mcp = d / "User" / "mcp.json"
             vs_settings = d / "User" / "settings.json"
+            codex_cfg = d / ".codex" / "config.toml"
+            codex_agents = d / ".codex" / "AGENTS.md"
+            shared = d / "repo" / "shared"
+            shared.mkdir(parents=True)
+            for name in ("conventions.md", "codex-wrapper.md"):
+                (shared / name).write_text(
+                    (FIXTURES / "shared" / name).read_text()
+                )
             defs = _load_fixture_servers()
             report = []
             agentic_lib.generate_user_configs(
@@ -599,6 +673,8 @@ class UserConfigWiringTests(unittest.TestCase):
                 claude_config_path=claude_cfg,
                 vscode_mcp_path=vs_mcp,
                 vscode_settings_path=vs_settings,
+                codex_config_path=codex_cfg,
+                codex_agents_path=codex_agents,
                 use_cli=False)
             self.assertEqual(json.loads(claude_cfg.read_text()),
                              _golden_json("repo-mcp.json"))
@@ -607,6 +683,8 @@ class UserConfigWiringTests(unittest.TestCase):
             settings = json.loads(vs_settings.read_text())
             self.assertIn("github.copilot.chat.customOAIModels", settings)
             self.assertNotEqual(settings.get("chat.useClaudeMdFile"), True)
+            self.assertIn("[mcp_servers.alpha]", codex_cfg.read_text())
+            self.assertIn("# Codex Instructions", codex_agents.read_text())
 
 
 class CanonicalServersFileTests(unittest.TestCase):

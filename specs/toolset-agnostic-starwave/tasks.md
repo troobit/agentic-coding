@@ -176,3 +176,47 @@ references:
   - Include one STOP task; verify blocked-at-STOP behaviour in --headless mode and the integrated-branch quality gate
   - Blocked-by: rv5n0ll (Write claude/skills/engage/SKILL.md execution skill), rv5n0lm (Write copilot/agents/prd.agent.md and delete stale copilot/prompts)
   - Requirements: [1.1](requirements.md#1.1), [2.1](requirements.md#2.1), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [2.7](requirements.md#2.7)
+
+- [x] 25. Add temp-HOME tests for Codex skill linking <!-- id:codex-skill-links-test -->
+  - Execute `scripts/sync-claude.sh` with `HOME` pointed at a temporary directory
+  - Assert every top-level directory under `claude/skills/` is symlinked into `~/.agents/skills/{skill-name}`
+  - Assert pre-existing non-matching Codex skill targets are preserved and reported
+  - Assert a second run leaves the link set unchanged
+  - Requirements: [11.1](requirements.md#11.1), [11.2](requirements.md#11.2), [11.3](requirements.md#11.3), [11.5](requirements.md#11.5)
+
+- [x] 26. Extend sync-claude.sh to link repository skills for Codex <!-- id:codex-skill-links-impl -->
+  - Create `~/.agents/skills` during sync
+  - Link each top-level `claude/skills/*` directory individually instead of replacing the whole Codex skills directory
+  - Preserve and report existing non-matching targets
+  - Blocked-by: codex-skill-links-test
+  - Requirements: [11.1](requirements.md#11.1), [11.2](requirements.md#11.2), [11.3](requirements.md#11.3), [11.5](requirements.md#11.5)
+
+- [x] 27. Update bootstrap and docs for Codex skill discovery <!-- id:codex-skill-links-docs -->
+  - Ensure bootstrap's setup commentary and dry-run text mention `~/.agents/skills`
+  - Update README.md, spec-workflow.md, and bootstrap/sync agent notes with the Codex discovery path and host-specific limitations
+  - Blocked-by: codex-skill-links-impl
+  - Requirements: [11.4](requirements.md#11.4)
+
+- [x] 28. Verify portable Starwave skill sync <!-- id:codex-skill-links-verify -->
+  - Run the targeted sync compatibility tests
+  - Run the full unittest suite, or document any skipped verification
+  - Blocked-by: codex-skill-links-impl, codex-skill-links-docs
+  - Requirements: [11.1](requirements.md#11.1), [11.2](requirements.md#11.2), [11.3](requirements.md#11.3), [11.4](requirements.md#11.4), [11.5](requirements.md#11.5)
+
+- [x] 29. Add tests for Codex instructions and MCP generation <!-- id:codex-instructions-mcp-test -->
+  - Assert generated `codex/AGENTS.md` contains the shared conventions and Codex wrapper
+  - Assert Codex MCP TOML renders canonical `[mcp_servers.*]` tables without secret values
+  - Assert user and repo generation preserve unrelated Codex config while converging canonical MCP tables
+  - Requirements: [4.6](requirements.md#4.6), [11.6](requirements.md#11.6)
+
+- [x] 30. Implement Codex instruction and MCP generation <!-- id:codex-instructions-mcp-impl -->
+  - Add `shared/codex-wrapper.md` and checked-in generated `codex/AGENTS.md`
+  - Extend `scripts/generate.py`/`agentic_lib.py` for user `~/.codex/AGENTS.md`, user `~/.codex/config.toml`, and repo `.codex/config.toml`
+  - Blocked-by: codex-instructions-mcp-test
+  - Requirements: [4.6](requirements.md#4.6), [8.1](requirements.md#8.1), [11.6](requirements.md#11.6)
+
+- [x] 31. Document and verify Codex instruction/MCP targets <!-- id:codex-instructions-mcp-docs -->
+  - Update README, spec-workflow, Makefile drift checks, and bootstrap/sync notes
+  - Run generated-drift lint, full tests, and a live `generate.py --user` pass if approved
+  - Blocked-by: codex-instructions-mcp-impl
+  - Requirements: [4.6](requirements.md#4.6), [8.1](requirements.md#8.1), [11.6](requirements.md#11.6)

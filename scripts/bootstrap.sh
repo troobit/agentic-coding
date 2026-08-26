@@ -9,11 +9,12 @@
 #      is a broken placeholder — see the Brewfile comment); then, when a
 #      local build exists at ~/repos/rune/rune and rune is still not on
 #      PATH, symlink it into ~/.local/bin (agreement-invoice-skills Req 3)
-#   5. mkdir -p ~/.claude and the VS Code User/ settings dir
-#   6. scripts/sync-claude.sh (symlinks)
-#   7. generate.py --user (user MCP configs, conventions, VS Code settings
-#      merge — ALL JSON work is delegated to generate.py; this script does
-#      no JSON manipulation, per Decision 12's rationale)
+#   5. mkdir -p ~/.claude, ~/.agents/skills, ~/.codex, and the VS Code
+#      User/ settings dir
+#   6. scripts/sync-claude.sh (symlinks, including Codex Agent Skills)
+#   7. generate.py --user (user MCP configs, Codex AGENTS.md, VS Code
+#      settings merge — ALL JSON work is delegated to generate.py; this
+#      script does no JSON manipulation, per Decision 12's rationale)
 #   8. remove the superseded ~/.copilot/agents/prd.agent.md (Req 1.4)
 #   9. print the remaining manual (authentication) steps
 #
@@ -219,12 +220,14 @@ make_dir() {
     fi
 }
 make_dir "$HOME/.claude"
+make_dir "$HOME/.agents/skills"
+make_dir "$HOME/.codex"
 make_dir "$VSCODE_USER_DIR"
 
 # ------------------------------------------------------------ 6. sync-claude
 step "Symlinks (scripts/sync-claude.sh)"
 if [ "$DRY_RUN" -eq 1 ]; then
-    would "run scripts/sync-claude.sh (idempotent ln -sfn symlinks)"
+    would "run scripts/sync-claude.sh (idempotent Claude symlinks plus Codex ~/.agents/skills links)"
 elif "$SCRIPT_DIR/sync-claude.sh"; then
     did "sync-claude.sh"
 else
@@ -236,7 +239,7 @@ step "User-level configs (scripts/generate.py --user)"
 if ! command -v python3 >/dev/null 2>&1; then
     skipped "generate.py --user (python3 not available)"
 elif [ "$DRY_RUN" -eq 1 ]; then
-    would "run python3 scripts/generate.py --user (user MCP configs + VS Code settings merge; preserves unmanaged entries)"
+    would "run python3 scripts/generate.py --user (user MCP configs + Codex AGENTS.md + VS Code settings merge; preserves unmanaged entries)"
 elif python3 "$SCRIPT_DIR/generate.py" --user; then
     did "generate.py --user (per-file report above)"
 else

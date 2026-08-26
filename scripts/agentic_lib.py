@@ -142,6 +142,14 @@ def build_copilot_block(shared_dir: Path) -> str:
     return wrapper + "\n\n" + conventions
 
 
+def build_codex_block(shared_dir: Path) -> str:
+    """codex/AGENTS.md block = codex wrapper + conventions."""
+    shared_dir = Path(shared_dir)
+    conventions = (shared_dir / "conventions.md").read_text().strip()
+    wrapper = (shared_dir / "codex-wrapper.md").read_text().strip()
+    return wrapper + "\n\n" + conventions
+
+
 def generate_conventions(repo_root: Path, report: list) -> None:
     """Regenerate the checked-in conventions outputs."""
     repo_root = Path(repo_root)
@@ -151,6 +159,8 @@ def generate_conventions(repo_root: Path, report: list) -> None:
     write_managed(repo_root / "copilot" / "instructions" /
                   "copilot-instructions.md",
                   build_copilot_block(shared), report)
+    write_managed(repo_root / "codex" / "AGENTS.md",
+                  build_codex_block(shared), report)
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +268,8 @@ def _render_server(name: str, spec: dict, target: str) -> dict:
             ref = f"${{input:{_input_id(name, secret)}}}"
         elif target == "cloud":
             ref = f"COPILOT_MCP_{var}"
+        elif target == "codex":
+            ref = var
         else:
             raise GenerationError(f"unknown target {target!r}")
         if "header" in mech:
@@ -320,6 +332,170 @@ def emit_cloud_json(defs: dict, subset=None) -> str:
     return json.dumps(emit_cloud_config(defs, subset), indent=2)
 
 
+def _render_codex_server(name: str, spec: dict) -> dict:
+    """Render one MCP server into Codex config.toml shape.
+
+    Secret values are never emitted. HTTP header secrets become
+    env_http_headers entries. STDIO env secrets are forwarded with
+    env_vars only when the canonical secret maps to the exact env var the
+    server expects; Codex's documented env_vars mechanism is a whitelist,
+    not a rename mechanism.
+    """
+    transport = spec["transport"]
+    if transport["type"] == "stdio":
+        entry = {"command": transport["command"]}
+        if transport.get("args"):
+            entry["args"] = list(transport["args"])
+        if transport.get("env"):
+            entry["env"] = dict(transport["env"])
+    else:
+        entry = {"url": transport["url"]}
+
+    env_vars = []
+    env_http_headers = {}
+    for secret, mech in sorted(spec.get("secrets", {}).items()):
+        var = _secret_var(name, secret)
+        if "header" in mech:
+            env_http_headers[mech["header"]] = var
+        elif "env" in mech:
+            expected = mech["env"]
+            if expected != var:
+                raise GenerationError(
+                    f"server {name!r}: secret {secret!r} maps to env "
+                    f"{expected!r}, but Codex can only forward env vars "
+                    "by their existing names")
+            env_vars.append(var)
+        else:
+            raise GenerationError(
+                f"server {name!r}: secret {secret!r} has no supported "
+                "secret mechanism for target 'codex'")
+    if env_vars:
+        entry["env_vars"] = env_vars
+    if env_http_headers:
+        entry["env_http_headers"] = env_http_headers
+    return entry
+
+
+def emit_codex_mcp(defs: dict, subset=None) -> dict:
+    """Codex config.toml MCP server table shape."""
+    return {name: _render_codex_server(name, spec)
+            for name, spec in _select(defs, subset, "codex").items()}
+
+
+def _toml_quote(value: str) -> str:
+    return json.dumps(value)
+
+
+def _toml_table_key(name: str) -> str:
+    if name.replace("_", "").replace("-", "").isalnum() and not name[0].isdigit():
+        return name
+    return _toml_quote(name)
+
+
+def _toml_value(value):
+    if isinstance(value, str):
+        return _toml_quote(value)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    raise GenerationError(f"cannot render TOML value {value!r}")
+
+
+def emit_codex_mcp_toml_block(defs: dict, subset=None) -> str:
+    """Canonical [mcp_servers.*] TOML block for Codex."""
+    lines = []
+    for name, entry in sorted(emit_codex_mcp(defs, subset).items()):
+        lines.append(f"[mcp_servers.{_toml_table_key(name)}]")
+        scalar_items = [(k, v) for k, v in entry.items()
+                        if not isinstance(v, dict)]
+        for key, value in scalar_items:
+            lines.append(f"{key} = {_toml_value(value)}")
+        for key, value in sorted((k, v) for k, v in entry.items()
+                                 if isinstance(v, dict)):
+            lines.append("")
+            lines.append(f"[mcp_servers.{_toml_table_key(name)}.{key}]")
+            for inner_key, inner_value in sorted(value.items()):
+                lines.append(f"{_toml_table_key(inner_key)} = "
+                             f"{_toml_value(inner_value)}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
+CODEX_MCP_BEGIN = "# agentic:begin codex-mcp"
+CODEX_MCP_END = "# agentic:end codex-mcp"
+
+
+def _codex_mcp_server_name(line: str):
+    stripped = line.strip()
+    if not stripped.startswith("[") or not stripped.endswith("]"):
+        return None
+    header = stripped.strip("[]")
+    parts = header.split(".")
+    if len(parts) >= 2 and parts[0] == "mcp_servers":
+        return parts[1].strip('"')
+    return None
+
+
+def _codex_mcp_server_names(text: str) -> set:
+    return {name for name in
+            (_codex_mcp_server_name(line) for line in text.splitlines())
+            if name}
+
+
+def _strip_codex_mcp_sections(text: str, canonical_names) -> str:
+    """Remove existing managed block and canonical mcp_servers tables.
+
+    This is intentionally narrow TOML surgery: it preserves unrelated text
+    verbatim and only drops tables whose header is one of the canonical
+    mcp_servers names (or a nested table under one).
+    """
+    if CODEX_MCP_BEGIN in text and CODEX_MCP_END in text:
+        head, _, rest = text.partition(CODEX_MCP_BEGIN)
+        _, _, tail = rest.partition(CODEX_MCP_END)
+        text = head.rstrip() + "\n\n" + tail.lstrip()
+
+    canonical = set(canonical_names)
+    out = []
+    skipping = False
+    for line in text.splitlines():
+        name = _codex_mcp_server_name(line)
+        if name is not None:
+            skipping = name in canonical
+        if not skipping:
+            out.append(line)
+    return "\n".join(out).rstrip()
+
+
+def update_codex_config(path: Path, defs: dict, subset, report: list) -> bool:
+    """Converge Codex MCP tables in config.toml while preserving unrelated text."""
+    path = Path(path)
+    old = path.read_text() if path.exists() else ""
+    canonical_names = set(emit_codex_mcp(defs, None).keys())
+    selected_names = set(emit_codex_mcp(defs, subset).keys())
+    existing_names = _codex_mcp_server_names(old)
+    rendered_names = selected_names | (existing_names & canonical_names)
+    rendered = emit_codex_mcp_toml_block(defs, sorted(rendered_names))
+    body = _strip_codex_mcp_sections(old, canonical_names)
+    preserved = sorted(existing_names - canonical_names)
+    if preserved:
+        report.append(ReportEntry(
+            "preserved", path,
+            f"preserved non-canonical entries: {', '.join(preserved)}"))
+    block = f"{CODEX_MCP_BEGIN}\n{rendered}\n{CODEX_MCP_END}".rstrip()
+    new = (body + "\n\n" + block + "\n") if body else (block + "\n")
+    if new == old:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(new)
+    report.append(ReportEntry(
+        "changed", path,
+        "canonical Codex MCP servers updated"))
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Managed JSON merge (Req 4.5)
 # ---------------------------------------------------------------------------
@@ -377,6 +553,8 @@ def generate_repo_configs(repo_path: Path, defs: dict, subset,
     _merge_servers_into(repo_path / ".vscode" / "mcp.json", "servers",
                         vscode["servers"], defs, "vscode", report,
                         inputs=vscode["inputs"])
+    update_codex_config(repo_path / ".codex" / "config.toml", defs, subset,
+                        report)
 
 
 def build_claude_cli_commands(defs: dict, subset=None) -> list:
@@ -570,6 +748,8 @@ def generate_user_configs(defs: dict, subset, report: list, repo_root: Path,
                           claude_config_path: Path = None,
                           vscode_mcp_path: Path = None,
                           vscode_settings_path: Path = None,
+                          codex_config_path: Path = None,
+                          codex_agents_path: Path = None,
                           use_cli=None) -> None:
     """User-level targets: Claude MCP config, VS Code mcp.json, VS Code
     settings merge. Paths are injectable so tests never touch real files."""
@@ -579,6 +759,9 @@ def generate_user_configs(defs: dict, subset, report: list, repo_root: Path,
     vscode_mcp_path = Path(vscode_mcp_path or vscode_dir / "mcp.json")
     vscode_settings_path = Path(vscode_settings_path
                                 or vscode_dir / "settings.json")
+    codex_dir = Path.home() / ".codex"
+    codex_config_path = Path(codex_config_path or codex_dir / "config.toml")
+    codex_agents_path = Path(codex_agents_path or codex_dir / "AGENTS.md")
 
     update_claude_user_config(claude_config_path, defs, subset, report,
                               use_cli=use_cli)
@@ -586,3 +769,6 @@ def generate_user_configs(defs: dict, subset, report: list, repo_root: Path,
     _merge_servers_into(vscode_mcp_path, "servers", vscode["servers"], defs,
                         "vscode", report, inputs=vscode["inputs"])
     merge_vscode_settings(vscode_settings_path, repo_root, report)
+    update_codex_config(codex_config_path, defs, subset, report)
+    write_managed(codex_agents_path,
+                  build_codex_block(Path(repo_root) / "shared"), report)
