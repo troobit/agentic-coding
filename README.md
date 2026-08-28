@@ -87,7 +87,7 @@ Top-level layout:
   - `claude/CLAUDE.md` - User-level instructions (generated from `shared/`, checked in)
   - `claude/agents/` - Specialized AI agents for different development tasks
   - `claude/skills/` - Skills for the development workflow (invoked via slash commands)
-  - `claude/rules/` - Language rules and reference documentation formats
+  - `claude/rules/` - Language rules and reference documentation formats, including the path-scoped `language-rules/styleguide-terraform.md` style guide
 - `copilot/agents/prd.agent.md` - Custom agent wrapper for VS Code and the cloud coding agent
 - `copilot/instructions/copilot-instructions.md` - Copilot instructions (generated from `shared/`, checked in)
 - `codex/AGENTS.md` - Codex instructions (generated from `shared/`, checked in and also seeded to `~/.codex/AGENTS.md`)

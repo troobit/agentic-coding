@@ -381,6 +381,7 @@ struct ComplexView: View {
 | `DispatchQueue.main.async` | `@MainActor` / `MainActor.run` |
 | Completion handlers | `async/await` |
 | `XCTestCase` (unit tests) | `@Test` with Swift Testing |
+| `Text("a") + Text("b")` (iOS 26) | `Text("\(textA)\(textB)")` — interpolate `Text` values |
 
 
 # Swift Language Rules
@@ -496,6 +497,36 @@ In Xcode 26+ projects, new code defaults to `@MainActor` isolation. Use `@concur
 - For background processing, create a new `ModelContext` on that actor
 
 ## SwiftUI Best Practices
+
+### Composing styled `Text` runs (iOS 26 deprecation)
+
+`Text + Text` is deprecated from iOS 26. Interpolate `Text` values into one
+`Text` instead — `LocalizedStringKey` interpolation preserves each run's own
+modifiers (weight, opacity, colour):
+
+```swift
+// Deprecated
+Text(" · ").foregroundStyle(.secondary.opacity(0.45))
+    + Text(label).fontWeight(.semibold)
+
+// Modern — bind the runs first so the line stays readable
+let separator = Text(" · ").foregroundStyle(.secondary.opacity(0.45))
+let units = Text(label).fontWeight(.semibold)
+Text("\(separator)\(units)")
+```
+
+Choosing between interpolation and an `HStack` of runs:
+
+- **Interpolation** keeps it a *single* `Text` — one accessibility element, and
+  text that wraps as one paragraph. Required when the composite carries an
+  `.accessibilityLabel`, a single tap target, or must line-break naturally.
+- **`HStack` of runs** is needed when runs require *per-run*
+  `.contentTransition(.numericText())`, because a composed `Text` carries only
+  one content transition for the whole string. It splits accessibility into
+  separate elements unless you add `.accessibilityElement(children: .ignore)`.
+
+Local `let` bindings are legal inside a `@ViewBuilder` closure, which is what
+keeps the interpolated form under a sane line length.
 
 ### iOS 26 / macOS Tahoe Liquid Glass
 
