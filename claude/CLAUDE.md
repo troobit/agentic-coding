@@ -18,7 +18,7 @@ When asked to analyze or document something, first check if there's an existing 
 - Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit
 - After writing code, you MUST ensure you use appropriate linters and validators.
 - When you discover a learning specific to a language that needs to be kept, add it to the related language-rule file (or create a new one if needed).
-- When managing tasks, use the rune skill.
+- When managing persistent project task lists, use the rune skill. Do NOT use rune for an agent's internal or ephemeral execution checklist; use the harness-native task-list tool instead.
 - When creating GitHub issues, ALWAYS create them in the current repository unless explicitly told otherwise.
 
 # Persisting Knowledge
@@ -64,4 +64,4 @@ If `run_silent` is available (check with `which run_silent`), use it to reduce t
 
 # Documentation Standards
 
-When creating or updating decision log entries, follow the format in `rules/references/decision-log-format.md`. This uses the Enhanced Nygard ADR structure with required fields (ID, Date, Status, Context, Decision, Rationale) and recommended fields (Alternatives Considered, Consequences). Read the format file before creating entries.
+When creating or updating decision log entries, follow the format in `rules/references/decision-log-format.md`. The format has two tiers: full Enhanced Nygard ADR entries (ID, Date, Status, Context, Decision, Rationale, plus Alternatives Considered and Consequences) for decisions that could reasonably have gone another way, and a Quick Decisions table for answered questions and minor resolutions. Read the format file before creating entries.

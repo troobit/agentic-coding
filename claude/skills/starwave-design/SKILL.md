@@ -122,7 +122,7 @@ Before triggering skill reviews, the model MUST verify:
 - The model SHOULD address any issues discovered during this explanation process before proceeding to skill reviews
 
 - The model MUST use relevant skills to receive feedback on the design, after writing the initial design. The requirements MUST always take precedence over this feedback.
-- The model MUST highlight design decisions and their rationales in a decision log document at specs/{feature_name}/decision_log.md
+- The model MUST highlight design decisions and their rationales in a decision log document at specs/{feature_name}/decision_log.md, using the two-tier format from the decision log format reference: full ADR entries for genuine trade-offs, Quick Decisions table rows for minor resolutions
 - The model MUST ask the user for input on specific technical decisions during the design process
 - When asking the user questions and offering options, the model MUST use the AskUserQuestion tool.
 - After updating the design document, the model MUST use the Task tool with subagent_type="general-purpose" to run the design-critic skill (invoke the Skill tool with skill="design-critic"), and the Task tool with subagent_type="peer-review-validator" to review the document and provide its questions to the user.

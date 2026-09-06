@@ -49,19 +49,36 @@ If an existing CR id was provided, fetch its details with **`CR_VIEW`** instead.
 
 ### 1.5 Decide Whether to Run Local Claude Review
 
-Run `local-review` by default. Skip it only when an automated reviewer will post the
-same comment, so the two don't duplicate each other.
+Run `local-review` up front by default. Skip the **up-front** run only when an
+automated reviewer will post the same comment, so the two don't duplicate each other.
 
 ```text
 RUN_LOCAL_REVIEW = (AUTO_REVIEWER_DETECT == 0) ? 1 : 0
 ```
 
-If `RUN_LOCAL_REVIEW=0`, skip every "Run Local Claude Review" step below — the
-automated reviewer posts the comment on its own.
+`RUN_LOCAL_REVIEW` only decides whether `local-review` runs **up front**:
+
+- `1` — no automated reviewer, so run `local-review` up front as the primary reviewer.
+- `0` — an automated reviewer will post, so do **not** run it up front (avoids a
+  duplicate note).
+
+It is **not** a licence to skip review entirely. An automated reviewer can finish
+`success` yet post nothing — it ran, hit a permission denial, and left no note, so
+`pr-review-fixer` has nothing to act on and the loop could merge with zero review. To
+prevent that, steps 2.1 and 3.3 fall back to `local-review` whenever a round produces
+no new review note, regardless of `RUN_LOCAL_REVIEW`.
+
+To detect an empty round, count the review notes already on the CR. Run
+**`CR_NOTES_LIST`** for `<id>` and count the notes whose `author` matches
+`claude`/`github-actions` (case-insensitive) **or** whose `body` carries the
+`claude-local-review` sentinel — call this value `count_reviews`.
 
 ### 2. Review Loop
 
 #### 2.1 Run Local Claude Review and Wait
+
+Record the review count before this round so you can tell whether a review actually
+lands: `PRE = count_reviews`.
 
 If `RUN_LOCAL_REVIEW=1`, invoke the `local-review` agent on the CR (pass `<id>`) so
 the Claude review note is posted from your local subscription instead of CI. It
@@ -74,6 +91,13 @@ Then wait for review input:
 - **If `CI_STATUS` is empty** (no CI configured): nothing to wait on — proceed once
   the local-review note is posted. Allow a brief pause only if human reviewers are
   expected.
+
+**Fallback — never proceed with no review.** Once the wait ends, re-check
+`POST = count_reviews`. If `POST <= PRE`, no new review landed this round (an
+automated reviewer that errored or posted nothing, or a `local-review` that failed to
+post) — invoke `local-review` on `<id>` exactly as in the `RUN_LOCAL_REVIEW=1` path,
+give it a minute or two to post, then continue to 2.2. Run this fallback at most once
+per round. When a review did land (`POST > PRE`), skip it.
 
 #### 2.2 Run PR Review Fixer
 
@@ -116,10 +140,17 @@ git push --force-with-lease
 
 #### 3.3 Run Local Claude Review and Wait
 
+Capture this round's baseline first — `PRE = count_reviews` — since the rebased
+diff's review hasn't been posted yet.
+
 If `RUN_LOCAL_REVIEW=1`, invoke `local-review` again so the post-rebase diff gets a
 fresh note. Wait for checks only if `CI_STATUS` is non-empty (poll up to 10 min);
-otherwise proceed. Then run `/pr-review-fixer` to check for new threads and CI
-failures.
+otherwise proceed.
+
+**Same fallback applies.** After the wait, if `POST = count_reviews` is still
+`<= PRE`, no review landed for the rebased code — invoke `local-review` on `<id>` and
+give it a minute or two to post. Then run `/pr-review-fixer` to check for new threads
+and CI failures.
 
 - **CLEAN**: proceed to merge.
 - **HAS_ISSUES**: fix, push, and repeat (up to 3 iterations). If still not clean,

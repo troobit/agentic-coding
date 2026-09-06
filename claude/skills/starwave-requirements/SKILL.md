@@ -84,7 +84,7 @@ Before triggering skill reviews, the model MUST verify:
 - If the user responds with affirmations like "yes", "looks good", "approved", or similar, consider this explicit approval and proceed to the next phase
 - If the user provides feedback or requests changes, the model MUST make the modifications and repeat the review cycle (design-critic → peer-review-validator → user approval)
 - If the user's response is unclear, the model MUST ask a clarifying question before proceeding
-- The model MUST document all decisions, answered questions, and their rationales in specs/{feature_name}/decision_log.md as they occur throughout the requirements phase
+- The model MUST document all decisions, answered questions, and their rationales in specs/{feature_name}/decision_log.md as they occur throughout the requirements phase, using the two-tier format from the decision log format reference: answered questions and minor resolutions go in the Quick Decisions table; only decisions that could reasonably have gone another way get a full ADR entry
 - The model SHOULD suggest specific areas where the requirements might need clarification or expansion
 - The model MAY ask targeted questions about specific aspects of the requirements that need clarification
 - The model MAY suggest options when the user is unsure about a particular aspect
