@@ -36,6 +36,12 @@ DEFAULT_CORPUS = os.path.join(REPO, "ui-ux")
 TRIAGE_MARKER = "<!-- triage -->"
 HUMAN_KEYS = ("concerns", "sentiment", "status", "principles")
 
+# Provenance the reader can lose but never re-derive. All instances now share one
+# store, so a thread no longer records which port it was written on and the reader
+# reports null. Null must not overwrite a value an earlier, better-informed run
+# recorded — losing "variant B" to "unknown" is a silent downgrade of evidence.
+STICKY_KEYS = ("source_variant", "source_url")
+
 DEFAULT_TRIAGE = """## Reading
 
 _Untriaged._ Set `concerns` and `sentiment` in the frontmatter, then write what this
@@ -134,7 +140,7 @@ def anchor_fields(record):
     return lines, (anchor.get("quote") or "").strip()
 
 
-def machine_frontmatter(record, classification, ingested):
+def machine_frontmatter(record, classification, ingested, sticky=None):
     lines, quote = anchor_fields(record)
     pairs = [
         ("id", record.get("commentId")),
@@ -156,7 +162,14 @@ def machine_frontmatter(record, classification, ingested):
         ("source_anchor_lines", lines),
         ("source_anchor_quote", quote),
     ]
-    return ["%s: %s" % (key, scalar(value)) for key, value in pairs]
+    sticky = sticky or {}
+    out = []
+    for key, value in pairs:
+        if value is None and key in sticky:
+            out.append("%s: %s" % (key, sticky[key]))
+        else:
+            out.append("%s: %s" % (key, scalar(value)))
+    return out
 
 
 def default_human_frontmatter():
@@ -174,9 +187,9 @@ def machine_body(record, name):
     return "# Observation %s\n\n## Verbatim\n\n%stext\n%s\n%s\n" % (name, fence, body, fence)
 
 
-def render(record, classification, ingested, human_frontmatter, human_body):
+def render(record, classification, ingested, human_frontmatter, human_body, sticky=None):
     name = observation_name(record)
-    front = machine_frontmatter(record, classification, ingested) + list(human_frontmatter)
+    front = machine_frontmatter(record, classification, ingested, sticky) + list(human_frontmatter)
     return "---\n%s\n---\n\n%s\n%s\n\n%s" % (
         "\n".join(front),
         machine_body(record, name),
@@ -190,19 +203,21 @@ def render(record, classification, ingested, human_frontmatter, human_body):
 
 
 def split_existing(text):
-    """(human frontmatter lines, human body, ingested date) from a file on disk.
+    """(human frontmatter lines, human body, ingested date, sticky provenance).
 
-    Only the human-owned half is recovered, because that is the only half worth
-    keeping — the machine half is rebuilt from the source record every run.
+    The human-owned half is recovered because the machine half is rebuilt from the
+    source record every run. STICKY_KEYS come back too: those are machine-owned but
+    the reader can no longer supply them, so the file on disk is the better source.
     Frontmatter lines are carried across verbatim rather than parsed, so a human
     can put whatever YAML they like in their own keys.
     """
     human_front = list(default_human_frontmatter())
     human_body = DEFAULT_TRIAGE
     ingested = None
+    sticky = {}
 
     if not text.startswith("---\n"):
-        return human_front, human_body, ingested
+        return human_front, human_body, ingested, sticky
 
     _, front, rest = text.split("---\n", 2)
     kept = {}
@@ -210,6 +225,10 @@ def split_existing(text):
         key = line.split(":", 1)[0].strip()
         if key in HUMAN_KEYS:
             kept[key] = line
+        elif key in STICKY_KEYS:
+            value = line.split(":", 1)[1].strip()
+            if value and value not in ('""', "null"):
+                sticky[key] = value
         elif key == "ingested":
             ingested = json.loads(line.split(":", 1)[1].strip() or '""') or None
     if kept:
@@ -217,7 +236,7 @@ def split_existing(text):
 
     if TRIAGE_MARKER in rest:
         human_body = rest.split(TRIAGE_MARKER, 1)[1].lstrip("\n")
-    return human_front, human_body, ingested
+    return human_front, human_body, ingested, sticky
 
 
 def read_verbatim(text):
@@ -319,8 +338,8 @@ def ingest(records, corpus, today, dry_run=False):
             with open(path) as fh:
                 existing = fh.read()
 
-        human_front, human_body, ingested = split_existing(existing or "")
-        rendered = render(record, classification, ingested or today, human_front, human_body)
+        human_front, human_body, ingested, sticky = split_existing(existing or "")
+        rendered = render(record, classification, ingested or today, human_front, human_body, sticky)
 
         if existing is None:
             summary["new"] += 1

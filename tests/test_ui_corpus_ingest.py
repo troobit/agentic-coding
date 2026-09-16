@@ -187,6 +187,34 @@ class TriagePreservationTest(CorpusCase):
         self.assertIn("The caret handle is the thing being praised.", text)
 
 
+class StickyProvenanceTest(CorpusCase):
+    """All eight instances now share one store, so a thread records nothing about
+    the port it was written on and the reader reports `variant: null`. An earlier
+    run, reading the per-worktree stores, did know. Unknown must not overwrite
+    known — that is evidence silently downgraded, not an update."""
+
+    def test_null_variant_does_not_erase_a_recorded_one(self):
+        self.run_ingest([record()])
+        self.assertIn('source_variant: "B"', self.only_observation().read_text())
+
+        result = self.run_ingest([record(variant=None, port=None, url=None)])
+        text = self.only_observation().read_text()
+        self.assertEqual(result["unchanged"], 1, "a null downgrade is not a change")
+        self.assertIn('source_variant: "B"', text)
+        self.assertIn('source_url: "http://100.82.39.26:5175/"', text)
+
+    def test_a_first_sighting_with_no_variant_records_null(self):
+        self.run_ingest([record(variant=None, port=None, url=None)])
+        text = self.only_observation().read_text()
+        self.assertIn("source_variant: null", text)
+        self.assertIn("source_url: null", text)
+
+    def test_a_known_variant_still_overwrites_a_different_known_one(self):
+        self.run_ingest([record()])
+        self.run_ingest([record(variant="F", port=5179, url="http://100.82.39.26:5179/")])
+        self.assertIn('source_variant: "F"', self.only_observation().read_text())
+
+
 class EpochTest(CorpusCase):
     """Req 6 — real review separated from seed data by time, not identity."""
 
