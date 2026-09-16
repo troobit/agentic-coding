@@ -1,0 +1,6 @@
+{
+  "epoch": "2026-09-13",
+  "epoch_reason": "The variant stores were seeded with demo threads on 2026-09-12 to make the comment UI look populated. Real review began on 2026-09-15. The two populations are separated by when they were written, not by who wrote them: the reviewer's own account (Gratin) authored a seeded note on the 12th and real feedback on the 15th, so every author allowlist or denylist gets this dataset wrong. See specs/ui-ux-corpus/decision_log.md, Decision 2.",
+  "force_include": [],
+  "force_exclude": []
+}

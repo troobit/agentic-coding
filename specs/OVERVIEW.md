@@ -10,6 +10,7 @@
 | [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth. Supersedes the machine-zone portions of Nextup Starwave Refinement. |
 | [Spec Janitor](#spec-janitor) | 2026-07-26 | Done | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
 | [Backlog Skill](#backlog-skill) | 2026-08-26 | Done | A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources; includes the full toolchain sunset and a per-repo decision overwrite mode |
+| [UI/UX Corpus](#uiux-corpus) | 2026-09-16 | Done | A durable library and corpus of UI/UX preferences built from in-app spadre review comments: verbatim observations indexed by UI concern (never by document), a derived `ui-ux/ui-ux-guide.md` peer to `arjen-style-guide.md` where every principle cites its evidence, and an idempotent ingest that reuses the existing variant-comment reader |
 
 ---
 
@@ -81,3 +82,11 @@ A /backlog skill replacing the sunset nextup and spout skills: captures loose in
 - [requirements.md](backlog-skill/requirements.md)
 - [rollout.md](backlog-skill/rollout.md)
 - [tasks.md](backlog-skill/tasks.md)
+
+## UI/UX Corpus
+
+A durable library and corpus of UI/UX preferences built from the comments Ronan leaves inside spadre while reviewing the UI variants. Verbatim observations are indexed by UI concern rather than by the document they were anchored to; `ui-ux/ui-ux-guide.md` is the derived, human-written peer of `arjen-style-guide.md`, and every principle in it cites the observation it rests on. Ingestion is idempotent on spadre's stable comment ids, separates real review from seeded demo notes by an epoch rather than an author list, and never guesses a concern, a sentiment or a rationale.
+
+- [decision_log.md](ui-ux-corpus/decision_log.md)
+- [smolspec.md](ui-ux-corpus/smolspec.md)
+- [tasks.md](ui-ux-corpus/tasks.md)
