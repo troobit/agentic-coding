@@ -1,3 +1,8 @@
+---
+name: go-test-fixer
+description: Fix Go unit tests to comply to best practices. Use this when you're asked to modernise tests.
+---
+
 # Go Test Fixer Skill
 
 This skill helps fix and improve Go test files according to best practices defined in `language-rules/go.md`.

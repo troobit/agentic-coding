@@ -32,6 +32,7 @@ status:
 
 test:
 	python3 -m unittest discover -s tests
+	cd scripts && python3 -m unittest discover -s tests -t .
 
 lint: lint-shell lint-drift
 

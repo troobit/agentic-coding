@@ -490,6 +490,35 @@ When designing SwiftData persistence with CloudKit/App Groups, always plan for t
 
 In Xcode 26+ projects, new code defaults to `@MainActor` isolation. Use `@concurrent` to explicitly opt out when needed for background work.
 
+### Conformances to app-defined protocols that inherit stdlib protocols must be `nonisolated`
+
+Under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, a type conforming to an
+*app-defined* protocol that itself inherits a stdlib protocol (`CaseIterable`,
+`Hashable`, `Equatable`, `Comparable`, …) must be declared `nonisolated`. Otherwise the
+conformance is main-actor-isolated and the compiler rejects it with "crosses into main
+actor-isolated code".
+
+**Marking the protocol `@MainActor` does not fix it** — that is the intuitive move and
+it produces the same error.
+
+```swift
+protocol EditableField: CaseIterable, Hashable {}
+
+// WRONG — implicitly @MainActor, conformance rejected
+enum ProjectField: EditableField { case name, description, colorHex }
+
+// RIGHT
+nonisolated enum ProjectField: EditableField { case name, description, colorHex }
+```
+
+The requirement is transitive: anything such a type calls must also be `nonisolated`,
+including small helpers and `String`/`Collection` extensions used inside its methods.
+
+Plan for this when designing a protocol hierarchy — retrofitting `nonisolated` through a
+call graph afterwards is markedly more disruptive than starting with it. This is the
+same family of surprise as `Codable` conformance on an enum pulling it into `@MainActor`
+isolation.
+
 ### SwiftData and Actors
 
 - `ModelContext` is not `Sendable` - keep context access on the same actor
@@ -759,6 +788,43 @@ static func inMemory() -> ModelContainer {
     return try! ModelContainer(for: schema, configurations: [config])
 }
 ```
+
+### Retain the ModelContainer in tests — never use a temporary
+
+A `ModelContext` does **not** keep its `ModelContainer` alive. Extracting the context from a non-retained container lets the container deallocate while the test still uses the context:
+
+```swift
+// WRONG — container is a temporary; it can deallocate out from under the context
+let context = try makeContainer().mainContext
+
+// RIGHT — retain the container for the test's lifetime, then derive the context
+let container = try makeContainer()
+let context = container.mainContext
+```
+
+The simulator's ARC timing often masks this (the container survives long enough), so the test passes there. On a **physical device** it crashes the test host — the XCTest runner exits early and restarts repeatedly, reporting "Restarting after unexpected exit, crash, or test timeout" and `0 tests` executed (no `recorded an issue`, because it is a crash, not an assertion failure). If a SwiftData suite passes on the simulator but the test host crashes on device with 0 tests run, suspect a non-retained container first. The same applies when a test builds two containers (e.g. dual-store designs) — retain both bindings.
+
+### `#expect` turns a literal type mismatch into a runtime failure, not a compile error
+
+`#expect` decomposes the comparison it is given so it can report both operands.
+A side effect: an untyped integer literal compared against a floating-point
+value no longer gets the literal-conversion the compiler would apply in ordinary
+code. It resolves as `Int`, and the assertion **fails at runtime** with a message
+that reads like a real defect.
+
+```swift
+// WRONG — compiles, then fails with "82800.0 != 82800"
+#expect(calendar.dateInterval(of: .day, for: springForward)?.duration == 23 * 3600)
+
+// RIGHT — both sides explicitly typed
+#expect(calendar.dateInterval(of: .day, for: springForward)?.duration == TimeInterval(23 * 3600))
+```
+
+The failure message is the tell: two numerically equal values reported as
+unequal, one printed with a decimal point and one without. Type both sides
+explicitly rather than hunting for a bug in the code under test. Applies to any
+`Double`/`TimeInterval`/`CGFloat` compared against an arithmetic expression of
+integer literals.
 
 ### Test Organization
 
@@ -1519,3 +1585,39 @@ struct DetailView: View {
         List(displayedItems) { ... }
     }
 }
+```
+
+## Default MainActor Isolation: Pure Statics Consumed by nonisolated Code
+
+Under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, every unannotated static
+constant and static function is main-actor isolated — including pure string
+constants and pure helper functions. Any `nonisolated` code that reads them
+gets a "main actor-isolated property referenced from nonisolated context"
+warning (an error under the Swift 6 language mode).
+
+When a type or file is deliberately `nonisolated` (e.g. a value-type state
+machine), every pure static helper it consumes must be explicitly
+`nonisolated` too, and the requirement is transitive: a `nonisolated` function
+can only call other `nonisolated` (or actor-free) helpers. Mark pure constants
+and pure functions `nonisolated` at the declaration, with a short comment
+noting why (called from nonisolated code, and pure). Extending an existing
+pattern beats retrofitting: when adding new statics to a file that already has
+`nonisolated` helpers, match them from the start.
+
+## Verifying "No New Compiler Warnings" Requires a Forced Recompile
+
+`xcodebuild` with warm DerivedData compiles nothing and therefore reports
+**zero warnings — a false green**. A "no new warnings" check on an incremental
+build proves only that nothing recompiled.
+
+To actually verify:
+
+1. `touch` every changed Swift file (e.g. from `git diff <base>..HEAD --name-only -- '*.swift'`).
+2. Also touch one file with a **known pre-existing warning** as a control.
+3. Rebuild with pretty-printers disabled (`xcbeautify` and similar drop or
+   dedupe warning lines) and grep the raw log for `warning:`.
+4. The control warning must appear — that proves the log is trustworthy.
+   Only then does "no warnings at changed lines" mean anything.
+
+`appintentsmetadataprocessor` "Metadata extraction skipped" lines are tool
+noise, not compiler warnings.

@@ -32,6 +32,7 @@ ORIGINAL_LINKS = {
     "~/.claude/skills": '"$REPO_CLAUDE_DIR/skills"',
     "~/.claude/scripts": '"$REPO_CLAUDE_DIR/../scripts"',
     "~/.claude/rules": '"$REPO_CLAUDE_DIR/rules"',
+    "~/.claude/forge-adapters": '"$REPO_CLAUDE_DIR/forge-adapters"',
 }
 
 # Skills deliberately removed from this branch (or sunset outright).
@@ -116,7 +117,7 @@ class TestSyncScriptCompat(unittest.TestCase):
                     f"symlink source for {target} changed",
                 )
 
-    def test_exactly_six_claude_home_links(self):
+    def test_exactly_seven_claude_home_links(self):
         claude_home_targets = [
             t for t in self.links if t.startswith("~/.claude/")
         ]

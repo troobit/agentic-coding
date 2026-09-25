@@ -1,10 +1,32 @@
 # Decision Log Format
 
-## Format: Enhanced Nygard ADR
+Decision logs use two tiers. Pick the tier before writing:
 
-Decision logs use the Enhanced Nygard ADR format - based on Michael Nygard's Architecture Decision Record format with additional fields for comprehensive decision tracking.
+- **Full entry** (Enhanced Nygard ADR): for decisions that could reasonably have gone another way — architectural choices, trade-offs, anything with real rejected alternatives or consequences worth recording.
+- **Quick decision**: a single table row for answered questions and minor resolutions (naming, formats, scope clarifications, tool picks with an obvious winner).
 
-## Decision Entry Template
+Rule of thumb: if you cannot name a genuine alternative or a meaningful consequence, it is a quick decision. Do not pad a small resolution into the full template.
+
+## Quick Decisions Table
+
+The table sits directly under the file header, before any full entries. Quick decisions use a `Q`-prefixed sequence, independent of full entry IDs, and can be referenced the same way (e.g., "per Q3").
+
+```markdown
+## Quick Decisions
+
+| ID | Date | Decision | Rationale |
+|----|------|----------|-----------|
+| Q1 | 2025-11-14 | Use ISO 8601 dates in all documents | Matches existing tooling |
+| Q2 | 2025-11-15 | Name the config file `settings.toml` | Convention in this repo |
+```
+
+If a quick decision later turns out to be contentious or grows consequences, promote it: write a full entry and change the row's Rationale to `promoted to Decision {ID}`.
+
+## Full Entries: Enhanced Nygard ADR
+
+Full entries use the Enhanced Nygard ADR format - based on Michael Nygard's Architecture Decision Record format with additional fields for comprehensive decision tracking.
+
+## Full Entry Template
 
 ```markdown
 ## Decision {ID}: {Title}
@@ -52,7 +74,7 @@ are affected by this decision. Useful for understanding scope of change.}
 ---
 ```
 
-## Required Fields
+## Required Fields (full entries)
 
 - **Decision ID and Title**: `## Decision {ID}: {Title}` - Sequential number and short title (5-10 words)
 - **Date**: `**Date**: YYYY-MM-DD` - ISO 8601 date format
@@ -78,7 +100,7 @@ are affected by this decision. Useful for understanding scope of change.}
 4. **Consider alternatives** - Show you evaluated multiple options (at least 2-3)
 5. **Be honest about trade-offs** - List both pros and cons
 
-## Quick Example
+## Full Entry Example
 
 ```markdown
 ## Decision 5: Use Go's Standard JSON Package
@@ -122,7 +144,8 @@ The standard library provides all necessary functionality for our use case. It's
 - **File name**: `decision_log.md`
 - **Location**: In the feature's spec directory (e.g., `specs/feature-name/decision_log.md`)
 - **File header**: `# Decision Log: {Feature Name}`
-- **Separator**: Use `---` between decisions
+- **Order**: Quick Decisions table first, then full entries
+- **Separator**: Use `---` between full entries
 
 ## Revising a decision
 
@@ -136,6 +159,9 @@ A repo with no `.agentic.json`, or one that omits `decision_mode`, is `supersede
 ## Quick Checklist
 
 When adding a decision, ensure:
+- [ ] Correct tier: quick decisions go in the table, not a full entry (and vice versa)
+
+For full entries, also ensure:
 - [ ] Unique sequential ID
 - [ ] Clear, descriptive title
 - [ ] Date in YYYY-MM-DD format

@@ -1,6 +1,6 @@
 ---
 name: release-prep
-description: I want to prepare this project for the next release, which will be {input}. Please do the following:
+description: Skill for preparing the project for a release
 ---
 
 I want to prepare this project for the next release, which will be {input}. Please do the following:

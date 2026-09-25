@@ -2,3 +2,4 @@ localdocs/
 __pycache__/
 *.pyc
 .worktrees/*
+claude/skills/.system/

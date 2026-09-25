@@ -31,6 +31,7 @@ ln -sfn "$REPO_CLAUDE_DIR/hooks" ~/.claude/hooks
 ln -sfn "$REPO_CLAUDE_DIR/skills" ~/.claude/skills
 ln -sfn "$REPO_CLAUDE_DIR/../scripts" ~/.claude/scripts
 ln -sfn "$REPO_CLAUDE_DIR/rules" ~/.claude/rules
+ln -sfn "$REPO_CLAUDE_DIR/forge-adapters" ~/.claude/forge-adapters
 
 # Codex Agent Skills: Codex discovers user skills from ~/.agents/skills and
 # supports symlinked skill folders. Link per skill so existing curated/user
@@ -87,6 +88,7 @@ echo "  hooks/    -> $REPO_CLAUDE_DIR/hooks"
 echo "  skills/   -> $REPO_CLAUDE_DIR/skills"
 echo "  scripts/  -> $REPO_CLAUDE_DIR/../scripts"
 echo "  rules/    -> $REPO_CLAUDE_DIR/rules"
+echo "  forge-adapters/ -> $REPO_CLAUDE_DIR/forge-adapters"
 echo "Symlinked to VS Code profile:"
 echo "  $VSCODE_PROMPTS_DIR/prd.agent.md -> $REPO_CLAUDE_DIR/../copilot/agents/prd.agent.md"
 echo "  $VSCODE_PROMPTS_DIR/spec-janitor.agent.md -> $REPO_CLAUDE_DIR/../copilot/agents/spec-janitor.agent.md"

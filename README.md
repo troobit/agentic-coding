@@ -2,7 +2,7 @@
 
 This repository contains my current process for working with agentic coding assistants. It's focused around spec-driven development and has a number of helpful tools and commands. Feel free to use what you see here and/or propose improvements.
 
-The repository is the single source of truth for agent tooling across Claude Code, GitHub Copilot (VS Code and the cloud coding agent), and Codex: shared conventions and MCP server definitions are generated into each tool's config shape, portable Agent Skills are linked into each host's discovery path, and one bootstrap script sets up a new machine.
+The repository is the single source of truth for agent tooling across Claude Code, GitHub Copilot (VS Code and the cloud coding agent), and Codex: shared conventions and MCP server definitions are generated into each tool's config shape, portable Agent Skills are linked into each host's discovery path, and one bootstrap script sets up a new machine. Review tooling is forge-aware (GitHub and GitLab), and task management integrates with the rune CLI.
 
 ## New-Machine Quickstart
 
@@ -20,13 +20,13 @@ The script is safe to re-run: each step reports `did`, `already done`, or `skipp
 
 ## Agents
 
-The framework provides specialized AI agents for different aspects of development. These are defined for use in Claude Code, and not every tool supports sub-agents like this. Some agents have dependencies on external CLI tools (e.g., peer-review-validator requires Gemini CLI, Codex CLI, or Q Developer CLI for consulting external AI systems).
+The framework provides specialized AI agents for different aspects of development. These are defined for use in Claude Code, and not every tool supports sub-agents like this. Some agents lean on external AI systems when available — `peer-review-validator` consults the Codex/Kiro MCP agents, but only on personal machines (see [Personal vs. work projects](#personal-vs-work-projects-personal_projects)); elsewhere it falls back to Claude subagents so no code leaves the machine.
 
 - **`code-simplifier`** - Reviews code for complexity reduction and maintainability improvements
 - **`design-critic`** - Provides critical review of design documents and architecture proposals (now using Sonnet model for improved efficiency)
 - **`efficiency-optimizer`** - Analyzes code for performance optimization opportunities
-- **`local-review`** - Sonnet-powered local replacement for the `anthropics/claude-code-action` PR review step. Reviews an open PR (code quality, bugs, performance, security, test coverage, plus whatever the project's `CLAUDE.md` mandates) and posts a single `gh pr comment` instead of consuming private GitHub Actions minutes
-- **`peer-review-validator`** - Validates decisions by consulting with at least two external AI systems (Gemini, Codex, or Q Developer) to ensure balanced perspective
+- **`local-review`** - Sonnet-powered local replacement for an automated CI review step. Forge-aware: it detects GitHub or GitLab from the git remote and reviews the open change request (code quality, bugs, performance, security, test coverage, plus whatever the project's `CLAUDE.md` mandates), posting a single review comment instead of consuming private CI/Actions minutes. See [Forge support](#forge-support-github--gitlab)
+- **`peer-review-validator`** - Validates decisions by obtaining at least two independent peer perspectives. On personal machines (`PERSONAL_PROJECTS=1`) it consults external AI systems (Codex, Kiro); otherwise it spawns Claude subagents with distinct lenses so the same balanced review runs without sending code off-machine. See [Personal vs. work projects](#personal-vs-work-projects-personal_projects)
 - **`pre-push-code-reviewer`** - Critically reviews unpushed commits before pushing to ensure code quality and spec adherence
 - **`research-agent`** - Conducts research and generates structured reports (stolen from @sammcj)
 - **`ui-ux-reviewer`** - Evaluates user interfaces for usability and accessibility improvements
@@ -77,6 +77,59 @@ Each phase requires explicit user approval before proceeding to ensure quality a
 
 For a small project or a first MVP, `/prd` writes a single standalone PRD for one repository — one document describing the whole system. It is authoring only and closes out at the document; nothing derives a task file from it. Work that must react to change or growing complexity belongs in the starwave chain instead. See [spec-workflow](spec-workflow.md) for the split.
 
+## Forge support (GitHub & GitLab)
+
+The review tooling — the `local-review` agent and the `pr-pilot` / `pr-review-fixer` skills — works on both GitHub (via `gh`) and GitLab (via `glab`). You don't pick a forge: each workflow detects it from `git remote get-url origin` and adapts.
+
+This is kept maintainable with a small adapter layer in `claude/forge-adapters/`:
+
+- **`CONTRACT.md`** - Defines the work in *forge-neutral* terms. It establishes a shared vocabulary (a **CR** is a pull request on GitHub and a merge request on GitLab; a **thread** is a review thread or a discussion; the **CLI** is `gh` or `glab`) and a fixed set of named operations — `PREFLIGHT`, `CR_VIEW`, `CR_DIFF`, `THREADS_FETCH`, `CR_COMMENT`, `CR_MERGE`, and so on. The workflow files describe *what* to do using these operation names and never hard-code a CLI command.
+- **`github.md`** / **`gitlab.md`** - Each adapter implements those same operation names with the concrete `gh` / `glab` commands for that forge.
+
+A workflow runs `PREFLIGHT` to resolve the forge, reads the matching adapter, and then, wherever it needs to (say) post a comment, runs that adapter's `CR_COMMENT` command. The rule is strict: **never improvise a `gh`/`glab` command** — if an operation isn't in the adapter, the workflow stops and reports it rather than guessing.
+
+**Why it's built this way:** GitHub and GitLab differ only in a small, bounded set of operations (mostly comment/discussion surfaces and id formats — `#123` vs `!1`). Keeping the workflow logic in one place and the per-forge commands in adapters avoids maintaining two near-identical copies that drift apart. Adding a third forge later means writing one new adapter, not editing every workflow.
+
+## Personal vs. work projects (`PERSONAL_PROJECTS`)
+
+Some agents are more useful when they can consult external AI systems (Codex, Kiro) for a genuinely independent second opinion. On a work machine that's often not acceptable — sending source code to a third-party model can breach client or employer policy. The `PERSONAL_PROJECTS` environment variable is the switch that resolves this.
+
+- **`PERSONAL_PROJECTS=1`** (set this only on your own machines) - external-model mode. Agents may send the work to external AI systems.
+- **unset, empty, or any other value** (the default) - safe mode. No code leaves the machine; agents that wanted an external opinion fall back to spawning Claude subagents with distinct review lenses instead.
+
+The default is the safe one on purpose: a machine that hasn't opted in never sends code out, so forgetting to configure it fails closed rather than open. `peer-review-validator` is the agent that uses this today — it states in its output which mode it ran in, so a reader knows whether the extra perspectives came from distinct external models or from Claude subagents.
+
+Set it in your shell profile on personal machines:
+
+```bash
+export PERSONAL_PROJECTS=1
+```
+
+If your machine holds both personal and work repos, you usually don't want it set globally. Scope it to a directory tree instead — for example, when all personal work lives under `~/projects/personal/`, add this to your `.zshrc`:
+
+```bash
+case "$PWD/" in
+  "$HOME/projects/personal/"*) export PERSONAL_PROJECTS=1 ;;
+esac
+```
+
+This evaluates at shell startup against the directory the shell opened in, which suits opening a terminal (or an editor's integrated terminal) directly in a project. If you want it to follow `cd` between trees within an existing shell, wrap the same check in a `chpwd` hook so it re-runs on every directory change:
+
+```bash
+# In .zshrc
+personal_projects_guard() {
+  case "$PWD/" in
+    "$HOME/projects/personal/"*) export PERSONAL_PROJECTS=1 ;;
+    *) unset PERSONAL_PROJECTS ;;
+  esac
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook chpwd personal_projects_guard   # run on every directory change
+personal_projects_guard                      # and once now, for the shell's starting directory
+```
+
+The `*)` branch matters: it `unset`s the flag when you leave the personal tree, so the setting follows `cd` in both directions instead of staying on for the rest of the session. The final call applies the rule to the directory the shell started in, since `chpwd` only fires on subsequent changes.
+
 ## File Structure
 
 Top-level layout:
@@ -87,6 +140,7 @@ Top-level layout:
   - `claude/CLAUDE.md` - User-level instructions (generated from `shared/`, checked in)
   - `claude/agents/` - Specialized AI agents for different development tasks
   - `claude/skills/` - Skills for the development workflow (invoked via slash commands)
+  - `claude/forge-adapters/` - Forge-neutral operation contract (`CONTRACT.md`) and per-forge command implementations (`github.md`, `gitlab.md`) shared by the review tooling (see [Forge support](#forge-support-github--gitlab))
   - `claude/rules/` - Language rules and reference documentation formats, including the path-scoped `language-rules/styleguide-terraform.md` style guide
 - `copilot/agents/prd.agent.md` - Custom agent wrapper for VS Code and the cloud coding agent
 - `copilot/instructions/copilot-instructions.md` - Copilot instructions (generated from `shared/`, checked in)

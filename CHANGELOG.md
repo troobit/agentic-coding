@@ -51,6 +51,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`claude/uplift-candidates.md`**: closed, fully-implemented historical mining report with no remaining references elsewhere in the tree; deleted rather than purged line-by-line
 - **Align nextup fixtures**: the eight `tests/fixtures/align/repos/nextup-*` repos, their `.gitignore` files, and `seed-root/nextup.example.md`, along with the step-6 test classes in `tests/test_align.py`
 
+## [2026-09-23]
+
+### Added
+- Review pages distinguish code and doc changes: `review_html/classify.py` classifies each `files[]` entry as `code`, `docs` (Markdown and similar, anything under `docs/`, README/CHANGELOG/LICENSE/CONTRIBUTING/CODEOWNERS), or `other` (images, lockfiles, editor and VCS dotfiles), overridable with `files[].kind`. The Per-file diffs section opens with the composition (`6 files: 4 code · 1 docs · 1 other`) and, for a mixed change, groups the diffs under Code, Docs, and Other headings
+
+### Changed
+- `change_classification` is now an optional override: when absent the renderer treats a change with no `code` file as docs-only. The `pr-review-html`, `pr-overview`, and `pre-push-review` skills no longer ask the agent to apply the classification rule by hand (review-html-tests-diagram, Q87)
+- Golden fixture regenerated for the grouped Per-file diffs section; the rest of the body is unchanged
+
+## [2026-09-08]
+
+### Changed
+- Blast-radius diagram: `scripts/blast_radius.py` drops documentation, data, and asset files (Markdown, text, JSON, YAML, TOML, lock files, images, fonts) before building the graph, so a changed README or lock file no longer pads the centre column. Code in a language without an ecosystem row still gets a node. A change touching only such files reports both columns as `failed: no code files changed`
+
+## [2026-09-04]
+
+### Added
+- `scripts/ecosystems.json` runner rows: gotestsum, pytest, vitest, jest, `swift test`, and `cargo llvm-cov nextest`, each with a detection rule, required binaries, coverage format, install command, the JUnit flags a Makefile target is inspected for, and per-row notes on known holes; a schema test keeps the script-read and runner keys honest (review-html-tests-diagram, phase 4)
+- Tests section for review pages: `review_html/junit.py` parses JUnit XML (nested suites, Surefire and pytest rerun elements collapsing to one flaky case per source), `coverage.py` parses lcov, Cobertura, and Go coverprofile, maps paths, and matches entries to changed files in five global passes that report `no candidate` or `ambiguous` rather than guess, and `redact.py` replaces bearer tokens, cloud keys, credential assignments, URLs with userinfo, and PEM blocks with `[redacted]` before failure messages are truncated. `tests_section.py` renders the Tests card and section (provenance, availability, totals, per-job or per-artifact rows, failed tests, new and removed tests, per-file diff coverage, overall coverage, unmatched report) and feeds uncovered added lines back into the per-file diffs. `render()` prints `summary coverage:` and `summary tests:` to stderr last, after every warning, for the skills' severity floor (review-html-tests-diagram, phase 3)
+- Timing tests: a generated 10 MB lcov file and a 5,000-case JUnit file must each parse in under 5 seconds; skipped on loaded hosts
+- Blast-radius diagram: `review_html/diagram.py` projects a `diagram.json` description into three columns (dependents, changed, dependencies), excludes test files while counting them per changed node, collapses package-granular groups over 3 and caps side columns at 15 plus a `+N more` node, and lays the result out as inline SVG with fixed-width boxes, `textLength` labels, hover-dimmed edges, and CSS-variable colours with literal fallbacks. `render()` picks it up from the top-level `diagram_file` key unless `change_classification` is `docs-only` (review-html-tests-diagram, phase 2)
+- `scripts/blast_radius.py`: derives the one-hop import graph around a change from two trees (a commit SHA, the working tree, or a remote repository via the GitHub API), writes `diagram.json` and `diff-tests.json`, and optionally replaces scanned edges with `go list` output. Language rules live in `scripts/ecosystems.json` (Go, Python, TypeScript, Swift, Rust)
+- Test harness for the review renderer: `make test` runs `scripts/tests/` via unittest. A golden fixture (`fixtures/golden.json` and the page the renderer at `9da40cf` produced from it) pins the existing output; unit tests cover guarded reads, the warning collector, hunk arithmetic, binary detection, fragment loading, and uncovered-line marks (review-html-tests-diagram, phase 1)
+- `review_html/inputs.py` and `warnings.py`: `read_guarded` refuses inputs over 50 MB, non-UTF-8 content, and XML carrying a DOCTYPE, and warns to stderr through a `Warnings` collector
+- `review_html/diffs.py`: `load_fragments`, `added_lines`, `is_binary`, and `render_diff` with an optional set of uncovered new-file line numbers; a `.diff-uncovered` rule marks those lines with a red left border and gutter marker
+
+### Changed
+- `pr-review-html`, `pr-overview`, and `pre-push-review` skills: every input now lives in `$CLAUDE_JOB_DIR/review-inputs` (or a `mktemp` directory) and is passed with `--diff-dir`; `pr-review-html` and `pre-push-review` choose a test recipe by reading Makefile text, CLAUDE.md, or the ecosystem row, run it once with a restore procedure for files the run touches, and populate the `tests`, `diagram_file`, and `change_classification` blocks; `pr-overview` collects JUnit and coverage artifacts from GitHub Actions with ordered CI-state rules, falls back to a detached worktree run only for same-repo PRs with a local clone (stated in its read-only disclosure), and looks up a baseline run on the base branch; all three apply a severity floor from the renderer's `summary tests:` stderr line, drop the highlight.js claim, and name the `review_html` package when explaining where to edit the renderer
+- `scripts/build_review_html.py` is now a thin entry point over the `scripts/review_html/` package (`common`, `sections`, `css`, `template`, `render`); the command line and output are unchanged, and the golden test proves it. A non-UTF-8 diff fragment now renders a placeholder instead of crashing the run
+
 ## [2026-08-26]
 
 ### Added
@@ -82,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`sendit` and `engage` skills deleted; `/prd` cut back to standalone authoring** (decision `toolset-agnostic-starwave` D17). The four starwave approval gates (requirements, design, tasks, smolspec) revert to plain approve-and-continue → design/tasks/make-it-so — the `/sendit` default-action lines were pure insertions, so removing them restores the prior flow exactly. `/prd` now authors `specs/{name}/prd.md` for a small project or first MVP and ends at the document: there is no PRD execution step, nothing derives a task file from a PRD, and `/nextup` does not route an existing `prd.md` onward. Work that must react to change or growing complexity goes through the starwave chain instead. The `act autonomously` flag now only suppresses starwave's gates and auto-dispatches `/make-it-so` on a complete spec. `nextup`, `prd`, `spec-janitor`, `README.md`, `spec-workflow.md`, and the runbooks updated to match
 - **Transit workflow layer removed from this branch** (decision `transit-workflow-integration` D4). Deleted `claude/skills/transit/` and stripped ticket-tracking steps from `fix-bug`, `starwave-creating-spec`, `pr-pilot`, `code-audit`, and `prd`; removed the Transit sections from `shared/conventions.md` and `shared/claude-wrapper.md` so the `T-<id>` conventions no longer generate into every repo's `CLAUDE.md` and Copilot instructions. Inert plumbing deliberately kept: the `transit` entry in `mcp/servers.json`, `transit_project` in `.agentic.json`, and `docs/agent-notes/transit-integration.md` as the restoration blueprint. `bug-blitz` and `blitz-merge` are left intact but dormant — Transit is their bug *source* — and `/nextup`'s light lane now fans a batch of bugs out as parallel `/fix-bug` jobs rather than routing to them
 - `tests/test_sync_compat.py`: `sendit` and `transit` moved out of the `PRE_FEATURE_SKILLS` baseline into a new `RETIRED_SKILLS` list, with a test asserting they are absent and that no skill is both retired and required — so the removals are an asserted expectation rather than a relaxed guardrail
+- Gemini as a peer reviewer: `peer-review-validator` no longer lists `mcp__devtools__gemini-agent` in its tools or its external-model consultation list, and the selection strategy drops the "use Gemini for general analysis" line. External-model mode now names Codex and Kiro only, with an instruction to top up from subagent mode (and say so) if one of the two is unavailable, since the two-perspective minimum no longer has slack. README and `starwave-requirements` updated to match — the latter also had a stale "Q Developer" reference, now Kiro; `fix-bug`'s "do not use these MCP agents" list drops the Gemini entry
 
 ## [2026-07-26]
 
@@ -127,6 +158,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/agent-notes/align-tooling.md` documents the nextup-template step (user-zone preservation, markerless skip, gitignore handling, why `nextup.md` is never touched)
 - Rollout: align applied and committed in medata, netmap, and loshop (`[chore]: align nextup/starwave process assets`, unpushed); tocs, rtob, and localml skipped as dirty and left bit-identical
 
+## [2026-07-07]
+
+### Added
+- `no-push-main.py`: regression test (`claude/hooks/test_no_push_main.py`) covering the protected-branch push matrix, including the newly-closed bypasses. Run with `python3 claude/hooks/test_no_push_main.py`
+- `blitz-merge` skill: a review-availability guarantee (`count_reviews` — never merge a PR that no review looked at; falls back to `local-review` when a round produces no review comment) and a pre-push review artifact step (a subagent runs `/pre-push-review` against `origin/main` per PR, so a durable, human-auditable review exists before merge). Phase 3 now refuses to squash-merge unless a review is on record **and** the artifact was generated
+
+### Changed
+- `no-push-main.py`: harden `git push` protection to resolve the real destination ref — now blocks `+main` (force via refspec), `HEAD:refs/heads/main`, `HEAD` while on a protected branch, and `--mirror` / `--all`, all of which previously bypassed the hook
+- `claude/CLAUDE.md`: calibrate the workflow gate prose to reversibility — keep the approval-gate and tool-result-verification guidance, drop the blanket "do not commit/push/open a PR/merge unless asked" sentence and the "run one command per turn" rule
+
+### Removed
+- `claude-remote.sh` and its SessionStart hook wiring (project `.claude/settings.json` and `project-init`'s `setup-project.sh`): the remote `curl | bash` configuration bootstrap is no longer part of the workflow
+
 ## [2026-07-05]
 
 ### Added
@@ -165,6 +209,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nextup` skill + `nextup.example.md`: Machine-zone marker is now `<!-- LM -->`, mirroring `<!-- USER -->` at the top of the user zone. Legacy markers (`<!-- ML -->`, `<!-- nextup:machine -->`, `# What I want`) still parse but are migrated to `<!-- LM -->` on rewrite. The machine zone is restricted to the template's fields only (feature, branch, stage, progress, next up, notes) — close-out now writes its handoff into those fields instead of growing new sections — and the user-zone placeholder reads `<user inputs for next session>`
 - `sendit` skill: Update the machine-zone reference to the `<!-- LM -->` marker (treating `<!-- ML -->` / `<!-- nextup:machine -->` as legacy equivalents); it previously matched only `<!-- nextup:machine -->` and would have missed migrated files
 
+## [2026-06-20]
+
+### Added
+- Forge adapter layer (`claude/forge-adapters/`): a `CONTRACT.md` defining forge-neutral operations (`PREFLIGHT`, `CR_VIEW`, `CR_DIFF`, `THREADS_FETCH`, `CR_COMMENT`, `CR_MERGE`, etc.) and a shared vocabulary (CR/thread/note/CLI), plus per-forge adapters `github.md` (`gh`) and `gitlab.md` (`glab`) implementing each operation. Workflows call named operations and never hard-code a CLI command — when an operation is missing from the selected adapter they stop and report rather than improvise
+- README: `Forge support (GitHub & GitLab)` and `Personal vs. work projects (PERSONAL_PROJECTS)` sections explaining the adapter architecture and the fail-closed external-AI gating
+
+### Changed
+- `local-review` agent, `pr-pilot` and `pr-review-fixer` skills: converted to forge-aware. Each detects the forge from `git remote get-url origin` via `PREFLIGHT`, reads the matching adapter, and calls the contract's named operations instead of hard-coded `gh` commands — so the same workflow runs unchanged on GitHub and GitLab
+- README: updated the `local-review` and `peer-review-validator` agent descriptions (forge detection; `PERSONAL_PROJECTS` gating with Claude-subagent fallback), added `claude/forge-adapters/` to the File Structure list
+- README: in the `Personal vs. work projects` section, document scoping `PERSONAL_PROJECTS` to a directory tree — a `.zshrc` `case` snippet for shell-startup evaluation, plus a full `chpwd` hook (with an `unset` branch and an initial call) for setting it on `cd` within a running shell
+- `go-test-fixer` skill: add YAML frontmatter (`name`/`description`) so the skill is discoverable
+- `release-prep` skill: replace the prompt-style `description` frontmatter with a plain one-line summary
+- `capture-knowledge` skill: minor description wording
+- `.gitignore`: ignore `claude/skills/.system/`
+- `copilot/prompts/Main.instructions.md`: add placeholder instructions file
+
 ## [2026-06-19]
 
 ### Added
@@ -172,6 +232,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `starwave-requirements`, `starwave-design`, `starwave-tasks`, and `starwave-smolspec` skills: Make `/sendit` the **default action** offered at every "do the requirements/design/tasks/smolspec look good?" approval gate. The reviewer is often non-technical and reviews markdown in Prism rather than the terminal, so each gate now offers `/sendit` (ship to Prism + close out) as the recommended choice alongside approving inline or requesting changes
+
+## [2026-06-11]
+
+### Added
+- `spec-cleanup` skill: Identify and clean up stale or superseded feature specs in a project's `specs/` directory. Detects supersession candidates via naming patterns (`-v2`, `-revised`), explicit supersedes/replaces/builds-on references, decision-log statuses, scope overlap, and git-history corroboration, then classifies each pair as fully replaced (recommend removal) or extended (consolidate-vs-remove is a user decision, with decision-log carry-over on consolidation). Presents an evidence-backed report behind a hard approval gate before touching any file, removes via `git rm` so specs stay recoverable, regenerates `specs/OVERVIEW.md` if present, and never touches `specs/bugfixes/`
+
+## [2026-06-03]
+
+### Changed
+- `peer-review-validator` agent: Gate the external AI systems (Gemini/Codex/Kiro) behind the `PERSONAL_PROJECTS` environment variable. The Peer Consultation step now checks `echo "$PERSONAL_PROJECTS"` first: when it equals `1` the agent uses external-model mode (the MCP agents, as before); otherwise it uses subagent mode — spawning at least two `general-purpose` subagents via the Task tool with the same validation package but distinct lenses (correctness/edge-cases, architecture/maintainability, optional risk/security). The Communication and Key principles sections were reworded to describe both modes and to require stating which mode was used
+
 
 ## [2026-05-22]
 

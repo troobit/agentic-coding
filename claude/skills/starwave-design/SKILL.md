@@ -22,6 +22,16 @@ The design exists to make implementation decisions clear and capture non-obvious
 - Diagrams SHOULD only be included when they reveal structure that prose cannot convey concisely. Do not add a diagram for its own sake.
 - Research findings MUST be distilled into the decisions they informed. Do not dump raw research into the design.
 
+**The Design States the Plan, Not the Discussion:**
+
+The design document describes the system to be built, in its settled form. It is not a transcript, a changelog, or a rebuttal. Someone reading it with no knowledge of the conversation MUST be able to treat every statement as the instruction to follow.
+
+- The design MUST NOT narrate its own history. No references to earlier drafts, superseded approaches, review feedback, or what changed between versions — no "previously", "originally", "the earlier approach", "this has been revised to", "no longer", "as the critic noted", "per the review". Write the current plan as plain fact.
+- The design MUST NOT hedge between options that have already been settled. If a choice has been made, state it. Words like "we could", "one option is", "it may be preferable to" indicate an unresolved decision — either resolve it, or move it to the open-questions the model asks the user about, but do not ship it as design prose.
+- The design MUST NOT contain a standalone objection. When the model disagrees with a requirement's implied approach, an existing codebase pattern, a library's default, or a suggestion raised during review, the design MUST state the approach to take instead. A criticism without a replacement is not a design element and MUST NOT appear in the document.
+- The argument behind a departure — what alternatives were weighed, why the other option was rejected, what the trade-off costs — belongs in `specs/{feature_name}/decision_log.md`, not the design. The design carries the outcome and MAY reference the entry by ID (e.g., "see Decision 4") when a reader is likely to ask why.
+- When incorporating feedback from the user, the design-critic, or the peer-review-validator, the model MUST rewrite the affected section so it reads as the current plan. The model MUST NOT append change notes, "addressed:" annotations, or leave the old text in place alongside the new.
+
 **Constraints:**
 
 - The user provides the {feature_name} as part of the prompt, or by way of the current branch which will contain the name of the feature, either in whole or prefixed by specs/.
@@ -43,6 +53,7 @@ The design exists to make implementation decisions clear and capture non-obvious
   - Components and Interfaces (sketch types/signatures; add a one-line behavioral note when the contract is not obvious from the name)
   - Data Models (omit if no new or changed models)
   - Error Handling (omit if no new failure modes)
+  - Risks and Assumptions (omit if nothing survives the gating rule below)
   - Testing Strategy
 - When writing the Testing Strategy section, the model SHOULD evaluate acceptance criteria for property-based testing (PBT) candidates:
   - Review requirements that express universal guarantees (invariants, round-trip behavior, idempotence)
@@ -52,6 +63,16 @@ The design exists to make implementation decisions clear and capture non-obvious
 - The model SHOULD include diagrams or visual representations when appropriate (use Mermaid for diagrams if applicable)
 - The model MUST ensure the design addresses all feature requirements identified during the clarification process
 - The model MUST use tools like context7 to retrieve relevant information about the libraries and tools
+
+**Risks and Assumptions — Only What Building Will Reveal:**
+
+The no-hedging rule above pushes every open question out of the design: it is either resolved by research or put to the user. The Risks and Assumptions section is the one place for unknowns that neither can settle — behaviour that only implementation or measurement will reveal. It is not an outlet for unresolved decisions.
+
+- An entry MAY appear only when it cannot be settled by codebase or library research and cannot be settled by asking the user. Typical cases: performance at real data volume, a third-party library's behaviour in a specific edge case, a migration against production-shaped data. If the model could answer it by reading code or asking a question, it MUST do that instead of writing an entry.
+- Each entry MUST name how it will be verified — an early implementation task, a measurement, or a fallback approach — and what happens if the assumption fails. An entry without a verification path is a hedge and MUST NOT appear.
+- Load-bearing assumptions surfaced by the beginner-level pass of the explain-like self-validation MUST be recorded here when the design depends on them and they are not otherwise stated in the design or requirements.
+- Entries use one line each in the form `Risk: {what may be wrong} | Verify: {how and when} | If wrong: {fallback}` or `Assumption: {what is taken as true} | Verify: {how and when}`.
+- Entries whose verification is an implementation task are consumed by the tasks phase, which sequences that task ahead of the work depending on it.
 
 **Contracts and Integration Points — Do Not Cut:**
 
@@ -84,7 +105,12 @@ Before triggering skill reviews, the model MUST verify:
 - [ ] If extending an existing pattern, all call sites of the original pattern are audited and the design addresses each one
 - [ ] UI elements that have existing equivalents reference the existing pattern rather than defining visual properties from scratch
 - [ ] Every paragraph carries a decision, constraint, or non-obvious fact — none exist solely to introduce, summarize, or restate the requirements
+- [ ] No references to earlier drafts, superseded approaches, or review feedback — the document reads as the plan, not as its revision history
+- [ ] No settled choice is still presented as an open option ("we could", "one option is")
+- [ ] Every objection to a requirement, existing pattern, or reviewed alternative is paired with the approach to take instead
+- [ ] The reasoning for rejected alternatives lives in decision_log.md, not in the design prose
 - [ ] No sections are padded with boilerplate; inapplicable sections are omitted entirely
+- [ ] No Risks and Assumptions entry restates a decision that research or a question to the user could have settled, and every entry names its verification path
 - [ ] No hyperbolic or marketing language ("comprehensive", "robust", "seamless", etc.)
 - [ ] Non-obvious behavioral contracts (idempotence, ordering, invariants, side effects, transaction/concurrency requirements) are stated, not just implied by signatures
 - [ ] Integration points with existing code are named (hook, call site, interface, event, extension point)
@@ -96,11 +122,11 @@ Before triggering skill reviews, the model MUST verify:
 - The model SHOULD address any issues discovered during this explanation process before proceeding to skill reviews
 
 - The model MUST use relevant skills to receive feedback on the design, after writing the initial design. The requirements MUST always take precedence over this feedback.
-- The model MUST highlight design decisions and their rationales in a decision log document at specs/{feature_name}/decision_log.md
+- The model MUST highlight design decisions and their rationales in a decision log document at specs/{feature_name}/decision_log.md, using the two-tier format from the decision log format reference: full ADR entries for genuine trade-offs, Quick Decisions table rows for minor resolutions
 - The model MUST ask the user for input on specific technical decisions during the design process
 - When asking the user questions and offering options, the model MUST use the AskUserQuestion tool.
 - After updating the design document, the model MUST use the Task tool with subagent_type="general-purpose" to run the design-critic skill (invoke the Skill tool with skill="design-critic"), and the Task tool with subagent_type="peer-review-validator" to review the document and provide its questions to the user.
 - After the review by the skills, the model MUST ask the user "Does the design look good?"
-- The model MUST make modifications to the design document if the user requests changes or does not explicitly approve
+- The model MUST make modifications to the design document if the user requests changes or does not explicitly approve. Modifications MUST replace the affected text so the document continues to read as a single settled plan; the model MUST NOT record what changed or why inside the design — that goes in decision_log.md.
 - The model MUST ask for explicit approval after every iteration of edits to the design document
 - The model MUST incorporate all user feedback into the design document before proceeding

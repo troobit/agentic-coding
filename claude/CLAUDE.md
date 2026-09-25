@@ -11,7 +11,7 @@
 - Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit
 - After writing code, you MUST ensure you use appropriate linters and validators.
 - When you discover a learning specific to a language that needs to be kept, add it to the related language-rule file (or create a new one if needed).
-- Manage tasks with the `rune` CLI; task files (`tasks.md` or `tasks-*.md`) MUST live under the feature's `specs/` folder and stay parseable by `rune list`.
+- Manage tasks with the `rune` CLI; task files (`tasks.md` or `tasks-*.md`) MUST live under the feature's `specs/` folder and stay parseable by `rune list`. Do NOT use rune for an agent's internal or ephemeral execution checklist; use the harness-native task-list tool instead.
 - Committed feature work requires its spec documents to exist in `specs/` first: a design document or PRD, plus the rune task file.
 - When creating GitHub issues, ALWAYS create them in the current repository unless explicitly told otherwise.
 
@@ -58,6 +58,14 @@ This project uses custom skills extensively. Available skills include: spec crea
 When asked to analyze or document something, first check if there's an existing skill/workflow for that task (e.g., spec creation, review). Use the established workflow rather than doing ad-hoc analysis.
 
 When managing tasks, prefer the rune skill over calling the CLI directly.
+
+# Persisting Knowledge (Cross-Project)
+
+**Before starting a task**: if it touches a framework, language, or domain you've worked in before, run `/recall-knowledge` to see if the vault already has notes — a quick check beats re-investigating something you already documented.
+
+If what you learned would help on a *different* project (framework gotchas, integration recipes, reusable patterns, platform quirks), use the `/capture-knowledge` skill to write it into the Obsidian vault. This is the preferred destination for anything generalizable. Be proactive: when you've just solved something non-obvious that isn't tied to this one repo, offer to capture it even if the user didn't ask.
+
+For knowledge that only makes sense inside this one repo, use `docs/agent-notes/` as described above rather than the vault.
 
 # Asking the User Questions
 
