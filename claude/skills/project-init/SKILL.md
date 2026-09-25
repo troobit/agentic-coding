@@ -1,6 +1,7 @@
 ---
 name: project-init
 description: Initialize Claude Code project settings with standard language-specific permissions. Use when setting up a new project for Claude Code or adding standard configuration to an existing project.
+disabled: true
 ---
 
 # Project Init
@@ -41,7 +42,7 @@ Run the setup script from your project directory:
 
 The script:
 - Creates `.claude/settings.json` if it doesn't exist
-- Merges hooks and permissions into existing settings without overwriting
+- Merges permissions into existing settings without overwriting
 - Is idempotent (safe to run multiple times)
 - Requires `jq` for JSON manipulation
 

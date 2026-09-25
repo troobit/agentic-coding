@@ -130,6 +130,17 @@ The codebases disagree, and both readings are defensible:
 
 **Rule:** stack-wide inputs (`subscription_id`, `tenant_id`, `location`, `common_tags`, anything a tfvars file sets) go in `variables.tf`. A variable used by exactly one file, whose default is really a constant (`endpointsvc_vnet_name = "endpointsvc-vnet"`), may sit under a `# Variables` banner at the top of that file. **Modules always use `variables.tf`** — no exceptions, because the module's interface is its contract.
 
+### `*.auto.tfvars` under `environments/` is not auto-loaded
+
+Auto-loading applies to `terraform.tfvars` and `*.auto.tfvars` **in the working directory
+only** — never in a subdirectory. A file named `environments/prod.auto.tfvars` therefore
+reads as automatic and is not: without `-var-file=environments/prod.auto.tfvars` on every
+plan and apply, every variable silently falls back to its default. Either pass the flag
+consistently, or drop the `.auto` from the name so it stops claiming otherwise.
+
+Defaults in `variables.tf` are what gets deployed by anyone who forgets the flag, so keep
+them deployable rather than illustrative.
+
 ---
 
 ## 5. Variables
@@ -392,7 +403,21 @@ Prefer keeping fragile resources out of a stack that gets destroyed over reachin
 
 ---
 
-## 16. Known Rough Edges
+## 16. Perpetual Diffs
+
+A plan that reports the same change every time, and an apply that never settles it, means
+the API is not keeping what the config sends. The fix is to stop sending it, not to run
+apply again.
+
+- **Optional attributes the resource ignores in the mode you are using.** `azurerm_container_app_environment` accepts `minimum_count`/`maximum_count` on a `workload_profile`, but Azure honours them only on a *dedicated* profile (`D4`, `E8`, ...). On a `Consumption` profile the API returns neither and the provider reads back zero, so setting them is an in-place update on every plan forever. Leave them off.
+- **Values another system owns.** That is what `ignore_changes` is for (§15) — a perpetual diff is the symptom it treats.
+
+Check a suspect attribute against the live resource (`az ... show`) before assuming the
+provider is at fault. If the API never returns it, the config should not set it.
+
+---
+
+## 17. Known Rough Edges
 
 Present in the checked-in code, not the standard. When touching these files, fix them:
 
@@ -404,7 +429,7 @@ Present in the checked-in code, not the standard. When touching these files, fix
 
 ---
 
-## 17. Working Practice
+## 18. Working Practice
 
 Same as the other repos:
 

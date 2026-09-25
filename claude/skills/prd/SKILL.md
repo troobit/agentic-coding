@@ -1,6 +1,13 @@
 ---
 name: prd
-description: Author a standalone Product Requirements Document (PRD) describing a whole small system. Use when the user wants a small project or a first MVP framed as a single document — e.g. "write a PRD for X", "frame this as a PRD". Authoring ends at the document; there is no execution step. NOT part of the gated starwave lane; do not use for features that need requirements/design/tasks approval gates, or for work that must react to change and growing complexity.
+description: >-
+  Author a standalone Product Requirements Document (PRD) describing a whole
+  small system. Use when the user wants a small project or a first MVP framed as
+  a single document — e.g. "write a PRD for X", "frame this as a PRD". Authoring
+  ends at the document; there is no execution step. NOT part of the gated
+  starwave lane; do not use for features that need requirements/design/tasks
+  approval gates, or for work that must react to change and growing complexity.
+disabled: true
 ---
 <!-- agentic:begin -->
 # PRD Authoring

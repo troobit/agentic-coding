@@ -1,6 +1,15 @@
 ---
 name: invoice
-description: Create or update an invoicer-schema invoice YAML under customers/<slug>/invoices/ in the tocs repository (~/repos/tocs) for a given Statement of Work, keeping the SoW ↔ invoice cross-references correct in both directions. Copies the SoW's line items so totals agree to the cent, carries the SoW/MSA back-reference in line descriptions, and lists the invoice_number in the owning SoW's invoice_refs. Works from any directory by resolving ~/repos/tocs; aborts with a plain message if tocs is missing. Use when the user says "raise an invoice for <client>", "invoice sow-002", or similar.
+description: >-
+  Create or update an invoicer-schema invoice YAML under
+  customers/<slug>/invoices/ in the tocs repository (~/repos/tocs) for a given
+  Statement of Work, keeping the SoW ↔ invoice cross-references correct in both
+  directions. Copies the SoW's line items so totals agree to the cent, carries
+  the SoW/MSA back-reference in line descriptions, and lists the invoice_number
+  in the owning SoW's invoice_refs. Works from any directory by resolving
+  ~/repos/tocs; aborts with a plain message if tocs is missing. Use when the
+  user says "raise an invoice for <client>", "invoice sow-002", or similar.
+disabled: true
 ---
 
 # Invoice — raise an invoice YAML under a SoW in tocs

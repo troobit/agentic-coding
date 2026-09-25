@@ -120,7 +120,7 @@ Seed `updated` with the same value as `created`; the `frontmatter-modified-date`
 
 Short, human-friendly title with spaces — Obsidian convention. e.g. `How to run an MCP server inside a Swift app.md`. Avoid kebab-case or snake_case. Keep it under ~80 chars. The H1 inside the file should match the filename minus `.md`.
 
-Full path: `<VAULT_PATH>/03-Notes/Generated/<title>.md`
+Full path: `<VAULT_PATH>/ML-Notes/cld/<title>.md`
 
 ### Check for collisions before writing
 
@@ -137,7 +137,7 @@ Tell the user which path you took.
 The simplest, most reliable approach is to write directly to the absolute filesystem path with the `Write` tool, using the `VAULT_PATH` you resolved earlier. Obsidian indexes new files automatically when it next sees the folder; no Obsidian instance needs to be running for this to work.
 
 ```
-Write file_path="${VAULT_PATH}/03-Notes/Generated/<title>.md" content=<full markdown including frontmatter>
+Write file_path="${VAULT_PATH}/ML-Notes/cld/<title>.md" content=<full markdown including frontmatter>
 ```
 
 Note: `Write` doesn't expand shell variables — substitute `${VAULT_PATH}` into the actual string before passing it to the tool.
@@ -155,22 +155,22 @@ Useful invocations:
 obsidian vaults verbose
 
 # List existing notes in the target folder (helpful for collision checks)
-obsidian files vault=Main folder="03-Notes/Generated"
+obsidian files vault=Main folder="ML-Notes/cld"
 
 # Check if a specific file exists (errors if not)
-obsidian file vault=Main path="03-Notes/Generated/<title>.md"
+obsidian file vault=Main path="ML-Notes/cld/<title>.md"
 
 # Find existing topic tags used in the vault, to avoid coining duplicates
-grep -rh "^  - " "${VAULT_PATH}/03-Notes" 2>/dev/null | sort -u | head -50
+grep -rh "^  - " "${VAULT_PATH}/ML-Notes" 2>/dev/null | sort -u | head -50
 
 # Create a file via Obsidian (alternative to Write — picks up templates, Obsidian must be running)
 obsidian create vault=Main \
-  path="03-Notes/Generated/<title>.md" \
+  path="ML-Notes/cld/<title>.md" \
   content="<text>"
 
 # Open a file in Obsidian after writing it (only if user asked you to)
 obsidian open vault=Main \
-  path="03-Notes/Generated/<title>.md"
+  path="ML-Notes/cld/<title>.md"
 ```
 
 The vault is named `Main`. Always pass `vault=Main` explicitly so this works even if the user has multiple vaults registered.
@@ -197,7 +197,7 @@ Don't add `#tag` lines inline in the body — tags belong in frontmatter only, o
 2. **Confirm the topic** in one sentence ("I'll capture how to wire an MCP server into a SwiftUI app, drawing on what we did in Transit"). If genuinely vague, ask one clarifying question — title or scope. Don't interview the user.
 3. **Gather the substance** from conversation context and the current project's code. Read source files when you need real specifics; don't invent code.
 4. **Pick the title** the way someone would search for it. Confirm only if non-obvious.
-5. **Pick topic tags** — 1–4 lowercase tags. Glance at existing tags in `03-Notes/` first to avoid coining duplicates.
+5. **Pick topic tags** — 1–4 lowercase tags. Glance at existing tags in `ML-Notes/` first to avoid coining duplicates.
 6. **Check for an existing note** with that title and decide extend / supersede / skip.
 7. **Write the note** with frontmatter + body following the rules above.
 8. **Report back** the absolute path of the file you wrote, in one short sentence. Don't dump the contents.
@@ -208,7 +208,7 @@ Don't add `#tag` lines inline in the body — tags belong in frontmatter only, o
 - **Hardcoded vault paths.** Always resolve at runtime — different machines have the vault in different places.
 - **Paraphrasing upstream docs.** Link to them. Capture the integration knowledge, not the API reference.
 - **Silent overwrites.** Always handle collisions explicitly.
-- **Dropping notes anywhere outside `03-Notes/Generated/`** unless the user explicitly directs.
+- **Dropping notes anywhere outside `ML-Notes/cld/`** unless the user explicitly directs.
 - **Inline tags in the body.** `generated` and topic tags live in frontmatter, full stop.
 - **Inventing tag synonyms** (`golang` vs `go`, `js` vs `javascript`). Reuse what's already in the vault.
 - **Padding.** A short, dense note beats a long, thin one.

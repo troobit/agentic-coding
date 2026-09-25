@@ -1,6 +1,9 @@
 ---
 name: release-prep
-description: Skill for preparing the project for a release
+description: >-
+  Prepare this project for the next release {input}: quality checks, dependency
+  and vulnerability review, changelog and version bump.
+disabled: true
 ---
 
 I want to prepare this project for the next release, which will be {input}. Please do the following:
