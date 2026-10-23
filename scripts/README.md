@@ -181,6 +181,20 @@ python3 process_status.py [repo ...]   # or: make status [REPOS="path1 path2"]
 - Drift flags: `spec-gap` (requirements.md without design.md or tasks.md), `rune-drift` (a `specs/**` task file fails `rune list` parsing), `backlog-drift` (specs/BACKLOG.md fails schema or parse checks), `no-agentic-json`.
 - Strictly read-only against target repos (`git --no-optional-locks` porcelain reads only); missing paths are reported on their row, never a crash.
 
+### local_next_task.py
+
+Runs the existing `next-task` skill repeatedly through Codex CLI and LM Studio's
+local `8-bit` model, using a fresh session for each selected task group.
+
+```bash
+make local-next-task TASKS=/absolute/path/to/repo/specs/feature/tasks.md ARGS="--dry-run"
+make local-next-task TASKS=/absolute/path/to/repo/specs/feature/tasks.md
+```
+
+See [the local runner runbook](../docs/runbooks/local-next-task.md) for model
+selection, limits, logs, and resuming after a halt. Run its tests with
+`make test-local-next-task`.
+
 ### test-conversion/ (Go Application)
 
 **Purpose**: Converts Go test files from slice-based table-driven tests to map-based table-driven tests for better test isolation and cleaner syntax.

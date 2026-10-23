@@ -71,6 +71,12 @@ The recommended way to start a new feature is with `/starwave:creating-spec`, wh
 
 Then implement using `/next-task` and commit with `/commit`.
 
+For iterative execution with LM Studio's local `8-bit` model, run
+`make local-next-task TASKS=/path/to/project/specs/feature/tasks.md`.
+Each task group gets a fresh Codex session. See the
+[local runner runbook](docs/runbooks/local-next-task.md) for previewing a run,
+limits, logs, and stop conditions.
+
 Each phase requires explicit user approval before proceeding to ensure quality and alignment.
 
 ### PRDs

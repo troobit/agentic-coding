@@ -28,6 +28,13 @@ paths: **/*.svelte, **/*.svelte.ts, **/*.svelte.js
 - Never export non-handler helpers from `+server.ts` / `+page.ts` files — the
   postbuild analysis rejects them and `pnpm build` fails (plain `check` does
   not catch it). Put shared helpers in `$lib`.
+- A prerendered page can host a form whose action lives on another route:
+  `<form method="POST" action="/contact" use:enhance>`. Cross-route, `update()`
+  does not set `page.form` (it still runs `invalidateAll` on success), so read
+  the `ActionResult` inside the enhance callback instead. A route may be just a
+  `+page.server.ts` (actions plus a `load` that redirects visits) with no
+  `+page.svelte`. Redirect with 303, not 307/308: a no-JS POST also runs that
+  `load` after the action, and 307/308 replay the POST at the target.
 
 ## Testing
 

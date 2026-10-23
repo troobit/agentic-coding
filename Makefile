@@ -13,7 +13,7 @@
 # lint      shellcheck all shell scripts + fail if generated files drift
 #           from their sources in shared/ and mcp/
 
-.PHONY: bootstrap generate sync sync-claude sync-codex align status test test-codex lint lint-shell lint-drift
+.PHONY: bootstrap generate sync sync-claude sync-codex align status local-next-task test test-local-next-task test-codex lint lint-shell lint-drift
 
 bootstrap:
 	scripts/bootstrap.sh
@@ -37,9 +37,16 @@ align:
 status:
 	python3 scripts/process_status.py $(REPOS)
 
+# TASKS is an explicit path, including when the target is in another repo.
+local-next-task:
+	python3 scripts/local_next_task.py "$(TASKS)" $(ARGS)
+
 test:
 	python3 -m unittest discover -s tests
 	cd scripts && python3 -m unittest discover -s tests -t .
+
+test-local-next-task:
+	python3 -m unittest discover -s tests -p 'test_local_next_task.py'
 
 # Opt-in native skill discovery through the installed Codex app server.
 test-codex:
