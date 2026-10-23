@@ -16,6 +16,10 @@ paths: **/*.py
   end-to-end test shelling out to `python3` failed on a generator script whose
   signatures had drifted to PEP 604 while every human ran it under Homebrew's
   3.13.
+- On Apple's Python, subprocesses with an isolated `HOME` can create bytecode
+  caches under `~/Library/Caches/com.apple.python`. Tests asserting which user
+  config directories were written should set `PYTHONDONTWRITEBYTECODE=1` for
+  those subprocesses so interpreter caches do not look like client writes.
 
 ## Dataclasses
 

@@ -22,6 +22,7 @@
     "default_for": ["svelte.config.js"]
   },
   "github": {
+    "codex_enabled": false,
     "transport": {
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp/"
@@ -36,6 +37,7 @@
     "default_for": []
   },
   "transit": {
+    "codex_enabled": false,
     "_comment": "Transit.app built-in MCP server; enable in Settings (default port 3141). Localhost only, so no cloud surface.",
     "transport": {
       "type": "http",
@@ -56,6 +58,7 @@
     "default_for": []
   },
   "terraform": {
+    "codex_enabled": false,
     "transport": {
       "type": "stdio",
       "command": "podman",
@@ -63,16 +66,6 @@
     },
     "secrets": {},
     "surfaces": ["claude", "vscode", "cloud", "codex"],
-    "default_for": []
-  },
-  "awesome-copilot": {
-    "transport": {
-      "type": "stdio",
-      "command": "podman",
-      "args": ["run", "-i", "--rm", "ghcr.io/microsoft/mcp-dotnet-samples/awesome-copilot:latest"]
-    },
-    "secrets": {},
-    "surfaces": ["vscode", "codex"],
     "default_for": []
   }
 }

@@ -21,6 +21,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SYNC_SCRIPT = REPO_ROOT / "scripts" / "sync-claude.sh"
+CODEX_SYNC_SCRIPT = REPO_ROOT / "scripts" / "sync-codex.sh"
 SKILLS_DIR = REPO_ROOT / "claude" / "skills"
 
 # The six original link pairs (target -> source), exactly as they appear
@@ -127,6 +128,15 @@ class TestSyncScriptCompat(unittest.TestCase):
             "the set of ~/.claude symlink targets changed",
         )
 
+    def test_claude_sync_does_not_create_codex_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = dict(os.environ, HOME=tmp)
+            env.pop("CODEX_HOME", None)
+            subprocess.run(["bash", str(SYNC_SCRIPT)], env=env, check=True,
+                           capture_output=True)
+            self.assertFalse((Path(tmp) / ".agents").exists())
+            self.assertFalse((Path(tmp) / ".codex").exists())
+
 
 class TestSpecJanitorAgentLink(unittest.TestCase):
     """Pins the VS Code spec-janitor agent symlink (Req 9.1)."""
@@ -156,8 +166,9 @@ class TestCodexSkillLinks(unittest.TestCase):
     def run_sync(self, home: Path):
         env = os.environ.copy()
         env["HOME"] = str(home)
+        env.pop("CODEX_HOME", None)
         return subprocess.run(
-            ["bash", str(SYNC_SCRIPT)],
+            ["bash", str(CODEX_SYNC_SCRIPT)],
             cwd=REPO_ROOT,
             env=env,
             check=True,
@@ -167,14 +178,15 @@ class TestCodexSkillLinks(unittest.TestCase):
 
     def repo_skill_names(self):
         return sorted(
-            path.name for path in SKILLS_DIR.iterdir() if path.is_dir()
+            path.name for path in SKILLS_DIR.iterdir()
+            if not path.name.startswith(".") and (path / "SKILL.md").is_file()
         )
 
     def test_every_repo_skill_is_linked_for_codex(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             first = self.run_sync(home)
-            self.assertIn("Codex skills in ~/.agents/skills:", first.stdout)
+            self.assertIn(f"Codex skills in {home}/.agents/skills:", first.stdout)
 
             codex_skills = home / ".agents" / "skills"
             for name in self.repo_skill_names():
@@ -219,8 +231,9 @@ class TestOwnedSymlinkPrune(unittest.TestCase):
     def run_sync(self, home: Path):
         env = os.environ.copy()
         env["HOME"] = str(home)
+        env.pop("CODEX_HOME", None)
         return subprocess.run(
-            ["bash", str(SYNC_SCRIPT)],
+            ["bash", str(CODEX_SYNC_SCRIPT)],
             cwd=REPO_ROOT,
             env=env,
             check=True,
@@ -261,7 +274,8 @@ class TestOwnedSymlinkPrune(unittest.TestCase):
             home = Path(tmp)
             self.run_sync(home)
             skill_name = sorted(
-                p.name for p in SKILLS_DIR.iterdir() if p.is_dir())[0]
+                p.name for p in SKILLS_DIR.iterdir()
+                if not p.name.startswith(".") and (p / "SKILL.md").is_file())[0]
             target = home / ".agents" / "skills" / skill_name
 
             # A second run must not prune a link whose target still exists.

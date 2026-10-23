@@ -389,6 +389,49 @@ class McpMergeTests(unittest.TestCase):
         self.assertNotIn("stale-alpha", text)
         self.assertNotIn("https://stale.example/mcp", text)
 
+    def test_codex_config_preserves_tables_after_canonical_server(self):
+        cfg = self.dir / "config.toml"
+        unrelated = ('[tui]\nnotifications = true\n\n'
+                     '[projects."/tmp/other"]\ntrust_level = "trusted"\n')
+        cfg.write_text('[mcp_servers.alpha]\ncommand = "old"\n'
+                       '[mcp_servers.alpha.env]\nOLD = "value"\n\n'
+                       + unrelated)
+        agentic_lib.update_codex_config(cfg, self.defs, None, [])
+        self.assertIn(unrelated, cfg.read_text())
+        self.assertNotIn('OLD = "value"', cfg.read_text())
+
+    def test_codex_disable_flag_does_not_affect_other_surfaces(self):
+        self.defs["alpha"]["codex_enabled"] = False
+        self.assertFalse(agentic_lib.emit_codex_mcp(self.defs)["alpha"]["enabled"])
+        self.assertNotIn("enabled", agentic_lib.emit_repo_mcp(self.defs)
+                         ["mcpServers"]["alpha"])
+        self.assertNotIn("enabled", agentic_lib.emit_vscode_mcp(self.defs)
+                         ["servers"]["alpha"])
+
+    def test_retired_service_removed_from_codex_and_json_but_custom_preserved(self):
+        import json
+        cfg = self.dir / "config.toml"
+        cfg.write_text('[mcp_servers.awesome-copilot]\ncommand = "old"\n\n'
+                       '[mcp_servers.custom]\ncommand = "keep"\n')
+        agentic_lib.update_codex_config(cfg, self.defs, None, [])
+        self.assertNotIn("awesome-copilot", cfg.read_text())
+        self.assertIn('[mcp_servers.custom]\ncommand = "keep"', cfg.read_text())
+        repo = self.dir / "repo"
+        repo.mkdir()
+        for relative, key in ((".mcp.json", "mcpServers"),
+                              (".vscode/mcp.json", "servers")):
+            target = repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps({key: {
+                "awesome-copilot": {"command": "old"},
+                "custom": {"command": "keep"}}}))
+        agentic_lib.generate_repo_configs(repo, self.defs, None, [])
+        for relative, key in ((".mcp.json", "mcpServers"),
+                              (".vscode/mcp.json", "servers")):
+            servers = json.loads((repo / relative).read_text())[key]
+            self.assertNotIn("awesome-copilot", servers)
+            self.assertEqual(servers["custom"], {"command": "keep"})
+
     def test_claude_cli_commands_use_user_scope(self):
         cmds = agentic_lib.build_claude_cli_commands(self.defs, None)
         self.assertTrue(cmds)
@@ -495,6 +538,18 @@ class ClaudeCliPathTests(unittest.TestCase):
         self.assertEqual([r.kind for r in report], ["unchanged"] * 3)
         self.assertEqual(self.invocations(), [],
                          "an already-converged rerun must not run the CLI")
+
+    def test_retired_service_is_removed_through_claude_cli(self):
+        import json as j
+        self.run_update()
+        data = j.loads(self.config.read_text())
+        data["mcpServers"]["awesome-copilot"] = {"command": "old"}
+        self.config.write_text(j.dumps(data))
+        self.clear_log()
+        self.run_update()
+        self.assertNotIn("awesome-copilot", j.loads(self.config.read_text())["mcpServers"])
+        self.assertEqual(self.invocations(), [["mcp", "remove", "awesome-copilot",
+                                              "--scope", "user"]])
 
     def test_claude_args_normalization_reports_no_change(self):
         import json as j
@@ -706,7 +761,7 @@ class CanonicalServersFileTests(unittest.TestCase):
         defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
         self.assertEqual(
             sorted(defs),
-            ["awesome-copilot", "azure", "devtools", "github",
+            ["azure", "devtools", "github",
              "svelte", "terraform", "transit"])
         for name, spec in defs.items():
             transport = spec["transport"]

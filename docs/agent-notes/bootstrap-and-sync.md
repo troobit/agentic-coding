@@ -1,4 +1,4 @@
-# Bootstrap, Brewfile, Makefile, and sync-claude.sh
+# Bootstrap, Brewfile, Makefile, and sync scripts
 
 ## bootstrap.sh
 
@@ -6,7 +6,7 @@
   Bootstrap section: Homebrew → `brew bundle` → Claude Code installer →
   `go install` orbit + mcp-devtools + rune → `mkdir -p` targets (`~/.claude`,
   `~/.agents/skills`, `~/.codex`, VS Code User dir) → `sync-claude.sh`
-  → `generate.py --user` → remove stale `~/.copilot/agents/prd.agent.md`
+  → `sync-codex.sh` → `generate.py --user` → remove stale `~/.copilot/agents/prd.agent.md`
   → print manual auth steps, ending with "re-run scripts/bootstrap.sh after
   authenticating".
 - No `set -e`: per-step failures are reported (`FAILED:`) and independent
@@ -41,7 +41,7 @@
 - All JSON/TOML work (user MCP configs, VS Code settings merge, Codex
   `config.toml`) is delegated to
   `generate.py --user` per Decision 12 — the shell only mkdirs, symlinks
-  (via sync-claude.sh, including Codex `~/.agents/skills` links), seeds
+  (via separate Claude and Codex sync scripts), seeds
   `~/.codex/AGENTS.md` through generate.py, and removes the one known stale
   file.
 - `make bootstrap` wraps it. shellcheck 0.11.0 is installed (via the
@@ -67,11 +67,37 @@
 - `lint` = `lint-shell` (shellcheck on `scripts/*.sh`, hard-fails if shellcheck is not installed) + `lint-drift`.
 - `lint-drift` avoids needing a temp-output flag on generate.py: it snapshots the checked-in generated instruction files (`claude/CLAUDE.md`, `copilot/instructions/copilot-instructions.md`, `codex/AGENTS.md`), runs `python3 scripts/generate.py` in place, diffs, then always restores the snapshots — so a drifting lint run never leaves the working tree modified.
 - `generate`/`align` reference `scripts/generate.py` and `scripts/align.py` by path; those are owned by other streams of the feature.
+- `sync` invokes `sync-claude` then `sync-codex`; either can run independently.
+- `test-codex` opts into an isolated native app-server `skills/list` regression
+  test. Ordinary `test` skips this check so the CLI is not a test prerequisite.
 
 ## sync-claude.sh
 
 - The six original `~/.claude` symlink lines must stay byte-for-byte identical (Req 9.1). `tests/test_sync_compat.py` enforces the exact target->source map (and that no seventh `~/.claude/*` link appears) plus the presence of every pre-feature skill directory.
-- New: `mkdir -p` for `$HOME/.claude`, `$HOME/.agents/skills`, and the VS Code prompts dir (fresh machine: none may exist), and a symlink `"$HOME/Library/Application Support/Code/User/prompts/prd.agent.md"` -> repo `copilot/agents/prd.agent.md`. The space in "Application Support" means every use must be quoted.
-- Codex skill linking is per top-level `claude/skills/*` directory into `$HOME/.agents/skills/{skill-name}`. Do not replace the whole `~/.agents/skills` directory: it may contain curated or user-installed Codex skills. Existing non-matching targets are skipped and reported.
+- Creates `$HOME/.claude` and the VS Code prompts dir, plus the PRD and
+  spec-janitor profile links. It no longer creates Codex links or files.
+  The space in "Application Support" means every use must be quoted.
 - If VS Code profile discovery fails (non-default profile active), the fallback is the `chat.agentFilesLocations` setting pointing at the repo's `copilot/agents/` dir — documented in the script header comment.
 - The link target `copilot/agents/prd.agent.md` may not exist yet (created by another stream); `ln -sfn` happily creates a dangling link, which resolves once the file lands.
+
+## sync-codex.sh
+
+- Runs `generate.py --codex` for user instructions and MCP, then links visible
+  top-level `claude/skills/*/SKILL.md` directories into `~/.agents/skills`.
+  Non-skill containers such as `synced/` and hidden `.trash/` are excluded.
+- Existing foreign targets are skipped and reported. Only dangling links into
+  this repo's skill source directory are pruned. Reruns preserve live links.
+- `CODEX_HOME` selects the configuration directory, never the skills directory.
+  `--servers a,b` is forwarded to the generator; invalid arguments fail before
+  creating links. No Claude or VS Code user files are written.
+- A known broken relative `skills -> claude/skills` symlink in the Codex config
+  directory blocks bundled skill installation. Sync removes this exact dangling
+  link and its `skills.legacy-link` backup, then creates the directory;
+  foreign links are preserved.
+- Native baseline on 2026-10-23: 27 repo skills discovered, no skill parse errors.
+  After sync, native `skills/list` discovered all 42 repo skills with no errors;
+  15 links were added and two retired dangling links pruned.
+- All five `starwave:*` skills report `enabled: true` through native listing.
+  Codex CLI/IDE explicitly invoke them through `/skills` or `$starwave:tasks`
+  (and the equivalent exact names). Desktop `/` completion is client UI;
+  native discovery does not verify its menu rendering. Shared names were kept.

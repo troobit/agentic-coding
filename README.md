@@ -166,18 +166,27 @@ The old `copilot/prompts/` prompt files are gone — the gated starwave lane is 
 
 ## Codex Integration
 
-Codex discovers Agent Skills from `~/.agents/skills`. `scripts/sync-claude.sh` links each top-level directory under `claude/skills/` into that location individually, so Starwave, `rune`, `next-task`, and the related workflow skills are available to Codex from the same repository source.
+Run `make sync-codex` (or `scripts/sync-codex.sh`) to set up Codex independently. It links each visible, top-level directory containing `claude/skills/<name>/SKILL.md` into `~/.agents/skills`, Codex's user skill discovery directory. Hidden directories and downloaded skill containers are excluded. [OpenAI's skill discovery documentation](https://developers.openai.com/codex/skills) covers these locations and symlink support.
 
 The script does not replace `~/.agents/skills`; existing Codex/user-installed skills are preserved. If a target skill name already exists and does not point at this repository, sync reports the conflict and leaves it alone. Some skill bodies still mention Claude-specific tools or approval mechanisms, so Codex can follow the portable `SKILL.md` instructions while host-specific behavior depends on the tools available in the Codex session.
 
-Codex instructions and MCP settings are generated too: `make generate` rebuilds the checked-in `codex/AGENTS.md`, `scripts/generate.py --user` writes managed blocks to `~/.codex/AGENTS.md` and `~/.codex/config.toml`, and `scripts/align.py <repo>` converges per-repo `.codex/config.toml` MCP tables while preserving unrelated Codex settings.
+The same command generates Codex instructions and MCP settings from `shared/` and `mcp/servers.json`, preserving unrelated settings and custom servers. It writes `~/.codex/AGENTS.md` and `~/.codex/config.toml`, or uses `CODEX_HOME` when set. Skill links remain in `~/.agents/skills`. A known broken legacy `~/.codex/skills -> claude/skills` link and its old backup are removed, and the directory restored so bundled Codex skills can install.
+
+GitHub and Terraform are disabled for Codex as requested. Transit also defaults to disabled because it requires a running local app. Set `codex_enabled` to `true` in `mcp/servers.json` and sync to enable one after its prerequisites are ready. This flag does not change other clients. Awesome Copilot has been removed; generation removes old entries instead of keeping them as custom servers. To select a subset, run `scripts/sync-codex.sh --servers devtools,svelte` (existing canonical entries are retained).
+
+`make test-codex` checks actual skill discovery through the installed Codex app server's `skills/list` API in an isolated home. `codex mcp list` shows server enablement; a native `mcpServerStatus/list` request also checks connections and tool discovery. Restart Codex if the running session's skill catalog has not refreshed.
+
+In Codex CLI and the IDE extension, invoke a skill through `/skills` or type its exact name with `$`. For Starwave, use `$starwave:creating-spec`, `$starwave:requirements`, `$starwave:design`, `$starwave:tasks`, or `$starwave:smolspec`. The desktop app also lists enabled skills in its `/` menu; this menu is client UI and is not the discovery check. See the [official invocation guidance](https://developers.openai.com/codex/skills) and [desktop slash-command reference](https://learn.chatgpt.com/docs/reference/slash-commands).
+
+`make generate` rebuilds the checked-in instruction files. `scripts/generate.py --codex` regenerates only Codex user files, while `--user` generates all clients' user files. `scripts/align.py <repo>` converges per-repo `.codex/config.toml` MCP tables.
 
 ## Scripts Directory
 
 The `scripts/` directory contains helper scripts for AI-assisted development:
 
 - **`bootstrap.sh`** - One-script new-machine setup (see the quickstart above)
-- **`sync-claude.sh`** - Syncs configuration from `claude/` to `~/.claude/`, links repo skills into Codex's `~/.agents/skills`, and links the PRD agent into the VS Code profile
+- **`sync-claude.sh`** - Syncs configuration from `claude/` to `~/.claude/` and links custom agents into the VS Code profile
+- **`sync-codex.sh`** - Links repo skills into `~/.agents/skills` and generates Codex user instructions and MCP settings
 - **`generate.py`** - Regenerates the instruction files and MCP configs from the canonical sources, including Codex `AGENTS.md` and `config.toml`
 - **`align.py`** - Aligns a target repository's agent configs with the canonical sources, including `.codex/config.toml`
 
@@ -186,7 +195,7 @@ To set up your global Claude Code configuration on an already-bootstrapped machi
 ./scripts/sync-claude.sh
 ```
 
-This creates symlinks from `~/.claude/` pointing to the files in this repository's `claude/` directory and per-skill symlinks under `~/.agents/skills` for Codex, keeping your configuration centralized and version-controlled.
+This creates the Claude and VS Code symlinks. Use `make sync-codex` for Codex only, or `make sync` to run both sync scripts. Bootstrap also runs both.
 
 This framework is designed to work with Claude Code, GitHub Copilot (VS Code and the cloud coding agent), and Codex.
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Independent Codex setup through `scripts/sync-codex.sh` and `make sync-codex`: links valid repo skills into `~/.agents/skills` and generates Codex instructions/MCP settings without configuring other clients. `make test-codex` verifies native skill discovery through the Codex app server.
 - **UI/UX corpus** (`ui-ux/`, `specs/ui-ux-corpus/`): A durable library and corpus of UI/UX preferences, built from the comments Ronan leaves *inside spadre* while reviewing the UI variants. `ui-ux/ui-ux-guide.md` is the UI/UX peer of `arjen-style-guide.md` — a cross-repository authority covering spadre, rtob and anything after. Two layers with different authorship: `ui-ux/observations/` holds one machine-written file per source comment carrying the body verbatim, and the guide holds human-written principles that each cite the observations they rest on. Indexed by **UI concern** from the closed vocabulary in `ui-ux/concerns.md`, never by document — a comment about a caret handle habitually sits on whatever heading the cursor was near, so the document id, version, line range and quoted anchor are recorded as provenance and never as an index
   - **`scripts/ui_corpus_ingest.py`**: stdlib ingest, idempotent by spadre's own stable comment ids — a re-run over unchanged threads writes nothing and leaves a clean tree. Ownership of every field is explicit, so `concerns`, `sentiment`, `status`, `principles` and everything below the `<!-- triage -->` marker survive re-ingestion, including when the upstream comment was edited. Ingestion records and never guesses: a new observation lands `concerns: []`, `sentiment: "unclear"`, `status: "untriaged"` with no invented rationale
   - **Real review separated from seed data by an epoch, not by identity**: `ui-ux/ingest.json` carries `epoch: 2026-09-13` with its reasoning beside it, plus `force_include`/`force_exclude` override lists keyed on stable comment ids. An author allowlist would rot *and* is wrong on the current data — the reviewer's own account wrote both a seeded note on the 12th and real feedback on the 15th. Declined comments are written to `ui-ux/excluded.md` with a reason rather than dropped silently
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Specs overview update**: `specs/OVERVIEW.md` with backlog-skill spec entry and status tracking
 
 ### Changed
+- Claude sync no longer configures Codex; `make sync` and bootstrap run both scripts. Codex generation honors `CODEX_HOME`, keeps GitHub/Terraform/Transit disabled, and documents exact Starwave invocation through `/skills` or `$starwave:…`.
 - **.gitignore**: Added `.worktrees/*` for git worktree isolation pattern used by parallel execution skills; removed the now-dead `/nextup.md` and `/SPOUT.md` entries and their comments — the tooling that managed them is gone
 - **`scripts/align.py`**: deleted the nextup-template convergence step (`_converge_nextup_template`, `NEXTUP_EXAMPLE`, `NEXTUP_LM_MARKER`, the `.gitignore`-append helper, and the seed-root existence check for the canonical template) in the same change as deleting the canonical `nextup.example.md`, so align never runs against a seed root missing a file it requires; remaining pipeline steps renumbered
 - **`docs/runbooks/process-onboarding.md`**: rewritten — onboarding no longer seeds a session template or manages `.gitignore`; the "First session" section now points at `/backlog` as the tracked entry point for forward intent
@@ -46,7 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tests/test_sync_compat.py`**: moved `nextup` from `PRE_FEATURE_SKILLS` to `RETIRED_SKILLS` and added `spout`, matching the existing `sendit`/`transit` retirement pattern
 - **`tests/test_process_status.py`**, **`tests/test_align.py`**: dropped the now-dead `nextup`/`example` fixture kwargs and the `nextup_text()` helper; genericized the stray-unmanaged-file regression test to no longer name the retired template
 
+### Fixed
+- Codex MCP updates preserve unrelated TOML tables following managed servers. Sync excludes non-skill containers, preserves user skills, prunes owned dangling links, and removes the broken legacy skills link and its backup so bundled skills can install.
+
 ### Removed
+- Unused Awesome Copilot MCP service. Generation removes retired entries from existing Codex, Claude, and VS Code configs instead of preserving them as custom services.
 - **`claude/skills/nextup/`, `claude/skills/spout/`**: deleted outright; README skill registry now lists `backlog` in their place
 - **`claude/uplift-candidates.md`**: closed, fully-implemented historical mining report with no remaining references elsewhere in the tree; deleted rather than purged line-by-line
 - **Align nextup fixtures**: the eight `tests/fixtures/align/repos/nextup-*` repos, their `.gitignore` files, and `seed-root/nextup.example.md`, along with the step-6 test classes in `tests/test_align.py`

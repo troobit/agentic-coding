@@ -4,7 +4,7 @@
 # generate  rebuild the checked-in generated files (claude/CLAUDE.md,
 #           copilot/instructions/copilot-instructions.md, codex/AGENTS.md)
 #           and MCP configs
-# sync      create the ~/.claude and VS Code profile symlinks
+# sync      sync Claude/VS Code links plus Codex skills, instructions, and MCP
 # align     align this repository's own agent configs
 # status    read-only process-status report over participating repos
 #           (this repo plus the checked-in default list; pass explicit
@@ -13,7 +13,7 @@
 # lint      shellcheck all shell scripts + fail if generated files drift
 #           from their sources in shared/ and mcp/
 
-.PHONY: bootstrap generate sync align status test lint lint-shell lint-drift
+.PHONY: bootstrap generate sync sync-claude sync-codex align status test test-codex lint lint-shell lint-drift
 
 bootstrap:
 	scripts/bootstrap.sh
@@ -22,7 +22,14 @@ generate:
 	python3 scripts/generate.py
 
 sync:
+	$(MAKE) sync-claude
+	$(MAKE) sync-codex
+
+sync-claude:
 	scripts/sync-claude.sh
+
+sync-codex:
+	scripts/sync-codex.sh
 
 align:
 	python3 scripts/align.py
@@ -33,6 +40,10 @@ status:
 test:
 	python3 -m unittest discover -s tests
 	cd scripts && python3 -m unittest discover -s tests -t .
+
+# Opt-in native skill discovery through the installed Codex app server.
+test-codex:
+	AGENTIC_CODEX_INTEGRATION=1 python3 -m unittest discover -s tests -p 'test_sync_codex.py'
 
 lint: lint-shell lint-drift
 

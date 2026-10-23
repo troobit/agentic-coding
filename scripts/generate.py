@@ -10,6 +10,7 @@ Usage:
   generate.py --user          user-level targets (Claude MCP, VS Code
                               mcp.json/settings, Codex config.toml +
                               AGENTS.md)
+  generate.py --codex         Codex user instructions and MCP settings only
   generate.py --repo PATH     per-repo .mcp.json + .vscode/mcp.json +
                               .codex/config.toml
   generate.py --cloud         print paste-ready cloud-agent MCP JSON
@@ -32,11 +33,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--user", action="store_true",
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--user", action="store_true",
                         help="generate user-level configs")
-    parser.add_argument("--repo", metavar="PATH",
+    modes.add_argument("--codex", action="store_true",
+                       help="generate only Codex user instructions and MCP settings")
+    modes.add_argument("--repo", metavar="PATH",
                         help="generate per-repo MCP configs into PATH")
-    parser.add_argument("--cloud", action="store_true",
+    modes.add_argument("--cloud", action="store_true",
                         help="print paste-ready cloud-agent MCP JSON")
     parser.add_argument("--servers", metavar="A,B",
                         help="comma-separated subset of canonical servers")
@@ -53,6 +57,10 @@ def main(argv=None) -> int:
         elif args.cloud:
             defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
             print(agentic_lib.emit_cloud_json(defs, subset))
+        elif args.codex:
+            defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
+            agentic_lib.generate_codex_user_configs(
+                defs, subset, report, repo_root=REPO_ROOT)
         elif args.user:
             defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
             agentic_lib.generate_user_configs(defs, subset, report,

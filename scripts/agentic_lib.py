@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import shutil
 from pathlib import Path
 
 BEGIN_MARKER = "<!-- agentic:begin -->"
 END_MARKER = "<!-- agentic:end -->"
+# Remove previously managed services rather than preserving them as custom.
+RETIRED_MCP_SERVERS = frozenset({"awesome-copilot"})
 
 
 class GenerationError(Exception):
@@ -351,6 +354,9 @@ def _render_codex_server(name: str, spec: dict) -> dict:
     else:
         entry = {"url": transport["url"]}
 
+    if not spec.get("codex_enabled", True):
+        entry["enabled"] = False
+
     env_vars = []
     env_http_headers = {}
     for secret, mech in sorted(spec.get("secrets", {}).items()):
@@ -461,9 +467,8 @@ def _strip_codex_mcp_sections(text: str, canonical_names) -> str:
     out = []
     skipping = False
     for line in text.splitlines():
-        name = _codex_mcp_server_name(line)
-        if name is not None:
-            skipping = name in canonical
+        if line.lstrip().startswith("["):
+            skipping = _codex_mcp_server_name(line) in canonical
         if not skipping:
             out.append(line)
     return "\n".join(out).rstrip()
@@ -478,8 +483,8 @@ def update_codex_config(path: Path, defs: dict, subset, report: list) -> bool:
     existing_names = _codex_mcp_server_names(old)
     rendered_names = selected_names | (existing_names & canonical_names)
     rendered = emit_codex_mcp_toml_block(defs, sorted(rendered_names))
-    body = _strip_codex_mcp_sections(old, canonical_names)
-    preserved = sorted(existing_names - canonical_names)
+    body = _strip_codex_mcp_sections(old, canonical_names | RETIRED_MCP_SERVERS)
+    preserved = sorted(existing_names - canonical_names - RETIRED_MCP_SERVERS)
     if preserved:
         report.append(ReportEntry(
             "preserved", path,
@@ -515,7 +520,8 @@ def _merge_servers_into(path: Path, key: str, rendered: dict, defs: dict,
     existing = data.get(key, {})
     if not isinstance(existing, dict):
         existing = {}
-    preserved = sorted(n for n in existing if n not in defs)
+    preserved = sorted(n for n in existing
+                       if n not in defs and n not in RETIRED_MCP_SERVERS)
     merged = {n: existing[n] for n in preserved}
     merged.update(rendered)
     # Canonical-named entries present but outside the emitted set are
@@ -642,6 +648,16 @@ def update_claude_user_config(path: Path, defs: dict, subset, report: list,
                         json.dumps(entry), "--scope", "user"],
                        check=True, capture_output=True, text=True)
 
+    for name in sorted(RETIRED_MCP_SERVERS):
+        if _read_claude_user_server(path, name) is None:
+            continue
+        remove(name)
+        removed = _read_claude_user_server(path, name) is None
+        report.append(ReportEntry(
+            "changed" if removed else "warning", path,
+            f"retired MCP server {name}: "
+            + ("removed" if removed else "could not remove; remove it manually")))
+
     for name, entry in emit_repo_mcp(defs, subset)["mcpServers"].items():
         existing = _read_claude_user_server(path, name)
         if _normalized_server(existing) == _normalized_server(entry):
@@ -744,6 +760,18 @@ def default_vscode_user_dir() -> Path:
     return Path.home() / "Library" / "Application Support" / "Code" / "User"
 
 
+def generate_codex_user_configs(defs: dict, subset, report: list,
+                                repo_root: Path,
+                                codex_config_path: Path = None,
+                                codex_agents_path: Path = None) -> None:
+    """Generate Codex user files independently of the other clients."""
+    codex_dir = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+    config = Path(codex_config_path or codex_dir / "config.toml")
+    agents = Path(codex_agents_path or codex_dir / "AGENTS.md")
+    update_codex_config(config, defs, subset, report)
+    write_managed(agents, build_codex_block(Path(repo_root) / "shared"), report)
+
+
 def generate_user_configs(defs: dict, subset, report: list, repo_root: Path,
                           claude_config_path: Path = None,
                           vscode_mcp_path: Path = None,
@@ -759,16 +787,11 @@ def generate_user_configs(defs: dict, subset, report: list, repo_root: Path,
     vscode_mcp_path = Path(vscode_mcp_path or vscode_dir / "mcp.json")
     vscode_settings_path = Path(vscode_settings_path
                                 or vscode_dir / "settings.json")
-    codex_dir = Path.home() / ".codex"
-    codex_config_path = Path(codex_config_path or codex_dir / "config.toml")
-    codex_agents_path = Path(codex_agents_path or codex_dir / "AGENTS.md")
-
     update_claude_user_config(claude_config_path, defs, subset, report,
                               use_cli=use_cli)
     vscode = emit_vscode_mcp(defs, subset)
     _merge_servers_into(vscode_mcp_path, "servers", vscode["servers"], defs,
                         "vscode", report, inputs=vscode["inputs"])
     merge_vscode_settings(vscode_settings_path, repo_root, report)
-    update_codex_config(codex_config_path, defs, subset, report)
-    write_managed(codex_agents_path,
-                  build_codex_block(Path(repo_root) / "shared"), report)
+    generate_codex_user_configs(defs, subset, report, repo_root,
+                                codex_config_path, codex_agents_path)

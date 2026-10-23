@@ -58,6 +58,12 @@ target paths are injected).
 - generate.py prints every entry and appends "no changes" when no entry has
   kind "changed" — a converged `--user` rerun prints per-server
   "already configured" lines plus "no changes".
+- `generate.py --codex` calls `generate_codex_user_configs`, also reused by
+  `--user`, and writes only Codex instructions/MCP. It honors `CODEX_HOME`.
+  The managed-block rules for markerless instructions remain unchanged.
+- Codex MCP table stripping must reset at every TOML table header. Otherwise
+  unrelated tables after a canonical MCP server (for example `[tui]`) are lost.
+  Regression coverage includes tables following a canonical `.env` table.
 
 ## Secret naming scheme (Req 4.3)
 
@@ -72,6 +78,22 @@ naming server + target (`GenerationError`).
 - transit is documented, not a placeholder: `http://localhost:3141/mcp`
   (Transit.app built-in MCP server, opt-in via Settings, default port 3141;
   localhost-only so its surfaces exclude "cloud").
-- awesome-copilot is vscode-only; devtools has `default_for: ["*"]`,
+- devtools has `default_for: ["*"]`,
   svelte `["svelte.config.js"]`.
 - Commands are bare PATH-resolved names; a test enforces no `/Users/` paths.
+- Optional `codex_enabled: false` emits `enabled = false` only for Codex.
+  GitHub, Terraform, and Transit use this flag; full user generation and repo alignment
+  share the renderer, so they cannot silently re-enable these servers.
+- Native MCP discovery on 2026-10-23 found four startup failures: GitHub lacked
+  authentication; Terraform and Awesome Copilot needed the stopped Podman VM;
+  Transit had no running local endpoint or installed app. GitHub/Terraform were
+  disabled by request, Awesome Copilot removed entirely, and Transit made opt-in.
+  Azure, DevTools, and Svelte
+  connected and returned tools.
+- `RETIRED_MCP_SERVERS` records removed formerly managed names. JSON merge,
+  Claude CLI generation, and Codex TOML updates remove these entries instead of
+  preserving them as custom servers. This is necessary when deleting a canonical
+  definition: definition removal alone otherwise leaves old live entries behind.
+- After sync, native `mcpServerStatus/list` reported no tool-discovery errors:
+  Azure 71 tools, DevTools 11, Svelte 4; GitHub/Terraform/Transit disabled;
+  Awesome Copilot absent. Its old VS Code user entry was removed as well.

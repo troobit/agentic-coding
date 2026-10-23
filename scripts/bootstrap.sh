@@ -11,7 +11,7 @@
 #      PATH, symlink it into ~/.local/bin (agreement-invoice-skills Req 3)
 #   5. mkdir -p ~/.claude, ~/.agents/skills, ~/.codex, and the VS Code
 #      User/ settings dir
-#   6. scripts/sync-claude.sh (symlinks, including Codex Agent Skills)
+#   6. scripts/sync-claude.sh and sync-codex.sh (links + Codex user config)
 #   7. generate.py --user (user MCP configs, Codex AGENTS.md, VS Code
 #      settings merge — ALL JSON work is delegated to generate.py; this
 #      script does no JSON manipulation, per Decision 12's rationale)
@@ -25,7 +25,8 @@
 #     (Req 8.1); steps that need authentication that does not exist yet are
 #     skipped with a report and appended to the manual-steps list.
 #   - Preserve-don't-clobber (Req 8.4): the shell parts only create
-#     directories and symlink via sync-claude.sh; the only removal is the
+#     directories and symlink via the sync scripts; the only removal besides
+#     dangling repo-owned skill links is the
 #     known stale ~/.copilot/agents/prd.agent.md. Managed-file merging is
 #     generate.py's job.
 #   - --dry-run prints what would happen without mutating anything.
@@ -227,11 +228,23 @@ make_dir "$VSCODE_USER_DIR"
 # ------------------------------------------------------------ 6. sync-claude
 step "Symlinks (scripts/sync-claude.sh)"
 if [ "$DRY_RUN" -eq 1 ]; then
-    would "run scripts/sync-claude.sh (idempotent Claude symlinks plus Codex ~/.agents/skills links)"
+    would "run scripts/sync-claude.sh (Claude and VS Code symlinks)"
 elif "$SCRIPT_DIR/sync-claude.sh"; then
     did "sync-claude.sh"
 else
     failed "sync-claude.sh (see output above)"
+fi
+
+# -------------------------------------------------------------- 6b. sync-codex
+step "Codex (scripts/sync-codex.sh)"
+if ! command -v python3 >/dev/null 2>&1; then
+    skipped "sync-codex.sh (python3 not available)"
+elif [ "$DRY_RUN" -eq 1 ]; then
+    would "run scripts/sync-codex.sh (Agent Skills, instructions, and MCP settings)"
+elif "$SCRIPT_DIR/sync-codex.sh"; then
+    did "sync-codex.sh"
+else
+    failed "sync-codex.sh (see output above)"
 fi
 
 # ------------------------------------------------------ 7. generate.py --user

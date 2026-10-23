@@ -11,6 +11,7 @@
 | [Spec Janitor](#spec-janitor) | 2026-07-26 | Done | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
 | [Backlog Skill](#backlog-skill) | 2026-08-26 | Done | A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources; includes the full toolchain sunset and a per-repo decision overwrite mode |
 | [UI/UX Corpus](#uiux-corpus) | 2026-09-16 | Done | A durable library and corpus of UI/UX preferences built from in-app spadre review comments: verbatim observations indexed by UI concern (never by document), a derived `ui-ux/ui-ux-guide.md` peer to `arjen-style-guide.md` where every principle cites its evidence, and an idempotent ingest that reuses the existing variant-comment reader |
+| [Codex Sync](#codex-sync) | 2026-10-23 | Done | Separate Codex skill/instruction/MCP sync, native discovery validation, disabled unavailable services, and retirement of Awesome Copilot |
 
 ---
 
@@ -90,3 +91,14 @@ A durable library and corpus of UI/UX preferences built from the comments Ronan 
 - [decision_log.md](ui-ux-corpus/decision_log.md)
 - [smolspec.md](ui-ux-corpus/smolspec.md)
 - [tasks.md](ui-ux-corpus/tasks.md)
+
+## Codex Sync
+
+Independent Codex setup with per-skill links, shared managed config generation,
+native discovery tests, disabled GitHub/Terraform/Transit, and retired Awesome
+Copilot cleanup. Documents Starwave invocation and preserves other clients' sync.
+
+- [decision_log.md](codex-sync/decision_log.md)
+- [design.md](codex-sync/design.md)
+- [requirements.md](codex-sync/requirements.md)
+- [tasks.md](codex-sync/tasks.md)
