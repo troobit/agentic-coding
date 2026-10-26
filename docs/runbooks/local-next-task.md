@@ -5,7 +5,26 @@ model ID for this runner is exactly `8-bit`, verified against this machine's
 `http://127.0.0.1:1234/v1/models` endpoint. Git, rune, Python 3.9+ and Codex CLI
 must be on PATH.
 
-From the agentic-coding checkout, preview the next invocation:
+Install the shell command once from the agentic-coding checkout:
+
+```sh
+make install-local-next-task
+```
+
+This links `~/.local/bin/local-next-task` to the runner in this checkout.
+Keep the checkout available and put `~/.local/bin` on PATH. Existing foreign
+files or links are preserved; reinstalling the same command is safe. Override
+the install location with `make install-local-next-task BIN_DIR=/path/to/bin`.
+
+Then use it from any directory, with a ledger path relative to that directory
+or an absolute path. For example, from the agentic-coding checkout:
+
+```sh
+local-next-task ../atk/redteam/tasks.md --dry-run
+local-next-task ../atk/redteam/tasks.md
+```
+
+The Make wrapper remains available from this checkout:
 
 ```sh
 make local-next-task TASKS=/path/to/project/specs/feature/tasks.md ARGS="--dry-run"
@@ -17,26 +36,55 @@ Then run the loop:
 make local-next-task TASKS=/path/to/project/specs/feature/tasks.md
 ```
 
+Make takes `TASKS=...`, not a positional file path. A missing value now prints
+usage; blank paths and directories are rejected before Git discovery. The
+previous empty value resolved to a directory and caused the misleading
+"tasks file must be inside a Git working tree" error.
+
 The target can be in another repository. The runner finds its Git root and
 sets that as the agent's working directory. The explicit ledger path is passed
 to rune and included in the prompt with the selected tasks and spec references.
 Use one runner per checkout at a time.
 
-Each iteration starts `codex exec --oss --local-provider lmstudio --model 8-bit`
-and explicitly invokes the existing `next-task` and rune skill manifests.
+Each iteration starts `codex exec --oss --local-provider lmstudio --model 8-bit`.
+By default Python runs `rune next`, checks the selection, and passes the work,
+spec references, and exact rune progress/completion commands to the model.
+The model implements that selection without retrieving work again.
 After the session returns, the runner re-reads the ledger. Newly completed
 tasks allow the loop to continue in a fresh session. The model marks its own
 tasks complete after validation; the runner never completes tasks for it.
 
-The default selection follows `next-task`: retrieve the next task, falling back
-to the whole phase when rune returns a top-level task ID. For small model
-contexts, keep task groups and phases modest. To request phases explicitly or
-change the model and limits:
+The default is one rune task and its descendants. It does not expand a
+top-level task into a whole phase. For small model contexts, keep task groups
+modest. Request phases explicitly or change the model and limits:
 
 ```sh
-make local-next-task TASKS=/path/to/project/specs/feature/tasks.md \
-  ARGS="--phase --model 8-bit --max-iterations 10 --timeout 1800"
+local-next-task /path/to/project/specs/feature/tasks.md \
+  --phase --model 8-bit --max-iterations 10 --timeout 1800
 ```
+
+To compare the original skill-driven retrieval with a more capable model:
+
+```sh
+local-next-task /path/to/project/specs/feature/tasks.md \
+  --model your-model-id --selection model
+```
+
+`--selection runner` is the default. `--selection model` invokes the existing
+`next-task` and rune skills and preserves their top-level-task phase fallback.
+Python still preflights the selection for STOP gates and blockers; the model
+must retrieve the same selection and halt if it differs. Both modes retain
+ledger-based progress checks and fresh sessions. Model names do not select a
+mode automatically: LM Studio aliases do not reliably indicate capability.
+With Make, pass switches inside `ARGS="..."`.
+
+This design applies the distinction between predictable workflows and dynamic
+model decisions described in [Building effective agents](https://www.anthropic.com/research/building-effective-agents).
+Task scheduling is predictable here; code owns it, while the model owns
+implementation. The single-task default and persisted progress also follow
+the incremental-session pattern in [Effective harnesses for long-running agents](https://www.anthropic.com/research/effective-harnesses-for-long-running-agents).
+These sources support the pattern; neither benchmarks this runner or proves
+that a particular model benefits from switching modes.
 
 Defaults are 20 iterations and 1800 seconds per session. `--model` accepts the
 exact ID reported by LM Studio, including aliases such as `8-bit`.

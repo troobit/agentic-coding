@@ -761,7 +761,7 @@ class CanonicalServersFileTests(unittest.TestCase):
         defs = agentic_lib.load_servers(REPO_ROOT / "mcp" / "servers.json")
         self.assertEqual(
             sorted(defs),
-            ["azure", "devtools", "github",
+            ["azure", "devtools", "github", "rea",
              "svelte", "terraform", "transit"])
         for name, spec in defs.items():
             transport = spec["transport"]

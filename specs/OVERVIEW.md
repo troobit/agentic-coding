@@ -10,8 +10,11 @@
 | [Nextup Pure Router](#nextup-pure-router) | 2026-07-25 | Done | Strips /nextup to a pure router and removes machine-zone status tracking from the toolchain; specs, task lists, and agent notes are the sources of truth. Supersedes the machine-zone portions of Nextup Starwave Refinement. |
 | [Spec Janitor](#spec-janitor) | 2026-07-26 | Done | Audit-and-repair toolchain for diluted specs directories: a stdlib mechanical auditor, a /spec-janitor skill with disposition-tiered repair authority, a normative conventions reference, and prevention guardrails across authoring skills |
 | [Backlog Skill](#backlog-skill) | 2026-08-26 | Done | A /backlog skill replacing the sunset nextup and spout skills: captures loose intent into a tracked rune-parseable specs/BACKLOG.md, routes items to spec tasks, requirement amendments, or the backlog, and clears consumed sources; includes the full toolchain sunset and a per-repo decision overwrite mode |
-| [UI/UX Corpus](#uiux-corpus) | 2026-09-16 | Done | A durable library and corpus of UI/UX preferences built from in-app spadre review comments: verbatim observations indexed by UI concern (never by document), a derived `ui-ux/ui-ux-guide.md` peer to `arjen-style-guide.md` where every principle cites its evidence, and an idempotent ingest that reuses the existing variant-comment reader |
+| [Review HTML Tests Diagram](#review-html-tests-diagram) | 2026-09-05 | Done | Adds structured test results and a file-dependency diagram to the reusable HTML review pages |
+| [UI/UX Corpus](#uiux-corpus) | 2026-09-16 | In Progress | A durable library and corpus of UI/UX preferences built from in-app spadre review comments: verbatim observations indexed by UI concern (never by document), a derived `ui-ux/ui-ux-guide.md` peer to `arjen-style-guide.md` where every principle cites its evidence, and an idempotent ingest that reuses the existing variant-comment reader |
 | [Codex Sync](#codex-sync) | 2026-10-23 | Done | Separate Codex skill/instruction/MCP sync, native discovery validation, disabled unavailable services, and retirement of Awesome Copilot |
+| [Local Next Task](#local-next-task) | 2026-10-24 | Done | Runs a local LM Studio model iteratively against an explicit rune task file in fresh sessions |
+| [REA Feature Discovery](#rea-feature-discovery) | 2026-10-26 | Done | Studies selected features in existing apps through REA and plans their adoption in destination repositories through Starwave |
 
 ---
 
@@ -84,6 +87,17 @@ A /backlog skill replacing the sunset nextup and spout skills: captures loose in
 - [rollout.md](backlog-skill/rollout.md)
 - [tasks.md](backlog-skill/tasks.md)
 
+## Review HTML Tests Diagram
+
+Adds structured test results and a file-dependency diagram to the reusable HTML
+review pages, with ecosystem-specific collection delegated to the review skills.
+
+- [decision_log.md](review-html-tests-diagram/decision_log.md)
+- [design.md](review-html-tests-diagram/design.md)
+- [implementation.md](review-html-tests-diagram/implementation.md)
+- [requirements.md](review-html-tests-diagram/requirements.md)
+- [tasks.md](review-html-tests-diagram/tasks.md)
+
 ## UI/UX Corpus
 
 A durable library and corpus of UI/UX preferences built from the comments Ronan leaves inside spadre while reviewing the UI variants. Verbatim observations are indexed by UI concern rather than by the document they were anchored to; `ui-ux/ui-ux-guide.md` is the derived, human-written peer of `arjen-style-guide.md`, and every principle in it cites the observation it rests on. Ingestion is idempotent on spadre's stable comment ids, separates real review from seeded demo notes by an epoch rather than an author list, and never guesses a concern, a sentiment or a rationale.
@@ -102,3 +116,26 @@ Copilot cleanup. Documents Starwave invocation and preserves other clients' sync
 - [design.md](codex-sync/design.md)
 - [requirements.md](codex-sync/requirements.md)
 - [tasks.md](codex-sync/tasks.md)
+
+## Local Next Task
+
+Runs a local LM Studio model iteratively against an explicit rune task file,
+following the existing next-task workflow while keeping model sessions small.
+
+- [decision_log.md](local-next-task/decision_log.md)
+- [design.md](local-next-task/design.md)
+- [requirements.md](local-next-task/requirements.md)
+- [tasks.md](local-next-task/tasks.md)
+
+## REA Feature Discovery
+
+Studies a selected capability in an existing application through REA and turns
+the findings into a Starwave specification in the destination application's repo.
+
+- [decision_log.md](rea-feature-discovery/decision_log.md)
+- [design.md](rea-feature-discovery/design.md)
+- [requirements.md](rea-feature-discovery/requirements.md)
+- [research.md](rea-feature-discovery/research.md)
+- [review-requirements.md](rea-feature-discovery/review-requirements.md)
+- [tasks.md](rea-feature-discovery/tasks.md)
+- [verification.md](rea-feature-discovery/verification.md)

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **REA feature discovery** (`rea-feature-discovery`): a reusable skill that investigates selected features in existing apps, preserves evidence in the destination repository, and continues its Starwave planning. Includes setup/recovery and handoff references, Codex UI metadata, specifications, and verification across accessible artifacts, installed-only apps, and expired evidence sessions.
+- **Pinned local REA MCP integration**: `rea-agents@6.7.0` is available through the existing canonical client configuration and skill distribution, with native discovery and repeated-sync verification.
+- **Installable local task runner**: `make install-local-next-task` exposes `local-next-task` on shell PATH through an idempotent symlink installer that preserves foreign files and links.
 - Independent Codex setup through `scripts/sync-codex.sh` and `make sync-codex`: links valid repo skills into `~/.agents/skills` and generates Codex instructions/MCP settings without configuring other clients. `make test-codex` verifies native skill discovery through the Codex app server.
 - **UI/UX corpus** (`ui-ux/`, `specs/ui-ux-corpus/`): A durable library and corpus of UI/UX preferences, built from the comments Ronan leaves *inside spadre* while reviewing the UI variants. `ui-ux/ui-ux-guide.md` is the UI/UX peer of `arjen-style-guide.md` — a cross-repository authority covering spadre, rtob and anything after. Two layers with different authorship: `ui-ux/observations/` holds one machine-written file per source comment carrying the body verbatim, and the guide holds human-written principles that each cite the observations they rest on. Indexed by **UI concern** from the closed vocabulary in `ui-ux/concerns.md`, never by document — a comment about a caret handle habitually sits on whatever heading the cursor was near, so the document id, version, line range and quoted anchor are recorded as provenance and never as an index
   - **`scripts/ui_corpus_ingest.py`**: stdlib ingest, idempotent by spadre's own stable comment ids — a re-run over unchanged threads writes nothing and leaves a clean tree. Ownership of every field is explicit, so `concerns`, `sentiment`, `status`, `principles` and everything below the `<!-- triage -->` marker survive re-ingestion, including when the upstream comment was edited. Ingestion records and never guesses: a new observation lands `concerns: []`, `sentiment: "unclear"`, `status: "untriaged"` with no invented rationale
@@ -40,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Specs overview update**: `specs/OVERVIEW.md` with backlog-skill spec entry and status tracking
 
 ### Changed
+- The local task runner now executes runner-selected work directly by default, with explicit `--phase` and `--selection model` options. Worker prompts include bounded selections and rune status commands; regression tests cover selection modes, installation, and paths containing spaces.
 - Claude sync no longer configures Codex; `make sync` and bootstrap run both scripts. Codex generation honors `CODEX_HOME`, keeps GitHub/Terraform/Transit disabled, and documents exact Starwave invocation through `/skills` or `$starwave:…`.
 - **.gitignore**: Added `.worktrees/*` for git worktree isolation pattern used by parallel execution skills; removed the now-dead `/nextup.md` and `/SPOUT.md` entries and their comments — the tooling that managed them is gone
 - **`scripts/align.py`**: deleted the nextup-template convergence step (`_converge_nextup_template`, `NEXTUP_EXAMPLE`, `NEXTUP_LM_MARKER`, the `.gitignore`-append helper, and the seed-root existence check for the canonical template) in the same change as deleting the canonical `nextup.example.md`, so align never runs against a seed root missing a file it requires; remaining pipeline steps renumbered
@@ -49,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tests/test_process_status.py`**, **`tests/test_align.py`**: dropped the now-dead `nextup`/`example` fixture kwargs and the `nextup_text()` helper; genericized the stray-unmanaged-file regression test to no longer name the retired template
 
 ### Fixed
+- Reject blank and directory task paths before repository discovery, retain Python 3.9 annotation compatibility, and restore the missing generated Copilot instructions so the repository's generated-file lint can complete.
 - Codex MCP updates preserve unrelated TOML tables following managed servers. Sync excludes non-skill containers, preserves user skills, prunes owned dangling links, and removes the broken legacy skills link and its backup so bundled skills can install.
 
 ### Removed

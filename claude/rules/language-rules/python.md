@@ -21,6 +21,16 @@ paths: **/*.py
   config directories were written should set `PYTHONDONTWRITEBYTECODE=1` for
   those subprocesses so interpreter caches do not look like client writes.
 
+## Filesystem paths
+
+- Validate raw CLI path strings before constructing `Path` objects: `Path("")`
+  becomes the current directory, so `resolve(strict=True)` accepts it. Preserve
+  the raw argparse string long enough to reject blank input, then check
+  `is_file()` before looking up a file's repository or parent directory.
+- When a Python CLI is installed as a symlink, use `Path(__file__).resolve()`
+  to locate resources beside its source. Resolve user-supplied relative paths
+  against the caller's working directory instead.
+
 ## Dataclasses
 
 - Do not combine `@dataclass(frozen=True, slots=True)`. The `slots=True` path

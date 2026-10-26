@@ -5,6 +5,7 @@
 #           copilot/instructions/copilot-instructions.md, codex/AGENTS.md)
 #           and MCP configs
 # sync      sync Claude/VS Code links plus Codex skills, instructions, and MCP
+# install-local-next-task  link the local task runner into ~/.local/bin
 # align     align this repository's own agent configs
 # status    read-only process-status report over participating repos
 #           (this repo plus the checked-in default list; pass explicit
@@ -13,7 +14,9 @@
 # lint      shellcheck all shell scripts + fail if generated files drift
 #           from their sources in shared/ and mcp/
 
-.PHONY: bootstrap generate sync sync-claude sync-codex align status local-next-task test test-local-next-task test-codex lint lint-shell lint-drift
+.PHONY: bootstrap generate sync sync-claude sync-codex align status local-next-task install-local-next-task test test-local-next-task test-codex lint lint-shell lint-drift
+
+BIN_DIR ?= $(HOME)/.local/bin
 
 bootstrap:
 	scripts/bootstrap.sh
@@ -39,7 +42,12 @@ status:
 
 # TASKS is an explicit path, including when the target is in another repo.
 local-next-task:
+	@test -n "$(strip $(TASKS))" || { \
+		echo 'Usage: make local-next-task TASKS=path/to/tasks.md [ARGS="--dry-run"]' >&2; exit 2; }
 	python3 scripts/local_next_task.py "$(TASKS)" $(ARGS)
+
+install-local-next-task:
+	bash scripts/install-local-next-task.sh "$(BIN_DIR)"
 
 test:
 	python3 -m unittest discover -s tests
