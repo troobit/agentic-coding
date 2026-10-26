@@ -183,13 +183,20 @@ python3 process_status.py [repo ...]   # or: make status [REPOS="path1 path2"]
 
 ### local_next_task.py
 
-Runs the existing `next-task` skill repeatedly through Codex CLI and LM Studio's
-local `8-bit` model, using a fresh session for each selected task group.
+Selects tasks with rune and runs them through Codex CLI and LM Studio's local
+`8-bit` model, using a fresh session for each task. `--phase` selects a whole
+phase; `--selection model` retains the original next-task skill retrieval.
 
 ```bash
-make local-next-task TASKS=/absolute/path/to/repo/specs/feature/tasks.md ARGS="--dry-run"
-make local-next-task TASKS=/absolute/path/to/repo/specs/feature/tasks.md
+make install-local-next-task
+local-next-task /absolute/path/to/repo/specs/feature/tasks.md --dry-run
+local-next-task /absolute/path/to/repo/specs/feature/tasks.md
 ```
+
+`install-local-next-task.sh` creates the shell command as an executable symlink
+in `~/.local/bin` (override with Make's `BIN_DIR`). It preserves foreign targets
+and can be rerun. Keep this checkout in place. The Make wrapper also works:
+`make local-next-task TASKS=/path/to/tasks.md ARGS="--dry-run"`.
 
 See [the local runner runbook](../docs/runbooks/local-next-task.md) for model
 selection, limits, logs, and resuming after a halt. Run its tests with

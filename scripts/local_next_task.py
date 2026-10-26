@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Run next-task repeatedly through Codex's local LM Studio provider."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
@@ -61,11 +63,11 @@ def selected_tasks(selection):
     return list(visit(tasks))
 
 
-def select_work(root, tasks, phase, states):
+def select_work(root, tasks, phase, states, selection_source):
     selection = rune_json(root, tasks, "next", *(["--phase"] if phase else []))
     task = selection.get("next_task")
-    # Match next-task's fallback for a top-level task rather than a subtask.
-    if task and "." not in task["id"] and not phase:
+    # Only skill-driven retrieval widens a top-level task into a phase.
+    if selection_source == "model" and task and "." not in task["id"] and not phase:
         selection = rune_json(root, tasks, "next", "--phase")
     selected = selected_tasks(selection)
     if not selected:
@@ -87,11 +89,32 @@ def select_work(root, tasks, phase, states):
     return selection
 
 
-def make_prompt(tasks, selection):
-    return f"""Use the $next-task skill for this explicit tasks file: {json.dumps(str(tasks))}.
+def make_prompt(tasks, selection, selection_source):
+    quoted_tasks = shlex.quote(str(tasks))
+    if selection_source == "model":
+        phase_flag = " --phase" if selection.get("tasks") else ""
+        retrieval = f"""Use the $next-task skill for this explicit tasks file: {json.dumps(str(tasks))}.
 Read these skill manifests before implementation:
 - {SKILLS / 'next-task' / 'SKILL.md'}
 - {SKILLS / 'rune' / 'SKILL.md'}
+
+Retrieve the same work shown below with:
+rune next {quoted_tasks}{phase_flag} --format json
+If the result differs from the runner's selection, halt for review.
+Do not advance beyond that selection.
+"""
+    else:
+        retrieval = """Implement the work already selected by the runner below.
+Do not retrieve or select work again; execute this selection directly.
+"""
+    commands = "\n".join(
+        f"- Start: rune progress {quoted_tasks} {shlex.quote(task['id'])}\n"
+        f"  After validation: rune complete {quoted_tasks} {shlex.quote(task['id'])}"
+        for task in selected_tasks(selection)
+        if task.get("status", "").lower() != "completed"
+    )
+    return f"""{retrieval}
+Explicit tasks file: {json.dumps(str(tasks))}
 
 This is a headless local-model iteration. The external runner will start a fresh
 session for the next group. Execute the selected work sequentially in this
@@ -100,8 +123,13 @@ relevant docs/agent-notes, and project instructions before editing. Resolve spec
 references from the repository root, or relative to the task file when needed.
 Use the explicit absolute tasks path in every rune command.
 
-The runner selected this work using rune (do not advance beyond this selection):
+Selected work (rune JSON):
+<selected-work>
 {json.dumps(selection, indent=2)}
+</selected-work>
+
+Rune commands for the selected work (complete subtasks before their parents):
+{commands}
 
 Implement only this selection and its subtasks, validate using the project's
 Makefile when present, and mark work complete with rune only after validation.
@@ -171,8 +199,8 @@ def execute(args, root, tasks):
         if all(status == 2 for status in before.values()):
             print(f"All tasks complete: {tasks}")
             return 0
-        selection = select_work(root, tasks, args.phase, before)
-        prompt = make_prompt(tasks, selection)
+        selection = select_work(root, tasks, args.phase, before, args.selection)
+        prompt = make_prompt(tasks, selection, args.selection)
         if args.dry_run:
             command = codex_command(root, args.model, Path("<iteration-dir>/final.txt"))
             print(shlex.join(command))
@@ -218,27 +246,36 @@ def positive_int(value):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("tasks", type=Path, help="Explicit path to a rune tasks.md file")
+    parser.add_argument("tasks", help="Explicit path to a rune tasks.md file")
     parser.add_argument("--model", default="8-bit", help="Exact LM Studio model ID (default: 8-bit)")
+    parser.add_argument(
+        "--selection", choices=("runner", "model"), default="runner",
+        help="Who retrieves work: runner (default) or model via the next-task skill",
+    )
     parser.add_argument("--phase", action="store_true", help="Select an entire phase per iteration")
     parser.add_argument("--max-iterations", type=positive_int, default=20)
     parser.add_argument("--timeout", type=positive_int, default=1800, help="Seconds per session (default: 1800)")
     parser.add_argument("--dry-run", action="store_true", help="Print the next invocation without calling the model or writing files")
     args = parser.parse_args(argv)
     try:
+        if not args.tasks.strip():
+            raise Halt("Provide a tasks file: local-next-task path/to/tasks.md (make: TASKS=path/to/tasks.md)")
+        tasks = Path(args.tasks).expanduser().resolve(strict=True)
+        tasks = Path(tasks).resolve()
+        if not tasks.is_file():
+            raise Halt(f"Expected a tasks file, not a directory: {tasks}")
         for name in ("git", "rune", "codex"):
             if not shutil.which(name):
                 raise Halt(f"Required command not found: {name}")
-        for name in ("next-task", "rune"):
+        for name in (("next-task", "rune") if args.selection == "model" else ()):
             if not (SKILLS / name / "SKILL.md").is_file():
                 raise Halt(f"Required skill not found: {SKILLS / name / 'SKILL.md'}")
-        tasks = args.tasks.expanduser().resolve(strict=True)
         result = subprocess.run(
             ["git", "-C", str(tasks.parent), "rev-parse", "--show-toplevel"],
             capture_output=True, text=True, timeout=30,
         )
         if result.returncode:
-            raise Halt("The tasks file must be inside a Git working tree")
+            raise Halt(f"Tasks file {tasks} must be inside a Git working tree: {result.stderr.strip()}")
         root = Path(result.stdout.strip()).resolve()
         tasks.relative_to(root)
         return execute(args, root, tasks)

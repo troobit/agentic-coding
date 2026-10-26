@@ -3,5 +3,6 @@
     "devtools"
   ],
   "cloud_assets": false,
-  "transit_project": "agentic-coding"
+  "transit_project": "agentic-coding",
+  "decision_mode": "overwrite"
 }

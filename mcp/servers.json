@@ -11,6 +11,16 @@
     "surfaces": ["claude", "vscode", "cloud", "codex"],
     "default_for": ["*"]
   },
+  "rea": {
+    "transport": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "rea-agents@6.7.0", "mcp"]
+    },
+    "secrets": {},
+    "surfaces": ["claude", "vscode", "codex"],
+    "default_for": []
+  },
   "svelte": {
     "transport": {
       "type": "stdio",

@@ -28,6 +28,11 @@ paths: **/*.svelte, **/*.svelte.ts, **/*.svelte.js
 - Never export non-handler helpers from `+server.ts` / `+page.ts` files — the
   postbuild analysis rejects them and `pnpm build` fails (plain `check` does
   not catch it). Put shared helpers in `$lib`.
+- A same-path `invalidateAll()` (including `use:enhance`'s default `update()`)
+  re-runs load and hands new props to components that stay mounted. Values that
+  must not change mid-interaction (an active iframe, an idempotency attempt ID,
+  a lock after an uncertain write) should be copied once with
+  `untrack(() => prop)`, which also avoids the `state_referenced_locally` warning.
 - A prerendered page can host a form whose action lives on another route:
   `<form method="POST" action="/contact" use:enhance>`. Cross-route, `update()`
   does not set `page.form` (it still runs `invalidateAll` on success), so read
@@ -62,3 +67,12 @@ paths: **/*.svelte, **/*.svelte.ts, **/*.svelte.js
   renders — headless Chrome defaults to 800×600 and media-query-gated UI may
   simply be absent there. `Runtime.enable` replays the tab's console backlog;
   discard events for a settle period or stale errors look current.
+  `Page.navigate` to a URL that differs only by hash fires no
+  `Page.loadEventFired`; navigate via `about:blank` first.
+- To call `invalidateAll()` from such a harness in Vite dev with pnpm, import the
+  app's own `runtime/app/navigation.js?v=...` URL (find it in
+  `performance.getEntriesByType('resource')`). The plain `/node_modules/...` path
+  loads a second router copy.
+- To fake a third-party HTTP API in the dev server, preload a module with
+  `NODE_OPTIONS=--import /abs/fake.mjs` that wraps `globalThis.fetch` for that
+  host. This works when the SDK resolves global `fetch` per call (Square's does).

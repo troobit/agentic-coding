@@ -1,0 +1,4 @@
+interface:
+  display_name: "REA Feature Discovery"
+  short_description: "Investigate app features and plan with Starwave"
+  default_prompt: "Use $rea-feature-discovery to investigate a feature in an existing app and plan its adoption in my repository through Starwave."

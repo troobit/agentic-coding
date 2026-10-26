@@ -53,6 +53,7 @@ The framework includes Claude Code skills for the complete feature development w
 - **`backlog`** - Capture loose ideas, note files, and audit findings into a tracked, rune-parseable `specs/BACKLOG.md`, route each item to where the work belongs — an existing spec's tasks, an existing spec's requirements, or the backlog itself — and clear the sources once filed. Use it bare, with free-form text, or with a named file path; it never commits.
 
 **Utility Skills:**
+- **`rea-feature-discovery`** - Investigate a selected feature in an existing app with REA, preserve evidence in the destination repo, and continue its Starwave planning. In Codex: `$rea-feature-discovery Investigate <feature> in <source app> for <destination repo>`; in Claude Code: `/rea-feature-discovery`. REA uses the pinned local MCP definition in `mcp/servers.json`; run `make sync-codex` to register it for Codex.
 - **`catchup`** - Get up to speed on branch changes by analyzing commits and modified files (inspired by [Shrivu Shankar](https://blog.sshh.io/p/how-i-use-every-claude-code-feature))
 - **`commit`** - Format, stage, and commit changes with proper changelog management
 - **`release-prep`** - Prepare the project for a new release with quality checks and documentation updates
@@ -72,8 +73,11 @@ The recommended way to start a new feature is with `/starwave:creating-spec`, wh
 Then implement using `/next-task` and commit with `/commit`.
 
 For iterative execution with LM Studio's local `8-bit` model, run
-`make local-next-task TASKS=/path/to/project/specs/feature/tasks.md`.
-Each task group gets a fresh Codex session. See the
+`make install-local-next-task` once, then use
+`local-next-task /path/to/project/specs/feature/tasks.md` from any directory.
+The runner selects one task per fresh Codex session. Use `--phase` for a whole
+phase or `--selection model` for skill-driven retrieval. The Make wrapper is
+`make local-next-task TASKS=/path/to/tasks.md`. See the
 [local runner runbook](docs/runbooks/local-next-task.md) for previewing a run,
 limits, logs, and stop conditions.
 
