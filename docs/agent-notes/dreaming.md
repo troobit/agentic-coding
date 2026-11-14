@@ -70,3 +70,13 @@
   and marks entries that relay the user's own words. Most recent headless Claude
   sessions are tool-driven, which is why 2.9 defaults sources without an origin
   to non-interactive.
+
+## Design (approved 2026-11-14)
+
+- Program lives in its own repository, `../dreaming` (Python 3.12+, uv). This repo keeps `specs/dreaming/` and the `dream` skill; the skill reaches the program only through the `dream` command and `dream api`.
+- A SQLite `steps` table, not a rune ledger, drives each dream (rune renumbers positional IDs, drops `add --phase --blocked-by` dependencies and cannot share a transaction with results). A rune-format plan is rendered from it for reading only (Decision 9).
+- Raw model output is stored as soon as a call returns; resume applies stored output instead of calling again. Locking is a kernel `flock` held by the detached child.
+- Isolation facts checked 2026-11-14: Codex's prompt view still listed `spawn_agent` under every flag tried, an empty `CODEX_HOME` drops auth and hides sessions from apsis, `--bare` drops the Claude login (prefer `--safe-mode`). Devtools agent tools are removed through `ENABLE_ADDITIONAL_TOOLS`. First implementation task is a probe set.
+- Adoption merges by fast-forwarding the user checkout to the commit tested in a separate worktree. Instruction and skill changes need a with/without replay (9.16–9.17); changes that received fetched web or PR content never auto-apply (9.19, Decision 15); currency-review changes are branch-only (16, Decision 14).
+- Sources behind the design (Prior Art in design.md): the Mukta dreaming talk, arXiv:2606.29823 (adds little for personal sessions), and 2026 papers reporting that LLM consolidation can leave agents worse than no memory, turn hedges into facts and be order-sensitive. `min_sessions` and the before/after rate are not validated by any source.
+

@@ -68,6 +68,16 @@
 | Q63 | 2026-11-14 | A session's model is attributed per entry, falling back to the first recorded model (2.2) | apsis preserves per-entry model changes (Decision 29) |
 | Q64 | 2026-11-14 | Decision 6 accepted | Requirements 13 to 15 depend on it |
 | Q65 | 2026-11-14 | The orbit baseline is `origin/main` at 4bf9776; both parent specs are complete and accepted, and section 3 is unchanged | Main was reset to a squash of the merged PR |
+| Q66 | 2026-11-14 | The program, its instruction set, the `dream` skill and the spec live in one repository, developed on a branch named `dreaming`; a Python 3.12+ package installed with uv | User chose a new repository; follows screw's patterns and keeps the program usable without any other checkout (14.4) |
+| Q67 | 2026-11-14 | State, including the steps of a dream, lives in SQLite under `~/.dreaming/`; a rune-format plan is rendered from it for reading | One transactional store; rune renumbers positional IDs and cannot share a transaction with results |
+| Q68 | 2026-11-14 | The instruction set is read from the default branch of the instruction repository at run start | Working-tree edits must not change a run, and dreams adopt changes to it |
+| Q69 | 2026-11-14 | The report is produced in the exit path, not as a step; the report CSS and shell are vendored once with the source revision recorded | A failed or exhausted run still reports; the package must not depend on agentic-coding at runtime (14.4) |
+| Q70 | 2026-11-14 | Observations record `modality` (asserted, hedged, tentative); recall returns the redacted quote and modality with each evidence reference | A 2026 paper reports consolidation turns hedged remarks into confident facts |
+| Q71 | 2026-11-14 | Review input is sorted deterministically; a run may supersede or dismiss at most a configured fraction of active items per scope; item versions guard against overwriting a mid-run correction | Consolidation order changes outcomes; OpenClaw caps rewrite loss; the dreaming talk uses optimistic concurrency |
+| Q72 | 2026-11-14 | The author emits id-keyed edits citing a supporting and a counter case, not whole-file rewrites | ACE and AutoManual report fewer collapses and fewer hallucinated rules |
+| Q73 | 2026-11-14 | Embeddings, graph stores and bi-temporal validity are not adopted | Scoped SQLite suffices at one user's scale; revisions already carry supersession and a latest supporting date |
+| Q74 | 2026-11-14 | Currency-review changes stay on the dream branch and are never auto-applied | promoted to Decision 14 |
+| Q75 | 2026-11-14 | A forgotten session is excluded and its data kept; a purge operation is a non-goal | User choice; reversibility over erasure (Decision 13) |
 
 ---
 
@@ -85,7 +95,7 @@ Dreams change skills, rules, MCP configuration and tooling. Harnesses link to th
 Auto-apply is enabled in the user's configuration:
 - One branch per repository, one commit per change, generate commands run on the branch.
 - Every configured lint and test command runs once on the merge of the branch into the default branch, in a separate working copy. Any failure blocks auto-apply; there is no baseline run. A repository with no configured checks is proposal-only.
-- The merge is one commit in the user's checkout, only when it is on the default branch, has nothing in the way, and its HEAD has not moved since the checks. Deploy runs from that checkout.
+- The merge commit is created and tested in the separate working copy and brought into the user's checkout with `merge --ff-only`, only when it is on the default branch, has nothing in the way, and its HEAD has not moved since the checks. The user's checkout therefore receives exactly the tested commit, as one merge commit. Deploy runs from that checkout.
 - If deploy fails, revert and redeploy. Linked repositories are checked together and rolled back together.
 - No category of change is held for manual approval.
 
@@ -98,7 +108,7 @@ What goes live is what was tested, from the checkout harnesses use. One pass/fai
 - **Proposal only**: Rejected by the user as too much friction.
 - **Hold back risky categories**: Rejected by the user in favour of uniform treatment.
 - **Merge without deploy**: Rejected: harnesses would be out of step.
-- **Check the branch and fast-forward from a worktree**: Rejected: tests a different tree and deploying elsewhere repoints live links.
+- **Check the dream branch alone and fast-forward it**: Rejected: misses conflicts with newer commits on the default branch; deploying from a dream worktree also repoints live links.
 - **Protect checks from dream changes**: Rejected by the user.
 - **Exempt checks already failing on main**: Rejected: needs baseline machinery and cannot show a worse suite.
 
@@ -329,3 +339,243 @@ Counting tool-written prompts would teach dreaming the automation's phrasing as 
 - Prompts typed into a headless run are not counted.
 - The user's words arrive via a tool only if it marks them (Q53).
 - The origin mapping needs updating as harnesses add entry points.
+
+---
+
+## Decision 9: A Thin Runner Executes Each Dream from a SQLite Step Table
+
+**Date**: 2026-11-14
+**Status**: accepted
+
+### Context
+
+Dreams must lock, resume, enforce token budgets, isolate each role and fall back between Claude Code, Codex and LM Studio (Decisions 2, 5). The user wants the custom program kept small, rune used where it fits, and the editable instruction set to carry the behaviour. screw is the consumer of dreaming and its gateway is tool-free and incomplete; hosted `orbit run` loads user configuration and `orbit local` drives only Codex on LM Studio. Review found that a rune ledger cannot share a transaction with step results, renumbers positional task IDs when an earlier phase gains a task, and drops `--blocked-by` on `rune add --phase`.
+
+### Decision
+
+A small Python runner (`dream`) keeps every step of a dream in a SQLite `steps` table with stable keys and dependencies; a step's follow-up steps commit in the same transaction as its result. Calls go directly to `claude`, `codex` or LM Studio, and sessions are read through apsis. A rune-format plan is rendered from the table for reading and never read back. The run record, lock and exit codes follow screw's conventions without importing screw.
+
+### Rationale
+
+One transactional store makes resume exact and removes the double-run and renumbering problems. Direct calls are the only way to enforce per-role isolation and token accounting. Rune stays useful as the readable plan format without being the execution state, which also keeps internal execution state out of rune files. Not importing screw keeps dreaming startable before screw is finished and avoids depending on its own consumer.
+
+### Alternatives Considered
+
+- **Rune ledger drives execution**: Reuses ordering and resume - Rejected: two stores to keep consistent, positional IDs, and dropped dependencies.
+- **Dream as a screw job**: Inherits lock, limits and profile chain - Rejected: screw's gateway is tool-free and unfinished, and dreaming would depend on its consumer.
+- **Orbit executes the steps**: Reuses retry and usage-limit handling - Rejected: hosted orbit loads user instructions and cannot enforce per-role isolation or a token budget.
+
+### Consequences
+
+**Positive:**
+- Little orchestration code; resume re-applies stored output instead of calling a model again.
+- Backends and roles change through configuration.
+
+**Negative:**
+- The runner owns step ordering that rune could have provided.
+- screw conventions are copied, so they can drift.
+
+---
+
+## Decision 10: Follow Current Practice Across Implementations; Reuse OpenClaw's Concepts, Not Its Code
+
+**Date**: 2026-11-14
+**Status**: accepted
+
+### Context
+
+Requirement 12.2 asks whether OpenClaw's dreaming code can be reused. At `9bf3e79c` (MIT) it is the `memory-core` plugin in TypeScript, bound to OpenClaw's gateway scheduler, SQLite plugin state and `MEMORY.md`. The user also wants the design to follow what makes sense across modern implementations and the literature, not one product. Anthropic's dreaming talk, Letta, Codex memories, Cognee and Mem0 share a shape (out-of-band batch consolidation, staged or reviewable output, provenance), and 2026 papers report that LLM consolidation can degrade memory, turn hedges into facts and be order-sensitive.
+
+### Decision
+
+Re-implement the converging concepts in Python (staged reflection before promotion, recurrence gates, a taint gate on untrusted provenance, operations instead of prose, reviewable and append-only revisions, provenance on every item) and apply the literature's mitigations (raw evidence stays primary, modality is recorded, review order is deterministic, a revision cap, delta edits for instruction changes). No OpenClaw or other product source is copied or vendored. The design's Prior Art section records sources and what each changed.
+
+### Rationale
+
+Reusing OpenClaw's code would carry the gateway and a second runtime for a storage and trigger model dreaming does not share. The concepts map onto requirements 4.5, 11.3 and 13, and the mitigations address reported failure modes at little cost.
+
+### Alternatives Considered
+
+- **Vendor memory-core modules**: Reuses working gates - Rejected: needs a Node runtime and rewriting its storage layer.
+- **Run OpenClaw alongside and read its output**: No code in this repo - Rejected: a second always-on system that reads a different session corpus.
+- **Adopt a memory framework (Mem0, Graphiti, Letta)**: Reuses extraction and retrieval - Rejected: vector or graph stores and server processes for a single user's scale, and Mem0 itself dropped LLM reconcile as lossy.
+
+### Consequences
+
+**Positive:**
+- One runtime; no licence attribution duty; the design owns its data model.
+- Known failure modes of LLM consolidation are designed against.
+
+**Negative:**
+- The gates and mitigations are re-implemented and tested here.
+- Upstream improvements need manual review to benefit from.
+- Sources are 2026 preprints and product documentation, some unreviewed; findings are treated as direction, not proof (see Risks and Assumptions).
+
+---
+
+## Decision 11: Versioned Installs Keep a Run on Its Starting Version
+
+**Date**: 2026-11-14
+**Status**: accepted
+
+### Context
+
+Requirement 7.3 requires a run, including a resumed part, to finish on the program version it started with, while adoption may deploy new dreaming code mid-run.
+
+### Decision
+
+Each deploy installs into `~/.dreaming/versions/<revision>/` and repoints `current`. The launcher uses `current` for new runs and the recorded revision for resumes. A version is removed only when no unfinished run records it.
+
+### Rationale
+
+A running process is unaffected by a new install, but a resume would load whatever is installed; selecting the interpreter by recorded revision makes the guarantee hold for both.
+
+### Alternatives Considered
+
+- **Editable install from the checkout**: Simplest - Rejected: adoption changes code under a running or resumed run.
+- **Refuse to resume on version mismatch**: Simple - Rejected: strands interrupted runs and defeats 1.6 resume.
+
+### Consequences
+
+**Positive:**
+- Resume behaves the same regardless of intervening deploys.
+
+**Negative:**
+- Disk use per version and a launcher to maintain.
+- Migrations are additive and run only when no unfinished run exists, so a newer command can refuse (`migration_blocked`) until an interrupted run is resumed or discarded.
+
+---
+
+## Decision 12: Instruction Changes Must Pass a Session Replay Before Auto-Apply
+
+**Date**: 2026-11-14
+**Status**: accepted
+
+### Context
+
+Decision 1 auto-applies changes when lint and test pass on the merged result. For skills, rules, lenses and role prompts these checks do not show behaviour improved. Research on self-modifying agents (Darwin Gödel Machine, GEPA) validates changes against evaluations, and a 2026 paper reports LLM-consolidated memory can leave agents worse than none.
+
+### Decision
+
+A change to a skill, rule, lens or role prompt that cites session observations is run once per authoring, with and without the change, on up to a configured number of past sessions showing its pattern; a session counts only if the problem recurs without the change, and an unclear judgement counts as recurrence. Lens and role-prompt changes re-run the role on stored inputs instead. If the problem recurs with the change in more than a configured share, too few sessions are replayable, or the budget cannot cover it, the change is held and its whole repository branch stays unmerged (9.16, 9.17). Replay counts against the run budget and is reported as association.
+
+### Rationale
+
+Auto-apply was accepted on the basis that checks gate what goes live; for instructions the checks are blind to the thing that matters. A replay is the cheapest available behavioural test using material the store already holds.
+
+### Alternatives Considered
+
+- **Single replay run with the change only**: Cheaper - Rejected: a change that does nothing passes.
+- **Report the replay but do not gate**: Cheaper to trust - Rejected by the user: a failed replay would not stop a change.
+- **Replay every change, including code**: Safest - Rejected: code changes have no recorded prompt to replay and would be blocked.
+- **Turn auto-apply off for instruction repositories**: Simple - Rejected: removes the low-friction path Decision 1 chose.
+
+### Consequences
+
+**Positive:**
+- Instruction changes face a behavioural check before going live.
+
+**Negative:**
+- Replay roughly doubles cost, and an LLM judgement of recurrence is not proof.
+- One held change keeps the whole repository branch unmerged, because the merge is one commit.
+- Patterns with few sessions cannot be replayed, so their changes wait on the branch.
+
+---
+
+## Decision 13: Forgetting a Session Excludes It and Keeps Its Data
+
+**Date**: 2026-11-14
+**Status**: accepted
+
+### Context
+
+OpenClaw (`memory forget`) and Codex (per-chat controls) let a user remove a session from consolidation. Dreaming's store keeps redacted evidence and per-session counts after transcripts disappear (6.6, 13.7), and dismissal acts on knowledge items or individual evidence only.
+
+### Decision
+
+Forgetting marks a session excluded: it is not selected, re-read or registered again, its observations stop counting as support or ranking signal, knowledge it supported is marked pending reassessment, and it is omitted from retrieval evidence and listed in the report. Its stored data remains, and restoring the session reverses the exclusion (2.11).
+
+### Rationale
+
+The user chose an easily reversible exclusion over deletion. Reassessment keeps dependent knowledge visible as doubtful without removing it silently.
+
+### Alternatives Considered
+
+- **Delete the data and keep a tombstone**: Removes private quotes - Rejected by the user in favour of reversibility.
+- **Delete and dismiss knowledge supported only by that session**: Strongest - Rejected: a single forgotten session could silently remove knowledge the user still wants.
+
+### Consequences
+
+**Positive:**
+- Reversible; no accidental loss of evidence or knowledge.
+
+**Negative:**
+- Quotes from a forgotten session stay in the private store, so this does not erase them; deleting stored data is a non-goal, and the user must edit or delete the store to erase it.
+
+---
+
+## Decision 14: Currency Review Is a Branch-Only, Source-Cited Dream
+
+**Date**: 2026-11-14
+**Status**: accepted
+
+### Context
+
+Skills, rules and agentic processes go stale as practice changes, and nothing in recorded sessions shows it. The user wants periodic review against current literature and implementations. A currency finding has no session behind it, so the session threshold (4.5), pattern identifiers (6.5) and the replay gate (Decision 12) do not apply, and fetched web content is untrusted input to instruction changes.
+
+### Decision
+
+A currency-review dream starts only on explicit request (including from a tool, Decision 7), reads no sessions, and searches configured targets within the run budget and a source limit. A candidate needs a configured number of independent sources and verification that each cited claim supports it; fetched content is data, never instructions. Resulting changes are committed to the dream branch with citations and never auto-applied; other findings are retained as currency notes. Each finding has a persistent identifier per target and claim so a rejected finding is not proposed again unless a source changed (16).
+
+### Rationale
+
+Without recorded sessions there is nothing to replay and no user evidence, so a human merge is the only available check. Requiring independent sources, verbatim verification of relied-on passages and delimited data fields limits a single page from steering instructions.
+
+### Alternatives Considered
+
+- **Auto-apply when lint and tests pass**: Same path as other changes - Rejected: fetched content would steer instructions without a human check.
+- **Learning recommendations only**: Never touches a repository - Rejected: leaves every update manual even when a source is clear.
+- **A single source suffices**: Cheaper - Rejected: a single fetched page could steer instructions.
+
+### Consequences
+
+**Positive:**
+- Instructions can be refreshed against current practice without weakening the replay gate.
+
+**Negative:**
+- Every currency change needs the user to merge it.
+- The independent-source threshold and web search quality limit what is found.
+
+---
+
+## Decision 15: Changes That Received Fetched Web or PR Content Stay on the Branch
+
+**Date**: 2026-11-14
+**Status**: accepted
+
+### Context
+
+Researchers can fetch web pages and read pull-request review threads (4.6), and the author sees what they return. The replay gate (Decision 12) checks whether a problem recurs, not what a change added, and changes citing only file findings skip replay. Fetched text from third parties could therefore steer an instruction change that auto-applies.
+
+### Decision
+
+A change whose research or authoring received fetched web or pull-request content is never auto-applied; it is committed to the branch and reported with its sources, as currency changes are (9.19). Changes based only on sessions and local files still auto-apply after their checks and, where applicable, replay.
+
+### Rationale
+
+Third-party text is the one input an attacker can write without access to the user's machine, so a human merge is the proportionate check.
+
+### Alternatives Considered
+
+- **Web research only in currency dreams**: Narrows the input surface - Rejected: PR threads remain third-party text and requirement 4.6 would narrow.
+- **Allow auto-apply after replay**: Lowest friction - Rejected: replay cannot see injected text.
+
+### Consequences
+
+**Positive:**
+- No third-party text reaches an auto-applied change.
+
+**Negative:**
+- Changes that used web research wait for the user's merge.
+- A single such change keeps its repository branch unmerged (9.17).
+
