@@ -41,3 +41,31 @@ paths: **/*.py
   via uv, August 2026). `frozen=True` alone already rejects every attribute
   assignment with a clean `FrozenInstanceError`; use it without `slots` unless
   the memory saving is measured to matter.
+
+## sqlite3
+
+- For atomic multi-statement work (schema migrations), open the connection with
+  `sqlite3.connect(path, autocommit=True)` (3.12+) and issue `BEGIN IMMEDIATE`,
+  `COMMIT` and `ROLLBACK` yourself. In the default legacy mode,
+  `executescript()` first commits any open transaction and then runs each
+  statement in its own transaction. A script that fails halfway therefore
+  leaves its earlier statements and the caller's prior writes committed.
+  Verified on CPython 3.12, November 2026.
+
+## Subprocesses
+
+- `python -m pkg.module` puts the current working directory first on
+  `sys.path`. A launcher or detached worker started that way from inside a
+  checkout's `src/` imports the checkout instead of the installed package. Pass
+  `-I` (no cwd, no `PYTHON*` variables, no user site) when the installed version
+  must be the one that runs; site-packages, including editable `.pth` installs,
+  still load.
+- `os.kill(pid, 0)` succeeds for a zombie. A test that kills a child it spawned
+  through `subprocess.Popen` must `wait()` on it before checking whether the pid
+  is gone, or any "leader still alive" logic sees the zombie.
+
+## Tooling
+
+- `ruff format .` also formats ```` ```python ```` blocks inside Markdown files
+  (ruff 0.17). It will rewrite code sketches in specs and design documents.
+  Add those folders to `extend-exclude` under `[tool.ruff]`.
